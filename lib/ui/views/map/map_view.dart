@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:stacked/stacked.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import 'map_viewmodel.dart';
+
+class MapView extends StackedView<MapViewModel> {
+  const MapView({super.key});
+
+  @override
+  Widget builder(
+    BuildContext context,
+    MapViewModel viewModel,
+    Widget? child,
+  ) {
+    return Scaffold(
+      body: viewModel.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: viewModel.currentPosition ??
+                        const LatLng(-34.6037, -58.3816),
+                    zoom: 15,
+                  ),
+                  onMapCreated: viewModel.onMapCreated,
+                  onCameraIdle: viewModel.onCameraIdle,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                ),
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 24.0),
+                    child: Icon(
+                      Icons.location_on,
+                      color: Colors.red,
+                      size: 40,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(10),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Ubicación seleccionada',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          viewModel.currentAddress != null
+                              ? '${viewModel.currentAddress!.street}, ${viewModel.currentAddress!.locality}'
+                              : 'Buscando dirección...',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          onPressed: viewModel.isBusy
+                              ? null
+                              : viewModel.confirmLocation,
+                          child: viewModel.isBusy
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
+                                  ),
+                                )
+                              : Text('Confirmar Ubicación',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      )),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  @override
+  void onViewModelReady(MapViewModel viewModel) {
+    viewModel.initialize();
+  }
+
+  @override
+  MapViewModel viewModelBuilder(
+    BuildContext context,
+  ) =>
+      MapViewModel();
+}

@@ -1,0 +1,103 @@
+import 'dart:developer';
+
+import 'package:jennygas_lib/domain/order.dart';
+import 'package:jennigas_customer/data/datasource/order_remote_datasource.dart';
+import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
+import 'package:jennigas_customer/domain/repository/order_repository.dart';
+
+class OrderRepositoryImp implements OrderRepository {
+  OrderRepositoryImp(this._remoteDatasource);
+
+  final OrderRemoteDatasource _remoteDatasource;
+
+  @override
+  Future<Order?> createOrder(
+    Map<String, dynamic> orderData,
+    String token,
+  ) async {
+    try {
+      final (success, data) = await _remoteDatasource.createOrder(
+        orderData,
+        token,
+      );
+      if (!success || data == null) return null;
+
+      final order = OrderApiMapper.parseOrder(data);
+      if (order != null) return order;
+
+      // Fallback for APIs that do not return the full created order payload.
+      return OrderApiMapper.parseOrder(orderData);
+    } catch (e) {
+      log('e in createOrder repository: ${e.toString()}');
+    }
+
+    return null;
+  }
+
+  @override
+  Future<Order?> updateOrder(
+    String orderId,
+    Map<String, dynamic> orderData,
+    String token,
+  ) async {
+    try {
+      final (success, data) = await _remoteDatasource.updateOrder(
+        orderId,
+        orderData,
+        token,
+      );
+      if (!success || data == null) return null;
+
+      final order = OrderApiMapper.parseOrder(data);
+      if (order != null) return order;
+
+      return OrderApiMapper.parseOrder({
+        ...orderData,
+        'order_id': orderId,
+      });
+    } catch (e) {
+      log('e in updateOrder repository: ${e.toString()}');
+    }
+
+    return null;
+  }
+
+  @override
+  Future<List<Order>> fetchCustomerHistory(
+    String customerId,
+    String token, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final (success, data) = await _remoteDatasource.fetchCustomerHistory(
+        customerId,
+        token,
+        limit: limit,
+        offset: offset,
+      );
+      if (!success || data == null) return [];
+
+      return OrderApiMapper.parseOrders(data);
+    } catch (e) {
+      log('e in fetchCustomerHistory repository: ${e.toString()}');
+    }
+
+    return [];
+  }
+
+  @override
+  Future<bool> updateOrderStatus(
+    String orderId,
+    String status,
+    String token,
+  ) async {
+    try {
+      return await _remoteDatasource.updateOrderStatus(orderId, status, token);
+    } catch (e) {
+      log('e in updateOrderStatus repository: ${e.toString()}');
+    }
+
+    return false;
+  }
+}
