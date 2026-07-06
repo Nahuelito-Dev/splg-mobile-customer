@@ -3,7 +3,9 @@ import 'package:stacked/stacked.dart';
 import 'package:jennygas_lib/domain/order.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/data/datasource/order_remote_datasource.dart';
+import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
 import 'package:jennigas_customer/data/repository/order_repository_imp.dart';
+import 'package:jennigas_customer/domain/create_order_result.dart';
 import 'package:jennigas_customer/domain/repository/order_repository.dart';
 import 'package:jennigas_customer/domain/usecases/create_order_usecases.dart';
 import 'package:jennigas_customer/domain/usecases/fetch_customer_orders_usecases.dart';
@@ -41,16 +43,17 @@ class HistoryService with ListenableServiceMixin {
     createOrder(order);
   }
 
-  Future<bool> createOrder(Order order) async {
+  Future<CreateOrderResult> createOrder(Order order) async {
     final token = await _customerService.token;
     if (token == null) {
-      return false;
+      return const CreateOrderResult(success: false);
     }
 
-    final createdOrder =
+    final result =
         await _createOrderUseCase(_toCreateOrderPayload(order), token);
-    if (createdOrder == null) {
-      return false;
+    final createdOrder = result.order;
+    if (!result.success || createdOrder == null) {
+      return CreateOrderResult(success: false, paymentUrl: result.paymentUrl);
     }
 
     _history.removeWhere((historyOrder) => historyOrder.id == createdOrder.id);
@@ -58,7 +61,11 @@ class HistoryService with ListenableServiceMixin {
     _hasPendingOrder.value = _history
         .any((historyOrder) => historyOrder.status == OrderStatus.pending);
     notifyListeners();
-    return true;
+    return CreateOrderResult(
+      success: true,
+      order: createdOrder,
+      paymentUrl: result.paymentUrl,
+    );
   }
 
   Future<bool> updateOrder(String orderId, Order order) async {
@@ -149,7 +156,9 @@ class HistoryService with ListenableServiceMixin {
     return {
       'customerId': _customerService.customer.customerId,
       'addressId': order.address?.addressId,
-      'paymentMethod': order.paymentMethod.name,
+      'paymentMethod': OrderApiMapper.serializePaymentMethod(
+        order.paymentMethod,
+      ),
       'items': items,
     };
   }
@@ -166,7 +175,9 @@ class HistoryService with ListenableServiceMixin {
 
     return {
       'addressId': order.address?.addressId,
-      'paymentMethod': order.paymentMethod.name,
+      'paymentMethod': OrderApiMapper.serializePaymentMethod(
+        order.paymentMethod,
+      ),
       'items': items,
     };
   }

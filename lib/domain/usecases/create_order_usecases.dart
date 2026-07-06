@@ -1,4 +1,4 @@
-import 'package:jennygas_lib/domain/order.dart';
+import 'package:jennigas_customer/domain/create_order_result.dart';
 import 'package:jennigas_customer/domain/repository/order_repository.dart';
 
 class CreateOrderUseCase {
@@ -6,7 +6,7 @@ class CreateOrderUseCase {
 
   final OrderRepository _orderRepository;
 
-  Future<Order?> call(
+  Future<CreateOrderResult> call(
     Map<String, dynamic> orderData,
     String token,
   ) async =>

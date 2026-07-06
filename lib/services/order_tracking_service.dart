@@ -17,10 +17,17 @@ class DriverLocationUpdate {
 }
 
 class OrderTrackingService {
-  static const String _socketBaseUrl = 'https://jennygas-app-backend.onrender.com';
+  // Namespace 'customers' del backend (CustomersGateway). En el simulador iOS,
+  // localhost apunta al host. Para el emulador Android usar 10.0.2.2.
+  // TODO(config): centralizar esta base junto a la de ApiClient por entorno.
+  static const String _socketBaseUrl = 'http://localhost:3000/customers';
 
   final _apiClient = ApiClient();
   io.Socket? _socket;
+
+  /// Pedido que estamos siguiendo: filtramos los eventos que llegan al room del
+  /// cliente para reaccionar solo a ESTE pedido.
+  String? _trackedOrderId;
 
   final _driverLocationController =
       StreamController<DriverLocationUpdate>.broadcast();
@@ -54,33 +61,43 @@ class OrderTrackingService {
 
   void subscribeToOrder({
     required String orderId,
+    required String customerId,
     String? token,
   }) {
     disconnect();
+    _trackedOrderId = orderId;
 
-    final options = io.OptionBuilder()
+    final builder = io.OptionBuilder()
         .setTransports(['websocket'])
         .disableAutoConnect()
         .enableReconnection()
         .setReconnectionAttempts(8)
-        .setReconnectionDelay(1000)
-        .build();
+        .setReconnectionDelay(1000);
 
+    // El CustomersGateway valida el token de Firebase en el handshake (auth.token
+    // o header Authorization). Mandamos ambos por compatibilidad.
     if (token != null && token.isNotEmpty) {
-      options['extraHeaders'] = {'Authorization': 'Bearer $token'};
+      builder.setAuth({'token': token});
+      builder.setExtraHeaders({'Authorization': 'Bearer $token'});
     }
 
-    _socket = io.io(_socketBaseUrl, options);
+    _socket = io.io(_socketBaseUrl, builder.build());
 
     _socket?.onConnect((_) {
-      final room = 'order_$orderId';
-      _socket?.emit('subscribe_order', {'room': room, 'orderId': orderId});
-      _socket?.emit('subscribe_order', room);
+      // Nos unimos a nuestra sala de cliente: el backend emite ahí los eventos
+      // de NUESTROS pedidos (ubicación del chofer + cambios de estado).
+      _socket?.emit('customer:join', {'customerId': customerId});
     });
 
-    _socket?.on('driver_location_update', _onDriverLocationUpdate);
-    _socket?.on('order_status_update', _onOrderStatusUpdate);
-    _socket?.on('order_update', _onOrderStatusUpdate);
+    // Ubicación del chofer en vivo (mientras el pedido está en camino).
+    _socket?.on('order:driver-location', _onDriverLocationUpdate);
+
+    // Cambios de estado del pedido → alertas al cliente.
+    _socket?.on('order:accepted', _onOrderStatusUpdate);
+    _socket?.on('order:on-the-way', _onOrderStatusUpdate);
+    _socket?.on('order:delivered', _onOrderStatusUpdate);
+    _socket?.on('order:cancelled', _onOrderStatusUpdate);
+
     _socket?.onError((e) => log('socket order tracking error: $e'));
     _socket?.onDisconnect((_) => log('socket order tracking disconnected'));
 
@@ -88,17 +105,25 @@ class OrderTrackingService {
   }
 
   void disconnect() {
-    _socket?.off('driver_location_update');
-    _socket?.off('order_status_update');
-    _socket?.off('order_update');
+    _socket?.off('order:driver-location');
+    _socket?.off('order:accepted');
+    _socket?.off('order:on-the-way');
+    _socket?.off('order:delivered');
+    _socket?.off('order:cancelled');
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+    _trackedOrderId = null;
   }
 
   void _onDriverLocationUpdate(dynamic payload) {
     final data = _toMap(payload);
     if (data == null) {
+      return;
+    }
+
+    // Ignorar ubicaciones de otros pedidos del mismo cliente.
+    if (!_isForTrackedOrder(data)) {
       return;
     }
 
@@ -120,11 +145,25 @@ class OrderTrackingService {
       return;
     }
 
+    if (!_isForTrackedOrder(data)) {
+      return;
+    }
+
     final status = (data['status'] ?? data['orderStatus'] ?? data['state'])
         ?.toString();
     if (status != null && status.isNotEmpty) {
       _orderStatusController.add(status);
     }
+  }
+
+  /// True si el evento es del pedido que seguimos (o si no trae orderId, para no
+  /// perder eventos legacy). El backend manda `orderId` en todos sus payloads.
+  bool _isForTrackedOrder(Map<String, dynamic> data) {
+    final incoming = (data['orderId'] ?? data['order_id'])?.toString();
+    if (incoming == null || _trackedOrderId == null) {
+      return true;
+    }
+    return incoming == _trackedOrderId;
   }
 
   Map<String, dynamic>? _extractOrderMap(Map<String, dynamic> raw) {

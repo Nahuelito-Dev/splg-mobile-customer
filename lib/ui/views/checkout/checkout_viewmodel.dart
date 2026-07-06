@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:jennygas_lib/domain/order.dart';
 import 'package:jennygas_lib/domain/address.dart';
@@ -217,36 +218,91 @@ class CheckoutViewModel extends ReactiveViewModel {
     final editingOrderId = _cartService.editingOrderId;
     final isEditingCurrentOrder =
         editingOrderId != null && updatedOrder.id == editingOrderId;
-    final success = !isEditingCurrentOrder
-        ? await _historyService.createOrder(updatedOrder)
-        : await _historyService.updateOrder(editingOrderId, updatedOrder);
 
-    if (success) {
+    if (isEditingCurrentOrder) {
+      final success =
+          await _historyService.updateOrder(editingOrderId, updatedOrder);
+
+      if (success) {
+        _cartService.clearEditingOrder();
+        _cartService.clearOrder();
+        _navigationService.back();
+      } else {
+        await _dialogService.showDialog(
+          title: 'Error al modificar pedido',
+          description:
+              'No se pudo modificar la orden. Verificá tu conexión e intentá nuevamente.',
+        );
+      }
+
+      setBusy(false);
+      return;
+    }
+
+    final result = await _historyService.createOrder(updatedOrder);
+
+    if (result.success) {
       _cartService.clearEditingOrder();
       _cartService.clearOrder();
-      if (!isEditingCurrentOrder) {
-        final trackedOrderId = _historyService.history.isNotEmpty
-            ? _historyService.history.first.id
-            : updatedOrder.id;
-        await _navigationService.replaceWithOrderTrackingView(
-          orderId: trackedOrderId,
-        );
-      } else {
-        _navigationService.back();
+
+      if (_selectedPaymentMethod == PaymentMethod.mercadoPago) {
+        await _openMercadoPagoCheckout(result.paymentUrl);
       }
+
+      final trackedOrderId = _historyService.history.isNotEmpty
+          ? _historyService.history.first.id
+          : updatedOrder.id;
+      await _navigationService.replaceWithOrderTrackingView(
+        orderId: trackedOrderId,
+      );
     } else {
       await _dialogService.showDialog(
-        title: !isEditingCurrentOrder
-            ? 'Error al crear pedido'
-            : 'Error al modificar pedido',
+        title: 'Error al crear pedido',
         description:
-            !isEditingCurrentOrder
-                ? 'No se pudo crear la orden. Verificá tu conexión e intentá nuevamente.'
-                : 'No se pudo modificar la orden. Verificá tu conexión e intentá nuevamente.',
+            'No se pudo crear la orden. Verificá tu conexión e intentá nuevamente.',
       );
     }
 
     setBusy(false);
+  }
+
+  /// Abre el checkout de MercadoPago (Checkout Pro) en el navegador externo.
+  /// El pedido ya fue creado en este punto; el backend lo despachará cuando
+  /// MercadoPago confirme el pago vía webhook. Si no llegó `paymentUrl` o
+  /// falla el launch, avisamos con un dialog pero igual dejamos avanzar al
+  /// tracking, ya que el pedido quedó creado.
+  Future<void> _openMercadoPagoCheckout(String? paymentUrl) async {
+    if (paymentUrl == null || paymentUrl.isEmpty) {
+      await _dialogService.showDialog(
+        title: 'No se pudo iniciar el pago',
+        description:
+            'El pedido se creó, pero no pudimos obtener el link de pago de Mercado Pago. '
+            'Podés reintentar el pago desde el seguimiento del pedido.',
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(paymentUrl);
+    var launched = false;
+
+    if (uri != null) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        launched = false;
+      }
+    }
+
+    if (!launched) {
+      await _dialogService.showDialog(
+        title: 'No se pudo abrir Mercado Pago',
+        description:
+            'El pedido se creó, pero no pudimos abrir el link de pago. '
+            'Podés reintentar el pago desde el seguimiento del pedido.',
+        buttonTitle: 'Aceptar',
+      );
+    }
   }
 
   String? _formatHour(int? hour) {

@@ -33,11 +33,11 @@ class PaymentMethodSelector extends StatelessWidget {
             PaymentMethod.online,
             'Transferencia (+10%)',
           ),
-          // _buildRadioOption(
-          //   context,
-          //   PaymentMethod.mercadoPago,
-          //   'Mercado Pago',
-          // ),
+          _buildRadioOption(
+            context,
+            PaymentMethod.mercadoPago,
+            'Mercado Pago',
+          ),
         ],
       );
   }

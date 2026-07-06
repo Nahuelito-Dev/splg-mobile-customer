@@ -219,6 +219,39 @@ class OrderApiMapper {
     return method;
   }
 
+  /// Serializa un [PaymentMethod] al string que espera el backend al crear
+  /// o modificar un pedido (`@IsEnum(['cash', 'mercadopago', 'transfer'])`).
+  static String serializePaymentMethod(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return 'cash';
+      case PaymentMethod.online:
+        return 'transfer';
+      case PaymentMethod.mercadoPago:
+        return 'mercadopago';
+    }
+  }
+
+  /// Extrae el `paymentUrl` (init_point de Checkout Pro) que el backend
+  /// devuelve en la respuesta de creación cuando `paymentMethod` es
+  /// `mercadopago`. Para el resto de los métodos de pago viene ausente/null.
+  static String? extractPaymentUrl(dynamic raw) {
+    if (raw is! Map<String, dynamic>) return null;
+
+    final direct = _pick(raw, ['paymentUrl', 'payment_url']);
+    if (direct is String && direct.isNotEmpty) return direct;
+
+    for (final key in const ['data', 'order', 'result']) {
+      final nested = raw[key];
+      if (nested is Map<String, dynamic>) {
+        final value = _pick(nested, ['paymentUrl', 'payment_url']);
+        if (value is String && value.isNotEmpty) return value;
+      }
+    }
+
+    return null;
+  }
+
   static double? _asNum(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);

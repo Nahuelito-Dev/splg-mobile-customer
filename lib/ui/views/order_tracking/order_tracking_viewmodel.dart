@@ -398,6 +398,7 @@ class OrderTrackingViewModel extends BaseViewModel {
 
     _trackingService.subscribeToOrder(
       orderId: orderId,
+      customerId: _customerService.customer.customerId,
       token: token,
     );
   }

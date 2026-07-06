@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:jennygas_lib/domain/order.dart';
 import 'package:jennigas_customer/data/datasource/order_remote_datasource.dart';
 import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
+import 'package:jennigas_customer/domain/create_order_result.dart';
 import 'package:jennigas_customer/domain/repository/order_repository.dart';
 
 class OrderRepositoryImp implements OrderRepository {
@@ -11,7 +12,7 @@ class OrderRepositoryImp implements OrderRepository {
   final OrderRemoteDatasource _remoteDatasource;
 
   @override
-  Future<Order?> createOrder(
+  Future<CreateOrderResult> createOrder(
     Map<String, dynamic> orderData,
     String token,
   ) async {
@@ -20,18 +21,25 @@ class OrderRepositoryImp implements OrderRepository {
         orderData,
         token,
       );
-      if (!success || data == null) return null;
-
-      final order = OrderApiMapper.parseOrder(data);
-      if (order != null) return order;
+      if (!success || data == null) {
+        return const CreateOrderResult(success: false);
+      }
 
       // Fallback for APIs that do not return the full created order payload.
-      return OrderApiMapper.parseOrder(orderData);
+      final order =
+          OrderApiMapper.parseOrder(data) ?? OrderApiMapper.parseOrder(orderData);
+      final paymentUrl = OrderApiMapper.extractPaymentUrl(data);
+
+      return CreateOrderResult(
+        success: order != null,
+        order: order,
+        paymentUrl: paymentUrl,
+      );
     } catch (e) {
       log('e in createOrder repository: ${e.toString()}');
     }
 
-    return null;
+    return const CreateOrderResult(success: false);
   }
 
   @override

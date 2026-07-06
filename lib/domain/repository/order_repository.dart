@@ -1,7 +1,8 @@
 import 'package:jennygas_lib/domain/order.dart';
+import 'package:jennigas_customer/domain/create_order_result.dart';
 
 abstract interface class OrderRepository {
-  Future<Order?> createOrder(
+  Future<CreateOrderResult> createOrder(
     Map<String, dynamic> orderData,
     String token,
   );
