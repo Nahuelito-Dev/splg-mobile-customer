@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
+import 'package:jennigas_customer/app/app.router.dart';
 import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
 import 'package:jennigas_customer/services/history_service.dart';
@@ -148,6 +149,12 @@ class OrderTrackingViewModel extends BaseViewModel {
   bool get showRadar => stage == TrackingStage.pending;
   bool get canCancelOrder => stage == TrackingStage.pending;
   bool get showArrivingBanner => stage == TrackingStage.arriving;
+
+  /// El chofer solo genera el QR de entrega una vez que el pedido esta
+  /// `on_the_way` (mapeado internamente a `out_for_delivery`). Se chequea el
+  /// status normalizado en vez de `stage`, porque `stage` ya devuelve
+  /// `arriving` por cercania GPS aunque el status siga siendo el mismo.
+  bool get canConfirmDelivery => _status == 'out_for_delivery';
 
   String get compactOrderDetail {
     if (_order == null || _order!.items.isEmpty) {
@@ -331,6 +338,25 @@ class OrderTrackingViewModel extends BaseViewModel {
       return;
     }
 
+    _trackingService.disconnect();
+    _navigationService.back();
+  }
+
+  /// Abre la camara para escanear el QR que muestra el chofer al llegar. La
+  /// confirmacion contra el backend (y sus dialogs de exito/error) se hacen
+  /// dentro de QrScanView; aca solo reaccionamos si volvio confirmada.
+  Future<void> confirmDeliveryByScan() async {
+    final delivered = await _navigationService.navigateToQrScanView(
+      orderId: orderId,
+    );
+    if (delivered != true) {
+      return;
+    }
+
+    // El pedido ya quedo `delivered` en el backend: refrescamos el historial
+    // (para que Home/History lo muestren al toque) y cerramos el tracking,
+    // que no tiene mas nada que seguir.
+    await _historyService.refreshHistory();
     _trackingService.disconnect();
     _navigationService.back();
   }

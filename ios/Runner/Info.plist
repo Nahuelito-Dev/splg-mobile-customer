@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Necesitamos su ubicación para la entrega del pedido.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para escanear el QR de entrega</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

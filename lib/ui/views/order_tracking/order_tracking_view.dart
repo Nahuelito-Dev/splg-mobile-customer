@@ -187,6 +187,19 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
                               ),
                             ),
                           ),
+                        if (viewModel.canConfirmDelivery) ...[
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: viewModel.confirmDeliveryByScan,
+                              icon: const Icon(Icons.qr_code_scanner),
+                              label: const Text(
+                                'Confirmar entrega (escanear QR)',
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         Text(
                           viewModel.compactOrderDetail,

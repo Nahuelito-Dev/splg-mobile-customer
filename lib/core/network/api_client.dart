@@ -50,6 +50,7 @@ class ApiClient {
     String path,
     Map<String, dynamic> body, [
     String? token,
+    Map<String, String>? extraHeaders,
   ]) async {
     try {
       final response = await dio.post(
@@ -61,6 +62,7 @@ class ApiClient {
             'Accept': 'application/json',
             'X-Client-Source': 'customer-app',
             if (token != null) 'Authorization': 'Bearer $token',
+            if (extraHeaders != null) ...extraHeaders,
           },
         ),
       );

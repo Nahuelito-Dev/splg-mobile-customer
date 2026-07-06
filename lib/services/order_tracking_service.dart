@@ -1,8 +1,15 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
 import 'package:jennigas_customer/core/network/api_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:uuid/uuid.dart';
+
+/// Resultado de intentar confirmar la entrega con el codigo leido del QR del
+/// chofer. `invalidCode` cubre tanto codigo incorrecto como pedido que ya no
+/// esta `on_the_way` (el backend devuelve 400 en ambos casos).
+enum ConfirmDeliveryResult { success, invalidCode, networkError }
 
 class DriverLocationUpdate {
   const DriverLocationUpdate({
@@ -23,6 +30,7 @@ class OrderTrackingService {
   static const String _socketBaseUrl = 'http://localhost:3000/customers';
 
   final _apiClient = ApiClient();
+  final _uuid = const Uuid();
   io.Socket? _socket;
 
   /// Pedido que estamos siguiendo: filtramos los eventos que llegan al room del
@@ -56,6 +64,39 @@ class OrderTrackingService {
     } catch (e) {
       log('e in fetchOrderById: ${e.toString()}');
       return null;
+    }
+  }
+
+  /// POST /orders/:orderId/confirm-delivery con el codigo leido del QR del
+  /// chofer. Idempotente via header `Idempotency-Key` (un uuid v4 por
+  /// intento del usuario, asi un reintento de red no reprocesa la entrega).
+  Future<ConfirmDeliveryResult> confirmDelivery(
+    String orderId,
+    String code,
+    String token,
+  ) async {
+    try {
+      final response = await _apiClient.post(
+        'orders/$orderId/confirm-delivery',
+        {'code': code},
+        token,
+        {'Idempotency-Key': _uuid.v4()},
+      );
+
+      if (response.statusCode == 200) {
+        return ConfirmDeliveryResult.success;
+      }
+
+      return ConfirmDeliveryResult.invalidCode;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        return ConfirmDeliveryResult.invalidCode;
+      }
+      log('e in confirmDelivery: ${e.toString()}');
+      return ConfirmDeliveryResult.networkError;
+    } catch (e) {
+      log('e in confirmDelivery: ${e.toString()}');
+      return ConfirmDeliveryResult.networkError;
     }
   }
 
