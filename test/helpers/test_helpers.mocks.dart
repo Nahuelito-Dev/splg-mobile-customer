@@ -772,11 +772,15 @@ class MockHistoryService extends _i1.Mock implements _i10.HistoryService {
       );
 
   @override
-  _i8.Future<_i2.CreateOrderResult> createOrder(_i11.Order? order) =>
+  _i8.Future<_i2.CreateOrderResult> createOrder(
+    _i11.Order? order, {
+    String? timeSlotId,
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #createOrder,
           [order],
+          {#timeSlotId: timeSlotId},
         ),
         returnValue:
             _i8.Future<_i2.CreateOrderResult>.value(_FakeCreateOrderResult_0(
@@ -784,6 +788,7 @@ class MockHistoryService extends _i1.Mock implements _i10.HistoryService {
           Invocation.method(
             #createOrder,
             [order],
+            {#timeSlotId: timeSlotId},
           ),
         )),
         returnValueForMissingStub:
@@ -792,6 +797,7 @@ class MockHistoryService extends _i1.Mock implements _i10.HistoryService {
           Invocation.method(
             #createOrder,
             [order],
+            {#timeSlotId: timeSlotId},
           ),
         )),
       ) as _i8.Future<_i2.CreateOrderResult>);
@@ -799,8 +805,9 @@ class MockHistoryService extends _i1.Mock implements _i10.HistoryService {
   @override
   _i8.Future<bool> updateOrder(
     String? orderId,
-    _i11.Order? order,
-  ) =>
+    _i11.Order? order, {
+    String? timeSlotId,
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateOrder,
@@ -808,6 +815,7 @@ class MockHistoryService extends _i1.Mock implements _i10.HistoryService {
             orderId,
             order,
           ],
+          {#timeSlotId: timeSlotId},
         ),
         returnValue: _i8.Future<bool>.value(false),
         returnValueForMissingStub: _i8.Future<bool>.value(false),

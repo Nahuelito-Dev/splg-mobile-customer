@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
 import 'package:jennygas_lib/domain/order.dart';
@@ -43,14 +44,19 @@ class HistoryService with ListenableServiceMixin {
     createOrder(order);
   }
 
-  Future<CreateOrderResult> createOrder(Order order) async {
+  Future<CreateOrderResult> createOrder(
+    Order order, {
+    String? timeSlotId,
+  }) async {
     final token = await _customerService.token;
     if (token == null) {
       return const CreateOrderResult(success: false);
     }
 
-    final result =
-        await _createOrderUseCase(_toCreateOrderPayload(order), token);
+    final result = await _createOrderUseCase(
+      _toCreateOrderPayload(order, timeSlotId),
+      token,
+    );
     final createdOrder = result.order;
     if (!result.success || createdOrder == null) {
       return CreateOrderResult(success: false, paymentUrl: result.paymentUrl);
@@ -68,7 +74,11 @@ class HistoryService with ListenableServiceMixin {
     );
   }
 
-  Future<bool> updateOrder(String orderId, Order order) async {
+  Future<bool> updateOrder(
+    String orderId,
+    Order order, {
+    String? timeSlotId,
+  }) async {
     final token = await _customerService.token;
     if (token == null) {
       return false;
@@ -76,7 +86,7 @@ class HistoryService with ListenableServiceMixin {
 
     final updatedOrder = await _orderRepository.updateOrder(
       orderId,
-      _toUpdateOrderPayload(order),
+      _toUpdateOrderPayload(order, timeSlotId),
       token,
     );
     if (updatedOrder == null) {
@@ -143,7 +153,7 @@ class HistoryService with ListenableServiceMixin {
     return _history;
   }
 
-  Map<String, dynamic> _toCreateOrderPayload(Order order) {
+  Map<String, dynamic> _toCreateOrderPayload(Order order, String? timeSlotId) {
     final items = order.items
         .where((item) => item.quantity > 0)
         .map((item) => {
@@ -160,10 +170,13 @@ class HistoryService with ListenableServiceMixin {
         order.paymentMethod,
       ),
       'items': items,
+      // Agendamiento: fecha (YYYY-MM-DD) + franja, más las notas del cliente.
+      // Antes se recogían en el checkout pero NO se enviaban (se perdían).
+      ..._schedulingPayload(order, timeSlotId),
     };
   }
 
-  Map<String, dynamic> _toUpdateOrderPayload(Order order) {
+  Map<String, dynamic> _toUpdateOrderPayload(Order order, String? timeSlotId) {
     final items = order.items
         .where((item) => item.quantity > 0)
         .map((item) => {
@@ -179,6 +192,28 @@ class HistoryService with ListenableServiceMixin {
         order.paymentMethod,
       ),
       'items': items,
+      ..._schedulingPayload(order, timeSlotId),
     };
+  }
+
+  /// Campos de agendamiento comunes a create/update, con los nombres que espera
+  /// el backend (`scheduledDate`, `timeSlotId`, `notes`). Solo incluye cada
+  /// clave si hay dato, para no pisar con null.
+  Map<String, dynamic> _schedulingPayload(Order order, String? timeSlotId) {
+    final payload = <String, dynamic>{};
+
+    final date = order.requestedDeliveryDate;
+    if (date != null) {
+      payload['scheduledDate'] = DateFormat('yyyy-MM-dd').format(date);
+    }
+    if (timeSlotId != null && timeSlotId.isNotEmpty) {
+      payload['timeSlotId'] = timeSlotId;
+    }
+    final notes = order.customerNotes;
+    if (notes != null && notes.trim().isNotEmpty) {
+      payload['notes'] = notes.trim();
+    }
+
+    return payload;
   }
 }

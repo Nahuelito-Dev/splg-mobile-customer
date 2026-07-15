@@ -11,9 +11,10 @@ import 'package:jennygas_lib/domain/order_item.dart';
 import 'package:jennigas_customer/app/app.router.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/services/cart_service.dart';
-import 'package:jennigas_customer/domain/business_hours.dart';
 import 'package:jennigas_customer/services/history_service.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/services/time_slot_service.dart';
+import 'package:jennigas_customer/domain/time_slot_availability.dart';
 import 'package:jennigas_customer/app/app.bottomsheets.dart';
 
 class CheckoutViewModel extends ReactiveViewModel {
@@ -23,6 +24,7 @@ class CheckoutViewModel extends ReactiveViewModel {
   final _navigationService = locator<NavigationService>();
   final _bottomSheetService = locator<BottomSheetService>();
   final _dialogService = locator<DialogService>();
+  final _timeSlotService = locator<TimeSlotService>();
 
   Order? get order => _cartService.order;
 
@@ -31,21 +33,14 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   final TextEditingController addressController = TextEditingController();
 
-  late BusinessHours _businessHours;
-
   void initialize() {
     setBusy(true);
-    _businessHours = BusinessHours(
-      morningStart: 9,
-      morningEnd: 13,
-      afternoonStart: 17,
-      afternoonEnd: 21,
-    );
-
     addressController.text = _cartService.order?.address?.streetName ?? '';
     _selectedPaymentMethod =
         _cartService.order?.paymentMethod ?? PaymentMethod.cash;
     setBusy(false);
+    // Trae las franjas de la fecha por defecto (hoy) para que el cliente elija.
+    loadTimeSlots();
   }
 
   void setPaymentMethod(PaymentMethod method) {
@@ -83,22 +78,46 @@ class CheckoutViewModel extends ReactiveViewModel {
     }
   }
 
-  int? get selectedStartHour => _businessHours.selectedStartHour;
+  // ─── Franjas horarias (agendamiento) ───
+  // El backend agenda por franjas fijas con cupo diario (las administra el
+  // panel), así que el cliente elige una franja disponible para la fecha, en
+  // vez de un rango de horas libre.
+  List<TimeSlotAvailability> _timeSlots = [];
+  List<TimeSlotAvailability> get timeSlots => _timeSlots;
 
-  int? get selectedEndHour => _businessHours.selectedEndHour;
+  bool _loadingTimeSlots = false;
+  bool get loadingTimeSlots => _loadingTimeSlots;
 
-  List<int> get availableStartHours => _businessHours.availableStartHours;
+  String? _selectedTimeSlotId;
+  String? get selectedTimeSlotId => _selectedTimeSlotId;
 
-  List<int> get availableEndHours => _businessHours.availableEndHours;
+  /// Trae las franjas disponibles para la fecha seleccionada. Si la franja
+  /// elegida ya no está disponible (cambió la fecha o se llenó), la deselecciona.
+  Future<void> loadTimeSlots() async {
+    _loadingTimeSlots = true;
+    notifyListeners();
 
-  void setStartHour(int? hour) {
-    _businessHours.setStartHour(hour);
+    _timeSlots = await _timeSlotService.availabilityFor(_selectedDate);
+
+    final stillValid = _timeSlots.any(
+      (slot) => slot.timeSlotId == _selectedTimeSlotId && !slot.isFull,
+    );
+    if (!stillValid) _selectedTimeSlotId = null;
+
+    _loadingTimeSlots = false;
     notifyListeners();
   }
 
-  void setEndHour(int? hour) {
-    _businessHours.setEndHour(hour);
+  void selectTimeSlot(String timeSlotId) {
+    _selectedTimeSlotId = timeSlotId;
     notifyListeners();
+  }
+
+  TimeSlotAvailability? get _selectedSlot {
+    for (final slot in _timeSlots) {
+      if (slot.timeSlotId == _selectedTimeSlotId) return slot;
+    }
+    return null;
   }
 
   // Discount and Total Calculation Logic
@@ -162,8 +181,7 @@ class CheckoutViewModel extends ReactiveViewModel {
     return order != null &&
         order!.items.isNotEmpty &&
         addressController.text.isNotEmpty &&
-        _businessHours.selectedStartHour != null &&
-        _businessHours.selectedEndHour != null;
+        _selectedTimeSlotId != null;
   }
 
   DateTime _selectedDate = DateTime.now();
@@ -183,6 +201,8 @@ class CheckoutViewModel extends ReactiveViewModel {
     if (picked != null && picked != _selectedDate) {
       _selectedDate = picked;
       notifyListeners();
+      // La disponibilidad de franjas depende del día → recargar.
+      await loadTimeSlots();
     }
   }
 
@@ -204,11 +224,13 @@ class CheckoutViewModel extends ReactiveViewModel {
 
     setBusy(true);
 
-    // Update order with new fields
+    // Update order with new fields. La franja seleccionada aporta la ventana
+    // horaria para mostrar; su id se manda aparte al backend (timeSlotId).
+    final slot = _selectedSlot;
     final updatedOrder = order!.copyWith(
       requestedDeliveryDate: _selectedDate,
-      deliveryWindowStart: _formatHour(_businessHours.selectedStartHour),
-      deliveryWindowEnd: _formatHour(_businessHours.selectedEndHour),
+      deliveryWindowStart: slot?.startTime,
+      deliveryWindowEnd: slot?.endTime,
       paymentMethod: _selectedPaymentMethod,
       customerNotes: deliveryDetailsController.text,
       total: finalTotal,
@@ -220,8 +242,11 @@ class CheckoutViewModel extends ReactiveViewModel {
         editingOrderId != null && updatedOrder.id == editingOrderId;
 
     if (isEditingCurrentOrder) {
-      final success =
-          await _historyService.updateOrder(editingOrderId, updatedOrder);
+      final success = await _historyService.updateOrder(
+        editingOrderId,
+        updatedOrder,
+        timeSlotId: _selectedTimeSlotId,
+      );
 
       if (success) {
         _cartService.clearEditingOrder();
@@ -239,7 +264,10 @@ class CheckoutViewModel extends ReactiveViewModel {
       return;
     }
 
-    final result = await _historyService.createOrder(updatedOrder);
+    final result = await _historyService.createOrder(
+      updatedOrder,
+      timeSlotId: _selectedTimeSlotId,
+    );
 
     if (result.success) {
       _cartService.clearEditingOrder();
@@ -303,11 +331,6 @@ class CheckoutViewModel extends ReactiveViewModel {
         buttonTitle: 'Aceptar',
       );
     }
-  }
-
-  String? _formatHour(int? hour) {
-    if (hour == null) return null;
-    return '${hour.toString().padLeft(2, '0')}:00';
   }
 
   @override

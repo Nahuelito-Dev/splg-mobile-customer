@@ -4,7 +4,7 @@ import 'package:stacked/stacked.dart';
 
 import 'checkout_viewmodel.dart';
 
-import 'widgets/time_range_selector.dart';
+import 'package:jennigas_customer/domain/time_slot_availability.dart';
 import 'widgets/cylinder_checkout_item.dart';
 import 'widgets/payment_method_selector.dart';
 
@@ -152,15 +152,15 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Time Selection
-                      TimeRangeSelector(
-                        availableStartHours: viewModel.availableStartHours,
-                        availableEndHours: viewModel.availableEndHours,
-                        selectedStartHour: viewModel.selectedStartHour,
-                        selectedEndHour: viewModel.selectedEndHour,
-                        onStartHourChanged: viewModel.setStartHour,
-                        onEndHourChanged: viewModel.setEndHour,
+                      // Franja de entrega (agendamiento por TimeSlots)
+                      Text(
+                        'Franja de entrega',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
+                      const SizedBox(height: 12),
+                      _buildTimeSlotSelector(theme, viewModel),
                       const SizedBox(height: 24),
 
                       // Address Input
@@ -244,6 +244,57 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Selector de franja horaria: chips con las franjas disponibles para la
+  /// fecha elegida. Las llenas (sin cupo) quedan deshabilitadas. Muestra
+  /// loader mientras trae, y un aviso si no hay franjas ese día.
+  Widget _buildTimeSlotSelector(ThemeData theme, CheckoutViewModel viewModel) {
+    if (viewModel.loadingTimeSlots) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final slots = viewModel.timeSlots;
+    if (slots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outline.withAlpha(70)),
+        ),
+        child: Text(
+          'No hay franjas disponibles para esta fecha. Probá con otro día.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withAlpha(160),
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: slots.map((TimeSlotAvailability slot) {
+        final selected = slot.timeSlotId == viewModel.selectedTimeSlotId;
+        return ChoiceChip(
+          label: Text(slot.isFull ? '${slot.label} · sin cupo' : slot.label),
+          selected: selected,
+          onSelected: slot.isFull
+              ? null
+              : (_) => viewModel.selectTimeSlot(slot.timeSlotId),
+          labelStyle: TextStyle(
+            color: selected
+                ? theme.colorScheme.onPrimary
+                : theme.colorScheme.onSurface.withAlpha(slot.isFull ? 90 : 220),
+          ),
+          selectedColor: theme.colorScheme.primary,
+        );
+      }).toList(),
     );
   }
 
