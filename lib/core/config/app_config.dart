@@ -1,0 +1,27 @@
+/// Configuración de entorno de la app cliente, centralizada y sobreescribible
+/// por `--dart-define` para device físico / staging / producción.
+///
+/// Ejemplos:
+///   flutter run --dart-define=API_BASE_URL=https://api.jennygas.com \
+///               --dart-define=DISTRIBUTOR=jeny-gas
+class AppConfig {
+  AppConfig._();
+
+  /// Base del backend SIN el sufijo `/api`. Default localhost para desarrollo.
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:3000',
+  );
+
+  /// URL completa de la API (con el `/api/` que espera el backend).
+  static String get apiUrl => '$apiBaseUrl/api/';
+
+  /// Distribuidora (tenant) contra la que opera esta instancia de la app.
+  /// Se envía en el header `X-Distributor` (slug o uuid) para que el backend
+  /// resuelva el tenant del cliente, y se usa como `?distributor=` en los
+  /// endpoints públicos (p.ej. franjas horarias).
+  static const String distributorSlug = String.fromEnvironment(
+    'DISTRIBUTOR',
+    defaultValue: 'jeny-gas',
+  );
+}

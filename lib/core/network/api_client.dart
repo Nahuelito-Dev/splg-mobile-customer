@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
+import 'package:jennigas_customer/core/config/app_config.dart';
+
 class ApiClient {
   static final instance = ApiClient._();
 
@@ -14,7 +16,7 @@ class ApiClient {
 
   final dio = Dio(
     BaseOptions(
-      baseUrl: 'http://localhost:3000/api/',
+      baseUrl: AppConfig.apiUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     ),
@@ -36,6 +38,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
             if (token != null) 'Authorization': 'Bearer $token',
           },
         ),
@@ -61,6 +64,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
             if (token != null) 'Authorization': 'Bearer $token',
             if (extraHeaders != null) ...extraHeaders,
           },
@@ -86,6 +90,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
             'Authorization': 'Bearer $token',
           },
         ),
@@ -110,6 +115,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
             'Authorization': 'Bearer $token',
           },
         ),
