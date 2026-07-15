@@ -6,6 +6,7 @@ import 'package:stacked_services/stacked_services.dart';
 
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/app/app.router.dart';
+import 'package:jennigas_customer/app/app.bottomsheets.dart';
 import 'package:jennigas_customer/services/history_service.dart';
 import 'package:jennigas_customer/services/cart_service.dart';
 
@@ -14,6 +15,7 @@ class HistoryModel extends ReactiveViewModel {
   final _navigationService = locator<NavigationService>();
   final _cartService = locator<CartService>();
   final _dialogService = locator<DialogService>();
+  final _bottomSheetService = locator<BottomSheetService>();
   Timer? _historyPollingTimer;
   bool _isOpeningTracking = false;
   String? _lastOpenedTrackingOrderId;
@@ -64,6 +66,26 @@ class HistoryModel extends ReactiveViewModel {
           preventDuplicates: false,
         )
         .whenComplete(() => _isOpeningTracking = false);
+  }
+
+  /// Abre un reclamo sobre un pedido (típicamente ya entregado). El sheet
+  /// maneja el envío y sus errores; acá solo confirmamos con un aviso.
+  Future<void> reportProblem(Order order) async {
+    final response = await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.claim,
+      isScrollControlled: true,
+      enableDrag: false,
+      data: {'orderId': order.id},
+    );
+
+    if (response?.confirmed == true) {
+      await _dialogService.showDialog(
+        title: 'Reclamo enviado',
+        description:
+            'Recibimos tu reclamo. Lo vamos a revisar y te contactamos.',
+        buttonTitle: 'Aceptar',
+      );
+    }
   }
 
   Future<void> cancelOrder(Order order) async {

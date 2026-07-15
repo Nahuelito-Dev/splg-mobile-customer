@@ -13,6 +13,7 @@ import 'package:stacked_services/src/navigation/navigation_service.dart';
 import 'package:stacked_shared/stacked_shared.dart';
 
 import '../services/cart_service.dart';
+import '../services/claim_service.dart';
 import '../services/customer_service.dart';
 import '../services/gas_cylinder_service.dart';
 import '../services/history_service.dart';
@@ -43,4 +44,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => OrderTrackingService());
   locator.registerLazySingleton(() => TimeSlotService());
   locator.registerLazySingleton(() => RatingService());
+  locator.registerLazySingleton(() => ClaimService());
 }

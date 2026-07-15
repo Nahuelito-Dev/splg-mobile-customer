@@ -52,6 +52,7 @@ class History extends StackedView<HistoryModel> {
                           onModifyOrder: () => viewModel.modifyOrder(order),
                           onCancelOrder: () => viewModel.cancelOrder(order),
                           onTrackOrder: () => viewModel.openTracking(order),
+                          onReportProblem: () => viewModel.reportProblem(order),
                         );
                       },
                     ),
@@ -79,6 +80,7 @@ class _OrderItemTile extends StatelessWidget {
   final VoidCallback onModifyOrder;
   final VoidCallback onCancelOrder;
   final VoidCallback onTrackOrder;
+  final VoidCallback onReportProblem;
 
   const _OrderItemTile({
     required this.order,
@@ -86,6 +88,7 @@ class _OrderItemTile extends StatelessWidget {
     required this.onModifyOrder,
     required this.onCancelOrder,
     required this.onTrackOrder,
+    required this.onReportProblem,
   });
 
   String _safeAddress(String? streetName) {
@@ -301,9 +304,23 @@ class _OrderItemTile extends StatelessWidget {
                         child: const Text('Seguir pedido'),
                       )
                     else
-                      TextButton(
-                        onPressed: onRepeatOrder,
-                        child: const Text('Repetir pedido'),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: onRepeatOrder,
+                            child: const Text('Repetir pedido'),
+                          ),
+                          if (order.status == OrderStatus.delivered)
+                            TextButton(
+                              onPressed: onReportProblem,
+                              style: TextButton.styleFrom(
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.error,
+                              ),
+                              child: const Text('Reportar un problema'),
+                            ),
+                        ],
                       ),
                   ],
                 ),
