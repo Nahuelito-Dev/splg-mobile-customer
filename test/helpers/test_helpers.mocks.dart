@@ -1034,6 +1034,75 @@ class MockCustomerService extends _i1.Mock implements _i14.CustomerService {
       );
 
   @override
+  _i8.Future<bool> updateProfile({
+    String? fullName,
+    String? phoneNumber,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateProfile,
+          [],
+          {
+            #fullName: fullName,
+            #phoneNumber: phoneNumber,
+          },
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+        returnValueForMissingStub: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<void> refreshAddresses() => (super.noSuchMethod(
+        Invocation.method(
+          #refreshAddresses,
+          [],
+        ),
+        returnValue: _i8.Future<void>.value(),
+        returnValueForMissingStub: _i8.Future<void>.value(),
+      ) as _i8.Future<void>);
+
+  @override
+  _i8.Future<bool> createAndSyncAddress(_i15.Address? address) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #createAndSyncAddress,
+          [address],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+        returnValueForMissingStub: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<bool> updateAddress(_i15.Address? address) => (super.noSuchMethod(
+        Invocation.method(
+          #updateAddress,
+          [address],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+        returnValueForMissingStub: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<bool> setDefaultAddress(String? addressId) => (super.noSuchMethod(
+        Invocation.method(
+          #setDefaultAddress,
+          [addressId],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+        returnValueForMissingStub: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<bool> deleteAddress(String? addressId) => (super.noSuchMethod(
+        Invocation.method(
+          #deleteAddress,
+          [addressId],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+        returnValueForMissingStub: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
   void addAddress(_i15.Address? address) => super.noSuchMethod(
         Invocation.method(
           #addAddress,

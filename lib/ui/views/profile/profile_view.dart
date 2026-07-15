@@ -52,14 +52,26 @@ class ProfileView extends StackedView<ProfileViewModel> {
                             icon: Icons.person_outline,
                             label: 'Nombre',
                             value: viewModel.fullName,
-                            onEdit: viewModel.editName,
+                            onEdit: () => _promptEditField(
+                              context,
+                              title: 'Editar nombre',
+                              initialValue: viewModel.fullName,
+                              keyboardType: TextInputType.name,
+                              onSave: viewModel.updateName,
+                            ),
                           ),
                           _buildDivider(colorScheme),
                           _ProfileField(
                             icon: Icons.phone_outlined,
                             label: 'Teléfono',
                             value: viewModel.phoneNumber,
-                            onEdit: viewModel.editPhone,
+                            onEdit: () => _promptEditField(
+                              context,
+                              title: 'Editar teléfono',
+                              initialValue: viewModel.phoneNumber,
+                              keyboardType: TextInputType.phone,
+                              onSave: viewModel.updatePhone,
+                            ),
                           ),
                           _buildDivider(colorScheme),
                           _ProfileField(
@@ -124,6 +136,57 @@ class ProfileView extends StackedView<ProfileViewModel> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Muestra un diálogo con un campo de texto para editar un dato del perfil.
+  /// [onSave] hace el PATCH y devuelve si se guardó; se avisa el resultado.
+  Future<void> _promptEditField(
+    BuildContext context, {
+    required String title,
+    required String initialValue,
+    required TextInputType keyboardType,
+    required Future<bool> Function(String value) onSave,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textCapitalization: keyboardType == TextInputType.name
+              ? TextCapitalization.words
+              : TextCapitalization.none,
+          autofocus: true,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (value == null || value.isEmpty || value == initialValue.trim()) {
+      return;
+    }
+
+    final ok = await onSave(value);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Datos actualizados.' : 'No se pudo actualizar.'),
       ),
     );
   }

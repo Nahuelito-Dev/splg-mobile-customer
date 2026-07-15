@@ -101,6 +101,26 @@ class ApiClient {
     }
   }
 
+  Future<Response> delete(String path, String token) async {
+    try {
+      final response = await dio.delete(
+        path,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<Response> put(
     String path,
     Map<String, dynamic> body,

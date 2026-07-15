@@ -124,6 +124,94 @@ class CustomerService {
     _customer = customer;
   }
 
+  /// Actualiza el perfil (nombre y/o teléfono) contra `PATCH /users/:id` y, si
+  /// el backend confirma, refleja el cambio en el customer local.
+  Future<bool> updateProfile({String? fullName, String? phoneNumber}) async {
+    final token = await this.token;
+    if (token == null) return false;
+
+    final data = <String, dynamic>{};
+    if (fullName != null && fullName.trim().isNotEmpty) {
+      data['full_name'] = fullName.trim();
+    }
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      data['phone_number'] = phoneNumber.trim();
+    }
+    if (data.isEmpty) return false;
+
+    final ok = await _customerDatasource.updateUser(
+      _customer.customerId,
+      data,
+      token,
+    );
+    if (ok) {
+      _customer = _customer.copyWith(
+        fullName: data['full_name'] as String? ?? _customer.fullName,
+        phoneNumber: data['phone_number'] as String? ?? _customer.phoneNumber,
+      );
+    }
+    return ok;
+  }
+
+  /// Recarga las direcciones del usuario desde el backend
+  /// (`GET /user-address/user/:id`) y las refleja en el customer local.
+  Future<void> refreshAddresses() async {
+    final token = await this.token;
+    if (token == null) return;
+
+    final raw = await AddressRemoteDataSource().fetchByUser(
+      _customer.customerId,
+      token,
+    );
+    final addresses = raw.map(Address.fromJson).toList();
+    _customer = _customer.copyWith(addresses: addresses);
+  }
+
+  /// Crea una dirección esperando la confirmación del backend y recarga la
+  /// lista (a diferencia de [addAddress], que es optimista y fire-and-forget).
+  Future<bool> createAndSyncAddress(Address address) async {
+    final token = await this.token;
+    if (token == null) return false;
+    final ok = await AddressRemoteDataSource().createAddress(
+      address.toJson(),
+      token,
+      _customer.customerId,
+    );
+    if (ok) await refreshAddresses();
+    return ok;
+  }
+
+  /// Actualiza una dirección existente y recarga la lista.
+  Future<bool> updateAddress(Address address) async {
+    final token = await this.token;
+    if (token == null) return false;
+    final ok = await AddressRemoteDataSource().updateAddress(
+      address.addressId,
+      address.toJson(),
+      token,
+    );
+    if (ok) await refreshAddresses();
+    return ok;
+  }
+
+  /// Marca una dirección como predeterminada y recarga la lista.
+  Future<bool> setDefaultAddress(String addressId) async {
+    final token = await this.token;
+    if (token == null) return false;
+    final ok = await AddressRemoteDataSource().setDefault(addressId, token);
+    if (ok) await refreshAddresses();
+    return ok;
+  }
+
+  /// Elimina una dirección y recarga la lista.
+  Future<bool> deleteAddress(String addressId) async {
+    final token = await this.token;
+    if (token == null) return false;
+    final ok = await AddressRemoteDataSource().deleteAddress(addressId, token);
+    if (ok) await refreshAddresses();
+    return ok;
+  }
+
   void addAddress(Address address) {
     List<Address> addresses = List<Address>.from(_customer.addresses);
     // Last address is primary

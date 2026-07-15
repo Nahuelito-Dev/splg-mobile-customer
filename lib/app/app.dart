@@ -15,6 +15,7 @@ import 'package:jennigas_customer/ui/views/map/map_view.dart';
 import 'package:jennigas_customer/services/location_service.dart';
 import 'package:jennigas_customer/ui/bottom_sheets/address_list/address_list_sheet.dart';
 import 'package:jennigas_customer/ui/views/profile/profile_view.dart';
+import 'package:jennigas_customer/ui/views/addresses/addresses_view.dart';
 import 'package:jennigas_customer/ui/views/order_tracking/order_tracking_view.dart';
 import 'package:jennigas_customer/services/order_tracking_service.dart';
 import 'package:jennigas_customer/services/time_slot_service.dart';
@@ -34,6 +35,7 @@ import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart';
     MaterialRoute(page: SignupView),
     MaterialRoute(page: MapView),
     MaterialRoute(page: ProfileView),
+    MaterialRoute(page: AddressesView),
     MaterialRoute(page: OrderTrackingView),
     MaterialRoute(page: QrScanView),
 // @stacked-route

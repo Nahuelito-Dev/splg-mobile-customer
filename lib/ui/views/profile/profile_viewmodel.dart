@@ -44,11 +44,25 @@ class ProfileViewModel extends BaseViewModel {
     return parts.isEmpty ? 'Sin dirección' : parts.join(', ');
   }
 
-  void editName() {}
+  /// Actualiza el nombre contra el backend y refresca la UI.
+  Future<bool> updateName(String name) async {
+    final ok = await _customerService.updateProfile(fullName: name);
+    if (ok) notifyListeners();
+    return ok;
+  }
 
-  void editPhone() {}
+  /// Actualiza el teléfono contra el backend y refresca la UI.
+  Future<bool> updatePhone(String phone) async {
+    final ok = await _customerService.updateProfile(phoneNumber: phone);
+    if (ok) notifyListeners();
+    return ok;
+  }
 
-  void navigateToAddresses() {}
+  Future<void> navigateToAddresses() async {
+    await _navigationService.navigateToAddressesView();
+    // Al volver, refrescamos por si cambió la dirección predeterminada.
+    notifyListeners();
+  }
 
   Future<void> signOut() async {
     final response = await _dialogService.showConfirmationDialog(
