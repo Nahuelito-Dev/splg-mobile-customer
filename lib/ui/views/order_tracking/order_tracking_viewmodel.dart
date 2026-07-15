@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/app/app.router.dart';
+import 'package:jennigas_customer/app/app.bottomsheets.dart';
 import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
 import 'package:jennigas_customer/services/history_service.dart';
@@ -33,6 +34,7 @@ class OrderTrackingViewModel extends BaseViewModel {
   final _customerService = locator<CustomerService>();
   final _historyService = locator<HistoryService>();
   final _dialogService = locator<DialogService>();
+  final _bottomSheetService = locator<BottomSheetService>();
   final _navigationService = locator<NavigationService>();
 
   GoogleMapController? _mapController;
@@ -358,7 +360,23 @@ class OrderTrackingViewModel extends BaseViewModel {
     // que no tiene mas nada que seguir.
     await _historyService.refreshHistory();
     _trackingService.disconnect();
+
+    // Momento de mayor señal para calificar al chofer (CU-025). El cliente
+    // puede omitir; el sheet maneja el envío y sus errores internamente.
+    await _promptDriverRating();
+
     _navigationService.back();
+  }
+
+  /// Ofrece calificar al chofer tras la entrega. `POST /ratings` requiere que
+  /// el pedido esté `delivered` (ya lo está en este punto).
+  Future<void> _promptDriverRating() async {
+    await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.rateDriver,
+      isScrollControlled: true,
+      enableDrag: false,
+      data: {'orderId': orderId, 'driverName': _driverName},
+    );
   }
 
   Future<void> showHelp() async {

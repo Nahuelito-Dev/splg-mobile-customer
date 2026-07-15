@@ -18,6 +18,7 @@ import '../services/gas_cylinder_service.dart';
 import '../services/history_service.dart';
 import '../services/location_service.dart';
 import '../services/order_tracking_service.dart';
+import '../services/rating_service.dart';
 import '../services/time_slot_service.dart';
 
 final locator = StackedLocator.instance;
@@ -41,4 +42,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => LocationService());
   locator.registerLazySingleton(() => OrderTrackingService());
   locator.registerLazySingleton(() => TimeSlotService());
+  locator.registerLazySingleton(() => RatingService());
 }

@@ -18,6 +18,8 @@ import 'package:jennigas_customer/ui/views/profile/profile_view.dart';
 import 'package:jennigas_customer/ui/views/order_tracking/order_tracking_view.dart';
 import 'package:jennigas_customer/services/order_tracking_service.dart';
 import 'package:jennigas_customer/services/time_slot_service.dart';
+import 'package:jennigas_customer/services/rating_service.dart';
+import 'package:jennigas_customer/ui/bottom_sheets/rate_driver/rate_driver_sheet.dart';
 import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart';
 // @stacked-import
 
@@ -45,11 +47,13 @@ import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart';
     LazySingleton(classType: LocationService),
     LazySingleton(classType: OrderTrackingService),
     LazySingleton(classType: TimeSlotService),
+    LazySingleton(classType: RatingService),
 // @stacked-service
   ],
   bottomsheets: [
     StackedBottomsheet(classType: NoticeSheet),
     StackedBottomsheet(classType: AddressListSheet),
+    StackedBottomsheet(classType: RateDriverSheet),
 // @stacked-bottom-sheet
   ],
   dialogs: [
