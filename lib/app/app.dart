@@ -25,6 +25,7 @@ import 'package:jennigas_customer/ui/bottom_sheets/rate_driver/rate_driver_sheet
 import 'package:jennigas_customer/ui/bottom_sheets/claim/claim_sheet.dart';
 import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart';
 import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
+import 'package:jennigas_customer/ui/views/payment_webview/payment_webview_view.dart';
 // @stacked-import
 
 @StackedApp(
@@ -40,6 +41,7 @@ import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
     MaterialRoute(page: OrderTrackingView),
     MaterialRoute(page: QrScanView),
     MaterialRoute(page: LegalView),
+    MaterialRoute(page: PaymentWebViewView),
 // @stacked-route
   ],
   dependencies: [

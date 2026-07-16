@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:jennygas_lib/domain/order.dart';
 import 'package:jennygas_lib/domain/address.dart';
@@ -15,6 +14,7 @@ import 'package:jennigas_customer/services/history_service.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
 import 'package:jennigas_customer/services/time_slot_service.dart';
 import 'package:jennigas_customer/domain/time_slot_availability.dart';
+import 'package:jennigas_customer/domain/payment_outcome.dart';
 import 'package:jennigas_customer/app/app.bottomsheets.dart';
 
 class CheckoutViewModel extends ReactiveViewModel {
@@ -294,11 +294,12 @@ class CheckoutViewModel extends ReactiveViewModel {
     setBusy(false);
   }
 
-  /// Abre el checkout de MercadoPago (Checkout Pro) en el navegador externo.
-  /// El pedido ya fue creado en este punto; el backend lo despachará cuando
-  /// MercadoPago confirme el pago vía webhook. Si no llegó `paymentUrl` o
-  /// falla el launch, avisamos con un dialog pero igual dejamos avanzar al
-  /// tracking, ya que el pedido quedó creado.
+  /// Abre el checkout de MercadoPago (Checkout Pro) en un WebView embebido:
+  /// el pago no sale de la app. El pedido ya fue creado en este punto; el
+  /// backend lo despachará cuando MercadoPago confirme el pago vía webhook
+  /// (esta pantalla no inventa una confirmación local, solo interpreta a qué
+  /// back_url redirigió MP). Si no llegó `paymentUrl`, avisamos con un dialog
+  /// pero igual dejamos avanzar al tracking, ya que el pedido quedó creado.
   Future<void> _openMercadoPagoCheckout(String? paymentUrl) async {
     if (paymentUrl == null || paymentUrl.isEmpty) {
       await _dialogService.showDialog(
@@ -311,25 +312,46 @@ class CheckoutViewModel extends ReactiveViewModel {
       return;
     }
 
-    final uri = Uri.tryParse(paymentUrl);
-    var launched = false;
+    final outcome = await _navigationService.navigateToPaymentWebViewView(
+      paymentUrl: paymentUrl,
+    );
 
-    if (uri != null) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } catch (_) {
-        launched = false;
-      }
-    }
+    await _showPaymentOutcomeDialog(
+      outcome is PaymentOutcome ? outcome : null,
+    );
+  }
 
-    if (!launched) {
-      await _dialogService.showDialog(
-        title: 'No se pudo abrir Mercado Pago',
-        description:
-            'El pedido se creó, pero no pudimos abrir el link de pago. '
-            'Podés reintentar el pago desde el seguimiento del pedido.',
-        buttonTitle: 'Aceptar',
-      );
+  Future<void> _showPaymentOutcomeDialog(PaymentOutcome? outcome) async {
+    switch (outcome) {
+      case PaymentOutcome.success:
+        await _dialogService.showDialog(
+          title: 'Pago realizado',
+          description:
+              'Recibimos tu pago. Tu pedido se confirma automáticamente ni bien '
+              'Mercado Pago nos avisa; podés seguir el estado desde el seguimiento.',
+          buttonTitle: 'Aceptar',
+        );
+        break;
+      case PaymentOutcome.pending:
+        await _dialogService.showDialog(
+          title: 'Pago pendiente',
+          description:
+              'Tu pago quedó pendiente de confirmación de Mercado Pago. '
+              'Te avisamos cuando se acredite.',
+          buttonTitle: 'Aceptar',
+        );
+        break;
+      case PaymentOutcome.failure:
+      case PaymentOutcome.cancelled:
+      case null:
+        await _dialogService.showDialog(
+          title: 'El pago no se completó',
+          description:
+              'El pedido se creó, pero el pago no se confirmó. '
+              'Podés reintentar el pago desde el seguimiento del pedido.',
+          buttonTitle: 'Aceptar',
+        );
+        break;
     }
   }
 

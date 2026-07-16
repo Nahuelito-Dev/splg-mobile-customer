@@ -48,6 +48,8 @@ dependencies:
   uuid: ^4.5.3
   # render de Términos y Condiciones / Política de Privacidad en markdown
   flutter_markdown_plus: ^1.0.12
+  # WebView embebido para el pago de MercadoPago (Checkout Pro) sin salir de la app
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   build_runner: ^2.4.5

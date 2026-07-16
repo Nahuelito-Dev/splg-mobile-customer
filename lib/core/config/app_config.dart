@@ -24,4 +24,21 @@ class AppConfig {
     'DISTRIBUTOR',
     defaultValue: 'jeny-gas',
   );
+
+  /// Back URLs de Checkout Pro de MercadoPago (deben coincidir con
+  /// `MP_SUCCESS_URL` / `MP_FAILURE_URL` / `MP_PENDING_URL` del backend). El
+  /// WebView de pago las usa para detectar cuándo MP redirige de vuelta y
+  /// cerrarse solo, sin salir de la app.
+  static const String mpSuccessUrl = String.fromEnvironment(
+    'MP_SUCCESS_URL',
+    defaultValue: 'https://jennygas.app/pago/exito',
+  );
+  static const String mpFailureUrl = String.fromEnvironment(
+    'MP_FAILURE_URL',
+    defaultValue: 'https://jennygas.app/pago/error',
+  );
+  static const String mpPendingUrl = String.fromEnvironment(
+    'MP_PENDING_URL',
+    defaultValue: 'https://jennygas.app/pago/pendiente',
+  );
 }
