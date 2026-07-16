@@ -21,6 +21,7 @@ import 'package:jennigas_customer/services/order_tracking_service.dart';
 import 'package:jennigas_customer/services/time_slot_service.dart';
 import 'package:jennigas_customer/services/rating_service.dart';
 import 'package:jennigas_customer/services/claim_service.dart';
+import 'package:jennigas_customer/services/notification_service.dart';
 import 'package:jennigas_customer/ui/bottom_sheets/rate_driver/rate_driver_sheet.dart';
 import 'package:jennigas_customer/ui/bottom_sheets/claim/claim_sheet.dart';
 import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart';
@@ -57,6 +58,7 @@ import 'package:jennigas_customer/ui/views/payment_webview/payment_webview_view.
     LazySingleton(classType: TimeSlotService),
     LazySingleton(classType: RatingService),
     LazySingleton(classType: ClaimService),
+    LazySingleton(classType: NotificationService),
 // @stacked-service
   ],
   bottomsheets: [

@@ -4,11 +4,13 @@ import 'package:jennigas_customer/app/app.locator.dart';
 
 import 'package:stacked_services/stacked_services.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/services/notification_service.dart';
 
 class StartupViewModel extends BaseViewModel {
   final _customerService = locator<CustomerService>();
   final _navigationService = locator<NavigationService>();
   final _dialogService = locator<DialogService>();
+  final _notificationService = locator<NotificationService>();
 
   // Place anything here that needs to happen before we get into the application
   Future runStartupLogic() async {
@@ -44,6 +46,11 @@ class StartupViewModel extends BaseViewModel {
         }
       }
     }
+
+    // Pide permiso de notificaciones y registra el token FCM (si hay sesión).
+    // No bloquea el arranque: NotificationService ya maneja sus propios
+    // errores internamente (p.ej. iOS sin APNs key configurada todavía).
+    await _notificationService.initialize();
 
     _navigationService.replaceWithHomeView();
   }

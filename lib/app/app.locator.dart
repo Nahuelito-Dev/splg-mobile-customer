@@ -18,6 +18,7 @@ import '../services/customer_service.dart';
 import '../services/gas_cylinder_service.dart';
 import '../services/history_service.dart';
 import '../services/location_service.dart';
+import '../services/notification_service.dart';
 import '../services/order_tracking_service.dart';
 import '../services/rating_service.dart';
 import '../services/time_slot_service.dart';
@@ -45,4 +46,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => TimeSlotService());
   locator.registerLazySingleton(() => RatingService());
   locator.registerLazySingleton(() => ClaimService());
+  locator.registerLazySingleton(() => NotificationService());
 }

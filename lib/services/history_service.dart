@@ -12,6 +12,7 @@ import 'package:jennigas_customer/domain/usecases/create_order_usecases.dart';
 import 'package:jennigas_customer/domain/usecases/fetch_customer_orders_usecases.dart';
 import 'package:jennigas_customer/domain/usecases/update_order_status_usecases.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/services/notification_service.dart';
 
 class HistoryService with ListenableServiceMixin {
   HistoryService() {
@@ -23,6 +24,7 @@ class HistoryService with ListenableServiceMixin {
   }
 
   final _customerService = locator<CustomerService>();
+  final _notificationService = locator<NotificationService>();
   final _orderDatasource = OrderRemoteDatasource();
   late OrderRepository _orderRepository;
   late CreateOrderUseCase _createOrderUseCase;
@@ -53,8 +55,9 @@ class HistoryService with ListenableServiceMixin {
       return const CreateOrderResult(success: false);
     }
 
+    final notificationToken = await _notificationService.currentToken;
     final result = await _createOrderUseCase(
-      _toCreateOrderPayload(order, timeSlotId),
+      _toCreateOrderPayload(order, timeSlotId, notificationToken),
       token,
     );
     final createdOrder = result.order;
@@ -153,7 +156,11 @@ class HistoryService with ListenableServiceMixin {
     return _history;
   }
 
-  Map<String, dynamic> _toCreateOrderPayload(Order order, String? timeSlotId) {
+  Map<String, dynamic> _toCreateOrderPayload(
+    Order order,
+    String? timeSlotId, [
+    String? notificationToken,
+  ]) {
     final items = order.items
         .where((item) => item.quantity > 0)
         .map((item) => {
@@ -173,6 +180,11 @@ class HistoryService with ListenableServiceMixin {
       // Agendamiento: fecha (YYYY-MM-DD) + franja, más las notas del cliente.
       // Antes se recogían en el checkout pero NO se enviaban (se perdían).
       ..._schedulingPayload(order, timeSlotId),
+      // Token FCM del device: el backend lo usa para notificar el estado de
+      // ESTE pedido aunque `notification_token` del customer todavía no esté
+      // seteado (p.ej. primer pedido justo después de otorgar el permiso).
+      if (notificationToken != null && notificationToken.isNotEmpty)
+        'notificationToken': notificationToken,
     };
   }
 

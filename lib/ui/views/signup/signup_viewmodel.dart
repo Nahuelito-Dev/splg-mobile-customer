@@ -6,6 +6,7 @@ import 'package:jennigas_customer/app/app.router.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/ui/common/app_strings.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/services/notification_service.dart';
 import 'package:jennigas_customer/ui/views/signup/signup_view.form.dart';
 import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
 
@@ -13,6 +14,7 @@ class SignupViewModel extends FormViewModel {
   final _dialogService = locator<DialogService>();
   final _customerService = locator<CustomerService>();
   final _navigationService = locator<NavigationService>();
+  final _notificationService = locator<NotificationService>();
 
   bool _isPasswordVisible = false;
   bool get isPasswordVisible => _isPasswordVisible;
@@ -53,6 +55,8 @@ class SignupViewModel extends FormViewModel {
     if (isRegistered) {
       await _customerService.signInWithEmailAndPassword(
           emailValue!, passwordValue!);
+      // Recién ahora hay sesión: registramos el token FCM contra el backend.
+      await _notificationService.registerCurrentToken();
       _navigationService.clearStackAndShow(Routes.homeView);
     } else {
       await _dialogService.showDialog(

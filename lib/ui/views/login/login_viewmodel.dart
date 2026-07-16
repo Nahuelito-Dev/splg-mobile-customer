@@ -5,12 +5,14 @@ import 'package:email_validator/email_validator.dart';
 import 'package:jennigas_customer/app/app.router.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/services/notification_service.dart';
 import 'package:jennigas_customer/ui/views/login/login_view.form.dart';
 
 class LoginViewModel extends FormViewModel {
   final _dialogService = locator<DialogService>();
   final _customerService = locator<CustomerService>();
   final _navigationService = locator<NavigationService>();
+  final _notificationService = locator<NotificationService>();
 
   String? _emailError;
   String? get emaileError => _emailError;
@@ -30,6 +32,9 @@ class LoginViewModel extends FormViewModel {
     final success = await _customerService.signInWithEmailAndPassword(
         emailValue!, passwordValue!);
     if (success) {
+      // Recién ahora hay sesión: registramos el token FCM contra el backend
+      // (antes del login, initialize() en startup no tenía con qué autenticar).
+      await _notificationService.registerCurrentToken();
       _navigationService.back();
     } else {
       _dialogService.showDialog(
