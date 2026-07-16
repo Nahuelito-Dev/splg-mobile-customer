@@ -4,6 +4,7 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/app/app.router.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
 
 import 'package:jennygas_lib/domain/customer.dart';
 import 'package:jennygas_lib/domain/address.dart';
@@ -62,6 +63,18 @@ class ProfileViewModel extends BaseViewModel {
     await _navigationService.navigateToAddressesView();
     // Al volver, refrescamos por si cambió la dirección predeterminada.
     notifyListeners();
+  }
+
+  Future<void> navigateToTerms() async {
+    await _navigationService.navigateToLegalView(
+      document: LegalDocument.terms,
+    );
+  }
+
+  Future<void> navigateToPrivacyPolicy() async {
+    await _navigationService.navigateToLegalView(
+      document: LegalDocument.privacy,
+    );
   }
 
   Future<void> signOut() async {

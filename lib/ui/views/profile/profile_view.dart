@@ -89,6 +89,27 @@ class ProfileView extends StackedView<ProfileViewModel> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh.withAlpha(100),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          _LegalLink(
+                            label: 'Términos y Condiciones',
+                            onTap: viewModel.navigateToTerms,
+                          ),
+                          _buildDivider(colorScheme),
+                          _LegalLink(
+                            label: 'Política de Privacidad',
+                            onTap: viewModel.navigateToPrivacyPolicy,
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -266,6 +287,51 @@ class _ProfileField extends StatelessWidget {
             splashRadius: 24,
           ),
       ],
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _LegalLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              Icons.description_outlined,
+              color: colorScheme.onSurface.withAlpha(150),
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: colorScheme.onSurface.withAlpha(100),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

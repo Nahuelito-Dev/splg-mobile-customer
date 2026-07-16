@@ -7,6 +7,7 @@ import 'package:jennigas_customer/app/app.locator.dart';
 import 'package:jennigas_customer/ui/common/app_strings.dart';
 import 'package:jennigas_customer/services/customer_service.dart';
 import 'package:jennigas_customer/ui/views/signup/signup_view.form.dart';
+import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
 
 class SignupViewModel extends FormViewModel {
   final _dialogService = locator<DialogService>();
@@ -117,5 +118,17 @@ class SignupViewModel extends FormViewModel {
 
   void navigateToLogin() {
     _navigationService.back();
+  }
+
+  Future<void> navigateToTerms() async {
+    await _navigationService.navigateToLegalView(
+      document: LegalDocument.terms,
+    );
+  }
+
+  Future<void> navigateToPrivacyPolicy() async {
+    await _navigationService.navigateToLegalView(
+      document: LegalDocument.privacy,
+    );
   }
 }

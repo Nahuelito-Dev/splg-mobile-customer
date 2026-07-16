@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked/stacked_annotations.dart';
@@ -158,7 +159,44 @@ class SignupView extends StackedView<SignupViewModel> with $SignupView {
             signupViewTitle,
           ),
         ),
+        const SizedBox(height: 16),
+        _buildLegalNotice(context, viewModel),
       ],
+    );
+  }
+
+  Widget _buildLegalNotice(BuildContext context, SignupViewModel viewModel) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final linkStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.primary,
+      fontWeight: FontWeight.bold,
+    );
+
+    return Text.rich(
+      TextSpan(
+        text: 'Al registrarte, aceptás nuestros ',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurface.withAlpha(170),
+        ),
+        children: [
+          TextSpan(
+            text: 'Términos y Condiciones',
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = viewModel.navigateToTerms,
+          ),
+          const TextSpan(text: ' y nuestra '),
+          TextSpan(
+            text: 'Política de Privacidad',
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = viewModel.navigateToPrivacyPolicy,
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      textAlign: TextAlign.center,
     );
   }
 
