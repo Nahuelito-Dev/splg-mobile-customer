@@ -1,4 +1,4 @@
-package com.gearthlogic.splg_customer
+package com.nahuelwagner.splg.customer
 
 import io.flutter.embedding.android.FlutterActivity
 

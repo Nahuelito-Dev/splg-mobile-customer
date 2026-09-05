@@ -2,7 +2,7 @@
 /// por `--dart-define` para device físico / staging / producción.
 ///
 /// Ejemplos:
-///   flutter run --dart-define=API_BASE_URL=https://api.jennygas.com \
+///   flutter run --dart-define=API_BASE_URL=https://api.splg.app \
 ///               --dart-define=DISTRIBUTOR=jeny-gas
 class AppConfig {
   AppConfig._();
@@ -31,14 +31,14 @@ class AppConfig {
   /// cerrarse solo, sin salir de la app.
   static const String mpSuccessUrl = String.fromEnvironment(
     'MP_SUCCESS_URL',
-    defaultValue: 'https://jennygas.app/pago/exito',
+    defaultValue: 'https://splg.app/pago/exito',
   );
   static const String mpFailureUrl = String.fromEnvironment(
     'MP_FAILURE_URL',
-    defaultValue: 'https://jennygas.app/pago/error',
+    defaultValue: 'https://splg.app/pago/error',
   );
   static const String mpPendingUrl = String.fromEnvironment(
     'MP_PENDING_URL',
-    defaultValue: 'https://jennygas.app/pago/pendiente',
+    defaultValue: 'https://splg.app/pago/pendiente',
   );
 }

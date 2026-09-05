@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:175861123393:android:d8f02e3a7a0321b30ef9c0",
         "android_client_info": {
-          "package_name": "com.gearthlogic.splg_customer"
+          "package_name": "com.nahuelwagner.splg.customer"
         }
       },
       "oauth_client": [],
