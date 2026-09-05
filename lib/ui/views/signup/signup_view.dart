@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked/stacked_annotations.dart';
 
-import 'package:jennigas_customer/ui/common/app_strings.dart';
-import 'package:jennigas_customer/ui/widgets/common/input/text_input.dart';
-import 'package:jennigas_customer/ui/views/signup/signup_view.form.dart';
+import 'package:splg_customer/ui/common/app_strings.dart';
+import 'package:splg_customer/ui/widgets/common/input/text_input.dart';
+import 'package:splg_customer/ui/views/signup/signup_view.form.dart';
 
 import 'signup_viewmodel.dart';
 

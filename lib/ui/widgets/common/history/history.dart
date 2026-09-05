@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:jennygas_lib/domain/order.dart';
-import 'package:jennygas_lib/domain/order_item.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_lib/domain/order_item.dart';
 
 import 'history_model.dart';
 

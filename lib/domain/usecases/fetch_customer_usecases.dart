@@ -1,5 +1,5 @@
-import 'package:jennygas_lib/domain/customer.dart';
-import 'package:jennigas_customer/domain/repository/customer_repository.dart';
+import 'package:splg_lib/domain/customer.dart';
+import 'package:splg_customer/domain/repository/customer_repository.dart';
 
 class FetchCustomerUseCase {
   final CustomerRepository _customerRepository;

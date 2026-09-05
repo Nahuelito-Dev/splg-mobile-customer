@@ -1,6 +1,6 @@
 import 'dart:developer';
 
-import 'package:jennigas_customer/core/network/api_client.dart';
+import 'package:splg_customer/core/network/api_client.dart';
 
 class CustomerRemoteDatasource {
   final _apiClient = ApiClient();

@@ -1,6 +1,6 @@
 import 'package:stacked/stacked.dart';
 
-import 'package:jennygas_lib/domain/order.dart';
+import 'package:splg_lib/domain/order.dart';
 
 class CartService with ListenableServiceMixin {
   CartService() {

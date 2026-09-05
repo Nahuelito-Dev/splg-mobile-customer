@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:jennygas_lib/domain/order.dart';
+import 'package:splg_lib/domain/order.dart';
 
 class PaymentMethodSelector extends StatelessWidget {
   final PaymentMethod selectedMethod;

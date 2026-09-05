@@ -1,4 +1,4 @@
-package com.gearthlogic.jennigas_customer
+package com.gearthlogic.splg_customer
 
 import io.flutter.embedding.android.FlutterActivity
 

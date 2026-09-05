@@ -1,6 +1,6 @@
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/data/datasource/rating_remote_datasource.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/data/datasource/rating_remote_datasource.dart';
+import 'package:splg_customer/services/customer_service.dart';
 
 /// Calificaciones del cliente hacia el chofer, una por pedido entregado.
 class RatingService {

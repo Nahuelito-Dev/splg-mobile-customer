@@ -4,7 +4,7 @@ import 'package:stacked/stacked.dart';
 
 import 'checkout_viewmodel.dart';
 
-import 'package:jennigas_customer/domain/time_slot_availability.dart';
+import 'package:splg_customer/domain/time_slot_availability.dart';
 import 'widgets/cylinder_checkout_item.dart';
 import 'widgets/payment_method_selector.dart';
 

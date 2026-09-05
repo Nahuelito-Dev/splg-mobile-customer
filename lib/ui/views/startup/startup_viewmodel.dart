@@ -1,10 +1,10 @@
 import 'package:stacked/stacked.dart';
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/app/app.locator.dart';
 
 import 'package:stacked_services/stacked_services.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/notification_service.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/notification_service.dart';
 
 class StartupViewModel extends BaseViewModel {
   final _customerService = locator<CustomerService>();

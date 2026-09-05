@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
-import 'package:jennigas_customer/core/config/app_config.dart';
+import 'package:splg_customer/core/config/app_config.dart';
 
 class ApiClient {
   static final instance = ApiClient._();

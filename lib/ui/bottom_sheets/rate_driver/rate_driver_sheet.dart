@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:jennigas_customer/ui/common/app_colors.dart';
-import 'package:jennigas_customer/ui/common/ui_helpers.dart';
+import 'package:splg_customer/ui/common/app_colors.dart';
+import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'rate_driver_sheet_model.dart';
 

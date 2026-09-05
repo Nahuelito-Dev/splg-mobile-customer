@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/ui/widgets/common/history/history_model.dart';
-import 'package:jennygas_lib/domain/order.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/ui/widgets/common/history/history_model.dart';
+import 'package:splg_lib/domain/order.dart';
 import 'package:mockito/mockito.dart';
 
 import '../helpers/test_helpers.dart';

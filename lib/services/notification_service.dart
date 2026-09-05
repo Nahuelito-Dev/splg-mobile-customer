@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/data/datasource/notification_remote_datasource.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/data/datasource/notification_remote_datasource.dart';
+import 'package:splg_customer/services/customer_service.dart';
 
 /// Notificaciones push (FCM). Pide permiso, obtiene el token del device y lo
 /// registra contra el backend (`POST /notifications/token`), que lo usa para

@@ -1,6 +1,6 @@
-import 'package:jennygas_lib/domain/address.dart';
+import 'package:splg_lib/domain/address.dart';
 
-import 'package:jennigas_customer/domain/repository/address_repository.dart';
+import 'package:splg_customer/domain/repository/address_repository.dart';
 
 class CreateAddressUsecases {
   final AddressRepository _addressRepository;

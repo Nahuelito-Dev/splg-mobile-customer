@@ -1,17 +1,17 @@
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:jennygas_lib/domain/order.dart';
-import 'package:jennygas_lib/domain/discount.dart';
-import 'package:jennygas_lib/domain/order_item.dart';
-import 'package:jennygas_lib/domain/gas_cylinder.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_lib/domain/discount.dart';
+import 'package:splg_lib/domain/order_item.dart';
+import 'package:splg_lib/domain/gas_cylinder.dart';
 
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/services/cart_service.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/gas_cylinder_service.dart';
-import 'package:jennigas_customer/services/history_service.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/gas_cylinder_service.dart';
+import 'package:splg_customer/services/history_service.dart';
 
 class OrderModel extends ReactiveViewModel {
   final _cartService = locator<CartService>();

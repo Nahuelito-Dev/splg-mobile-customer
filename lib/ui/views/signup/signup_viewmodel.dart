@@ -2,13 +2,13 @@ import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:email_validator/email_validator.dart';
 
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/ui/common/app_strings.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/notification_service.dart';
-import 'package:jennigas_customer/ui/views/signup/signup_view.form.dart';
-import 'package:jennigas_customer/ui/views/legal/legal_view.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/ui/common/app_strings.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/notification_service.dart';
+import 'package:splg_customer/ui/views/signup/signup_view.form.dart';
+import 'package:splg_customer/ui/views/legal/legal_view.dart';
 
 class SignupViewModel extends FormViewModel {
   final _dialogService = locator<DialogService>();

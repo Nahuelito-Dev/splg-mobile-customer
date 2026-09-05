@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:jennygas_lib/domain/address.dart';
+import 'package:splg_lib/domain/address.dart';
 
 import 'addresses_viewmodel.dart';
 

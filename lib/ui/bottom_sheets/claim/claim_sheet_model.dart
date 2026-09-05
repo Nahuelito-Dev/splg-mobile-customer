@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/services/claim_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/claim_service.dart';
 
 /// Motivos frecuentes de reclamo. Son etiquetas libres (el backend guarda
 /// `reason` como string), la última abre a texto libre en la descripción.

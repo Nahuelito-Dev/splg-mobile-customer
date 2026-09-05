@@ -1,5 +1,5 @@
-import 'package:jennygas_lib/domain/order.dart';
-import 'package:jennigas_customer/domain/repository/order_repository.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/domain/repository/order_repository.dart';
 
 class FetchCustomerOrdersUseCase {
   FetchCustomerOrdersUseCase(this._orderRepository);

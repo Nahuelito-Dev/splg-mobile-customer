@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.locator.dart';
 
 import '../helpers/test_helpers.dart';
 

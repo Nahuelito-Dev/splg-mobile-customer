@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/services/rating_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/rating_service.dart';
 
 class RateDriverSheetModel extends BaseViewModel {
   final _ratingService = locator<RatingService>();

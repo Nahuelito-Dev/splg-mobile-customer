@@ -1,8 +1,8 @@
 import 'dart:developer';
 
-import 'package:jennygas_lib/domain/customer.dart';
-import 'package:jennigas_customer/domain/repository/customer_repository.dart';
-import 'package:jennigas_customer/data/datasource/customer_remote_datasource.dart';
+import 'package:splg_lib/domain/customer.dart';
+import 'package:splg_customer/domain/repository/customer_repository.dart';
+import 'package:splg_customer/data/datasource/customer_remote_datasource.dart';
 
 class CustomerRepositoryImp implements CustomerRepository {
   final CustomerRemoteDatasource remoteDatasource;

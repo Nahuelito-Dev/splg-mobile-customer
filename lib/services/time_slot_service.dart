@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
-import 'package:jennigas_customer/data/datasource/time_slot_remote_datasource.dart';
-import 'package:jennigas_customer/domain/time_slot_availability.dart';
+import 'package:splg_customer/data/datasource/time_slot_remote_datasource.dart';
+import 'package:splg_customer/domain/time_slot_availability.dart';
 
 /// Franjas horarias de entrega (agendamiento). El backend agenda por franjas
 /// fijas con cupo diario (las administra el panel), así que el cliente elige

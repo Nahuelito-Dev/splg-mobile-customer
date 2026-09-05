@@ -1,4 +1,4 @@
-import 'package:jennigas_customer/domain/repository/order_repository.dart';
+import 'package:splg_customer/domain/repository/order_repository.dart';
 
 class UpdateOrderStatusUseCase {
   UpdateOrderStatusUseCase(this._orderRepository);

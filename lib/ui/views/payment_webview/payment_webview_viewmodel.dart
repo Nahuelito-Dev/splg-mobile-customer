@@ -2,9 +2,9 @@ import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/core/config/app_config.dart';
-import 'package:jennigas_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/core/config/app_config.dart';
+import 'package:splg_customer/domain/payment_outcome.dart';
 
 /// WebView embebido para el Checkout Pro de MercadoPago: el pago no sale de
 /// la app. El form de tarjeta/dinero en cuenta lo hostea MP; esta pantalla

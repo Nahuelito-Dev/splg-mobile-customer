@@ -1,4 +1,4 @@
-import 'package:jennygas_lib/domain/order.dart';
+import 'package:splg_lib/domain/order.dart';
 
 class OrderApiMapper {
   static Order? parseOrder(dynamic raw) {

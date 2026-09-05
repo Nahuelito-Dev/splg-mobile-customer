@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:jennygas_lib/domain/discount.dart';
-import 'package:jennygas_lib/domain/order_item.dart';
+import 'package:splg_lib/domain/discount.dart';
+import 'package:splg_lib/domain/order_item.dart';
 
 class CylinderCheckoutItem extends StatelessWidget {
   final OrderItem item;

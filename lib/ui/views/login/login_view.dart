@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked/stacked_annotations.dart';
 
-import 'package:jennigas_customer/ui/common/app_strings.dart';
-import 'package:jennigas_customer/ui/views/login/login_view.form.dart';
+import 'package:splg_customer/ui/common/app_strings.dart';
+import 'package:splg_customer/ui/views/login/login_view.form.dart';
 
 import 'login_viewmodel.dart';
 

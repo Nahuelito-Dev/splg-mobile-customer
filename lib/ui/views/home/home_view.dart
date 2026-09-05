@@ -4,9 +4,9 @@ import 'package:stacked/stacked.dart';
 import 'package:bootstrap_icons/bootstrap_icons.dart';
 
 import 'home_viewmodel.dart';
-import 'package:jennigas_customer/ui/widgets/common/order/order.dart';
-import 'package:jennigas_customer/ui/widgets/common/history/history.dart';
-import 'package:jennigas_customer/ui/widgets/common/account/account.dart';
+import 'package:splg_customer/ui/widgets/common/order/order.dart';
+import 'package:splg_customer/ui/widgets/common/history/history.dart';
+import 'package:splg_customer/ui/widgets/common/account/account.dart';
 
 class HomeView extends StackedView<HomeViewModel> {
   const HomeView({super.key});

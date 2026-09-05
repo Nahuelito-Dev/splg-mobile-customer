@@ -1,18 +1,18 @@
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:jennygas_lib/domain/order.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/data/datasource/order_remote_datasource.dart';
-import 'package:jennigas_customer/data/mappers/order_api_mapper.dart';
-import 'package:jennigas_customer/data/repository/order_repository_imp.dart';
-import 'package:jennigas_customer/domain/create_order_result.dart';
-import 'package:jennigas_customer/domain/repository/order_repository.dart';
-import 'package:jennigas_customer/domain/usecases/create_order_usecases.dart';
-import 'package:jennigas_customer/domain/usecases/fetch_customer_orders_usecases.dart';
-import 'package:jennigas_customer/domain/usecases/update_order_status_usecases.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/notification_service.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
+import 'package:splg_customer/data/mappers/order_api_mapper.dart';
+import 'package:splg_customer/data/repository/order_repository_imp.dart';
+import 'package:splg_customer/domain/create_order_result.dart';
+import 'package:splg_customer/domain/repository/order_repository.dart';
+import 'package:splg_customer/domain/usecases/create_order_usecases.dart';
+import 'package:splg_customer/domain/usecases/fetch_customer_orders_usecases.dart';
+import 'package:splg_customer/domain/usecases/update_order_status_usecases.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/notification_service.dart';
 
 class HistoryService with ListenableServiceMixin {
   HistoryService() {

@@ -4,12 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'package:jennygas_lib/theme/app_theme.dart';
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/app/app.dialogs.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/firebase_options.dart';
-import 'package:jennigas_customer/app/app.bottomsheets.dart';
+import 'package:splg_lib/theme/app_theme.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/app/app.dialogs.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/firebase_options.dart';
+import 'package:splg_customer/app/app.bottomsheets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

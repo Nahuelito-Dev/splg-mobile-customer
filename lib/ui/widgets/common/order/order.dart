@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
 import 'order_model.dart';
-import 'package:jennygas_lib/domain/gas_cylinder.dart';
+import 'package:splg_lib/domain/gas_cylinder.dart';
 
 class Order extends StackedView<OrderModel> {
   const Order({super.key});

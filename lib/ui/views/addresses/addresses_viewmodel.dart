@@ -1,11 +1,11 @@
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:jennygas_lib/domain/address.dart';
+import 'package:splg_lib/domain/address.dart';
 
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/services/customer_service.dart';
 
 class AddressesViewModel extends BaseViewModel {
   final _customerService = locator<CustomerService>();

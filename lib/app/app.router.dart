@@ -8,21 +8,21 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:flutter/material.dart' as _i14;
 import 'package:flutter/material.dart';
-import 'package:jennigas_customer/ui/views/addresses/addresses_view.dart'
+import 'package:splg_customer/ui/views/addresses/addresses_view.dart'
     as _i9;
-import 'package:jennigas_customer/ui/views/checkout/checkout_view.dart' as _i4;
-import 'package:jennigas_customer/ui/views/home/home_view.dart' as _i2;
-import 'package:jennigas_customer/ui/views/legal/legal_view.dart' as _i12;
-import 'package:jennigas_customer/ui/views/login/login_view.dart' as _i5;
-import 'package:jennigas_customer/ui/views/map/map_view.dart' as _i7;
-import 'package:jennigas_customer/ui/views/order_tracking/order_tracking_view.dart'
+import 'package:splg_customer/ui/views/checkout/checkout_view.dart' as _i4;
+import 'package:splg_customer/ui/views/home/home_view.dart' as _i2;
+import 'package:splg_customer/ui/views/legal/legal_view.dart' as _i12;
+import 'package:splg_customer/ui/views/login/login_view.dart' as _i5;
+import 'package:splg_customer/ui/views/map/map_view.dart' as _i7;
+import 'package:splg_customer/ui/views/order_tracking/order_tracking_view.dart'
     as _i10;
-import 'package:jennigas_customer/ui/views/payment_webview/payment_webview_view.dart'
+import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart'
     as _i13;
-import 'package:jennigas_customer/ui/views/profile/profile_view.dart' as _i8;
-import 'package:jennigas_customer/ui/views/qr_scan/qr_scan_view.dart' as _i11;
-import 'package:jennigas_customer/ui/views/signup/signup_view.dart' as _i6;
-import 'package:jennigas_customer/ui/views/startup/startup_view.dart' as _i3;
+import 'package:splg_customer/ui/views/profile/profile_view.dart' as _i8;
+import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart' as _i11;
+import 'package:splg_customer/ui/views/signup/signup_view.dart' as _i6;
+import 'package:splg_customer/ui/views/startup/startup_view.dart' as _i3;
 import 'package:stacked/stacked.dart' as _i1;
 import 'package:stacked_services/stacked_services.dart' as _i15;
 

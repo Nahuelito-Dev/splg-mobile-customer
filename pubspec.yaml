@@ -1,4 +1,4 @@
-name: jennigas_customer
+name: splg_customer
 description: A new Flutter project.
 publish_to: 'none'
 version: 0.1.0
@@ -39,9 +39,9 @@ dependencies:
   dio: ^5.9.0
   # dio logger
   pretty_dio_logger: ^1.4.0
-  # jennygas_lib
-  jennygas_lib:
-    path: ../jennygas_lib
+  # splg_lib
+  splg_lib:
+    path: ../splg-lib
   # escaneo de QR (confirmacion de entrega)
   mobile_scanner: ^7.2.0
   # Idempotency-Key para requests no idempotentes

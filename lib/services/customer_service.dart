@@ -1,18 +1,18 @@
 import 'dart:developer';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:jennigas_customer/data/datasource/address_remote_datasource.dart';
-import 'package:jennigas_customer/data/repository/address_repository_imp.dart';
+import 'package:splg_customer/data/datasource/address_remote_datasource.dart';
+import 'package:splg_customer/data/repository/address_repository_imp.dart';
 
-import 'package:jennigas_customer/domain/repository/customer_repository.dart';
-import 'package:jennigas_customer/data/repository/customer_repository_imp.dart';
-import 'package:jennigas_customer/data/datasource/customer_remote_datasource.dart';
-import 'package:jennigas_customer/domain/usecases/create_address_usecases.dart';
-import 'package:jennigas_customer/domain/usecases/create_customer_usecases.dart';
-import 'package:jennigas_customer/domain/usecases/fetch_customer_usecases.dart';
+import 'package:splg_customer/domain/repository/customer_repository.dart';
+import 'package:splg_customer/data/repository/customer_repository_imp.dart';
+import 'package:splg_customer/data/datasource/customer_remote_datasource.dart';
+import 'package:splg_customer/domain/usecases/create_address_usecases.dart';
+import 'package:splg_customer/domain/usecases/create_customer_usecases.dart';
+import 'package:splg_customer/domain/usecases/fetch_customer_usecases.dart';
 
-import 'package:jennygas_lib/domain/address.dart';
-import 'package:jennygas_lib/domain/customer.dart';
+import 'package:splg_lib/domain/address.dart';
+import 'package:splg_lib/domain/customer.dart';
 
 class CustomerService {
   CustomerService() {

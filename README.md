@@ -1,4 +1,4 @@
-# jennigas_customer
+# splg_customer
 
 A new Flutter project.
 

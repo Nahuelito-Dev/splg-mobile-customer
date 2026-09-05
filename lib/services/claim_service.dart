@@ -1,6 +1,6 @@
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/data/datasource/claim_remote_datasource.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/data/datasource/claim_remote_datasource.dart';
+import 'package:splg_customer/services/customer_service.dart';
 
 /// Reclamos del cliente sobre un pedido (`POST /claims`). El backend los deja
 /// PENDING para que el panel los resuelva; no hay listado del lado del cliente.

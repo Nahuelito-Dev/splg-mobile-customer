@@ -1,5 +1,5 @@
-import 'package:jennigas_customer/domain/create_order_result.dart';
-import 'package:jennigas_customer/domain/repository/order_repository.dart';
+import 'package:splg_customer/domain/create_order_result.dart';
+import 'package:splg_customer/domain/repository/order_repository.dart';
 
 class CreateOrderUseCase {
   CreateOrderUseCase(this._orderRepository);

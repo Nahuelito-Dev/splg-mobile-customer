@@ -6,9 +6,9 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:jennygas_lib/domain/address.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/services/location_service.dart';
+import 'package:splg_lib/domain/address.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/location_service.dart';
 
 class MapViewModel extends BaseViewModel {
   //final _snackbarService = locator<SnackbarService>();

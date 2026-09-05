@@ -3,19 +3,19 @@ import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:jennygas_lib/domain/order.dart';
-import 'package:jennygas_lib/domain/address.dart';
-import 'package:jennygas_lib/domain/discount.dart';
-import 'package:jennygas_lib/domain/order_item.dart';
-import 'package:jennigas_customer/app/app.router.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
-import 'package:jennigas_customer/services/cart_service.dart';
-import 'package:jennigas_customer/services/history_service.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/time_slot_service.dart';
-import 'package:jennigas_customer/domain/time_slot_availability.dart';
-import 'package:jennigas_customer/domain/payment_outcome.dart';
-import 'package:jennigas_customer/app/app.bottomsheets.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_lib/domain/address.dart';
+import 'package:splg_lib/domain/discount.dart';
+import 'package:splg_lib/domain/order_item.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/time_slot_service.dart';
+import 'package:splg_customer/domain/time_slot_availability.dart';
+import 'package:splg_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/app/app.bottomsheets.dart';
 
 class CheckoutViewModel extends ReactiveViewModel {
   final _cartService = locator<CartService>();

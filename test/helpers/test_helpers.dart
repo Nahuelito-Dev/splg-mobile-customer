@@ -1,12 +1,12 @@
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
-import 'package:jennigas_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.locator.dart';
 import 'package:stacked_services/stacked_services.dart';
-import 'package:jennigas_customer/services/history_service.dart';
-import 'package:jennigas_customer/services/gas_cylinder_service.dart';
-import 'package:jennigas_customer/services/customer_service.dart';
-import 'package:jennigas_customer/services/cart_service.dart';
-import 'package:jennigas_customer/services/location_service.dart';
+import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/gas_cylinder_service.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/location_service.dart';
 // @stacked-import
 
 import 'test_helpers.mocks.dart';
