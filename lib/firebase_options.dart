@@ -50,19 +50,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCw-yUeWFyQOhCS9JpZgJ-jR5eBroON3dE',
-    appId: '1:175861123393:android:d8f02e3a7a0321b30ef9c0',
-    messagingSenderId: '175861123393',
-    projectId: 'jennigas-55f69',
-    storageBucket: 'jennigas-55f69.firebasestorage.app',
+    apiKey: 'AIzaSyCINEEptz-g3DX_vVkn1RfKftGNHtqwCas',
+    appId: '1:757204810726:android:565a5705440979bf8f7427',
+    messagingSenderId: '757204810726',
+    projectId: 'splg-gas',
+    storageBucket: 'splg-gas.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAlBgzIhkNk1UuWZTpo47txKOeN2Q78LD4',
-    appId: '1:175861123393:ios:1dcbec3a490b2dd50ef9c0',
-    messagingSenderId: '175861123393',
-    projectId: 'jennigas-55f69',
-    storageBucket: 'jennigas-55f69.firebasestorage.app',
+    apiKey: 'AIzaSyAZE8JBLkpd2PjrdV5lNxwJLLMXinNe7oU',
+    appId: '1:757204810726:ios:c01428f4d0759aa28f7427',
+    messagingSenderId: '757204810726',
+    projectId: 'splg-gas',
+    storageBucket: 'splg-gas.firebasestorage.app',
     iosBundleId: 'com.nahuelwagner.splg.customer',
   );
 }
