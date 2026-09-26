@@ -8,8 +8,11 @@ class CustomerRemoteDatasource {
   Future<(bool, dynamic)> createCustomer(
       Map<String, dynamic> customerData) async {
     try {
+      // Alta pública de clientes. La ruta anterior
+      // (users/customer-registration) sigue andando para las versiones ya
+      // publicadas, pero se va a retirar.
       final response = await _apiClient.post(
-        'users/customer-registration',
+        'auth/registro',
         customerData,
       );
 
