@@ -14,6 +14,9 @@ import 'package:splg_customer/services/order_tracking_service.dart';
 import 'package:splg_customer/services/claim_service.dart';
 import 'package:splg_customer/services/rating_service.dart';
 import 'package:splg_customer/services/session_service.dart';
+import 'package:splg_customer/services/photo_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
+import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/domain/orders_page.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_lib/domain/order.dart';
@@ -43,12 +46,16 @@ import 'test_helpers.mocks.dart';
     MockSpec<ClaimService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<RatingService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<SessionService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<PhotoService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<ProfilePhotoService>(onMissingStub: OnMissingStub.returnDefault),
 // @stacked-mock-spec
   ],
 )
 void registerServices() {
   provideDummy<PermissionOutcome>(PermissionOutcome.granted);
   provideDummy<ApiResult<void>>(const ApiResult.ok());
+  provideDummy<ApiResult<String?>>(const ApiResult.ok());
+  provideDummy<ApiResult<SignedUrl?>>(const ApiResult.ok());
   provideDummy<ApiResult<Address?>>(const ApiResult.ok());
   provideDummy<ApiResult<ClaimsPage>>(
       const ApiResult.ok(ClaimsPage(claims: [], total: 0)));
@@ -79,6 +86,8 @@ void registerServices() {
   getAndRegisterClaimService();
   getAndRegisterRatingService();
   getAndRegisterSessionService();
+  getAndRegisterPhotoService();
+  getAndRegisterProfilePhotoService();
 // @stacked-mock-register
 }
 
@@ -217,6 +226,20 @@ MockRatingService getAndRegisterRatingService() {
   _removeRegistrationIfExists<RatingService>();
   final service = MockRatingService();
   locator.registerSingleton<RatingService>(service);
+  return service;
+}
+
+MockPhotoService getAndRegisterPhotoService() {
+  _removeRegistrationIfExists<PhotoService>();
+  final service = MockPhotoService();
+  locator.registerSingleton<PhotoService>(service);
+  return service;
+}
+
+MockProfilePhotoService getAndRegisterProfilePhotoService() {
+  _removeRegistrationIfExists<ProfilePhotoService>();
+  final service = MockProfilePhotoService();
+  locator.registerSingleton<ProfilePhotoService>(service);
   return service;
 }
 

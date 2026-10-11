@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
@@ -172,5 +173,39 @@ class ApiClient {
     } catch (e) {
       rethrow;
     }
+  }
+
+  /// Sube un archivo como multipart (campo `file`) al endpoint del back, con el
+  /// token. Nunca se sube directo al almacenamiento.
+  Future<Response> upload(
+    String method,
+    String path,
+    Uint8List bytes,
+    String filename,
+    String contentType,
+    String token,
+  ) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        bytes,
+        filename: filename,
+        contentType: DioMediaType.parse(contentType),
+      ),
+    });
+    return dio.request(
+      path,
+      data: form,
+      options: Options(
+        method: method,
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Accept': 'application/json',
+          'X-Client-Source': 'customer-app',
+          'X-Distributor': AppConfig.distributorSlug,
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
   }
 }

@@ -3,18 +3,24 @@ import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
 
 class ClaimRemoteDatasource {
+  /// El alta responde en snake_case (`claim_id`); el listado, en camelCase.
+  static String? claimIdFrom(Object? body) => body is Map
+      ? (body['claim_id'] ?? body['claimId'])?.toString()
+      : null;
+
   final _apiClient = ApiClient();
 
   /// Crea un reclamo (`POST /claims`). Body:
-  /// `{ orderId, customerId, reason, description }`.
-  Future<ApiResult<void>> createClaim(
+  /// `{ orderId, customerId, reason, description }` (sin `photoUrl`: la foto se
+  /// sube aparte). Devuelve el `claimId`.
+  Future<ApiResult<String?>> createClaim(
     Map<String, dynamic> body,
     String token,
   ) async {
     try {
       final response = await _apiClient.post('claims', body, token);
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return const ApiResult.ok();
+        return ApiResult.ok(claimIdFrom(response.data));
       }
       return const ApiResult.fail(
         'No pudimos enviar el reclamo. Probá de nuevo.',

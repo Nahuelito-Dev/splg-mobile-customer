@@ -14,6 +14,10 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
       AppDrawerViewModel();
 
   @override
+  void onViewModelReady(AppDrawerViewModel viewModel) =>
+      viewModel.loadPhoto();
+
+  @override
   Widget builder(
       BuildContext context, AppDrawerViewModel model, Widget? child) {
     Widget item(String label, IconData icon, Future<void> Function() go) =>
@@ -75,6 +79,27 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
                       },
                     ),
                   ],
+                ),
+                line(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      SplgAvatar(
+                        key: const Key('drawer-avatar'),
+                        imageUrl: model.photoUrl,
+                        initials: model.initials,
+                        radius: 34,
+                      ),
+                      if (model.fullName.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(model.fullName,
+                              style: SplgType.of(context).subtitle.copyWith(
+                                  color: Colors.white)),
+                        ),
+                    ],
+                  ),
                 ),
                 line(),
                 group([

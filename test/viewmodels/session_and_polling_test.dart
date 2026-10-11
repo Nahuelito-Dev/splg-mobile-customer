@@ -14,6 +14,7 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/session_service.dart';
 import 'package:splg_customer/ui/views/home/home_viewmodel.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -185,6 +186,9 @@ void main() {
       verify(history.reset()).called(1);
       verify((locator<NotificationService>() as MockNotificationService)
               .clearToken())
+          .called(1);
+      verify((locator<ProfilePhotoService>() as MockProfilePhotoService)
+              .clear())
           .called(1);
       verify(customers.signOut()).called(1);
       verify(customers.reset()).called(1);

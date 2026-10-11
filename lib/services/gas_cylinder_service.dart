@@ -17,6 +17,16 @@ class GasCylinderService {
   final List<GasCylinder> _gasCylinder = [];
   List<GasCylinder> get gasCylinder => _gasCylinder;
 
+  /// Foto firmada de una garrafa si todavía no venció; null = usar el asset.
+  String? photoUrl(String id) {
+    final p = _gascylinderRepository.photos[id];
+    return p != null && p.isValid ? p.url : null;
+  }
+
+  /// Hay garrafas con foto cuya URL ya venció (hay que volver a pedir el catálogo).
+  bool get hasExpiredPhotos =>
+      _gascylinderRepository.photos.values.any((p) => !p.isValid);
+
   Future<List<GasCylinder>> getGasCylinders() async {
     final gasCylinders = await _fetchGasCylindersUseCase();
 

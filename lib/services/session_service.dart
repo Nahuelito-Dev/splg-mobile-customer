@@ -10,6 +10,7 @@ import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
 
@@ -29,6 +30,7 @@ class SessionService {
       }
     }
 
+    await step('foto', () => locator<ProfilePhotoService>().clear());
     await step('tracking', () => locator<OrderTrackingService>().disconnect());
     await step('cart', () => locator<CartService>().clearOrder());
     await step('history', () => locator<HistoryService>().reset());

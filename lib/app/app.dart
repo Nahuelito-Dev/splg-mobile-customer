@@ -44,6 +44,8 @@ import 'package:splg_customer/ui/views/personal_info/personal_info_view.dart';
 import 'package:splg_customer/ui/views/edit_profile/edit_profile_view.dart';
 import 'package:splg_customer/ui/views/change_password/change_password_view.dart';
 import 'package:splg_customer/services/session_service.dart';
+import 'package:splg_customer/services/photo_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 // @stacked-import
 
 @StackedApp(
@@ -93,6 +95,8 @@ import 'package:splg_customer/services/session_service.dart';
     LazySingleton(classType: NotificationService),
     LazySingleton(classType: AppPermissions),
     LazySingleton(classType: SessionService),
+    LazySingleton(classType: PhotoService),
+    LazySingleton(classType: ProfilePhotoService),
 // @stacked-service
   ],
   bottomsheets: [

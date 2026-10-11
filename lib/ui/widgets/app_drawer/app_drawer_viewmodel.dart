@@ -3,13 +3,34 @@ import 'package:stacked_services/stacked_services.dart';
 
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/session_service.dart';
 import 'package:splg_customer/ui/views/legal/legal_view.dart';
 
 /// Navegación del menú lateral: cada ítem abre su pantalla.
-class AppDrawerViewModel extends BaseViewModel {
+class AppDrawerViewModel extends ReactiveViewModel {
   final _nav = locator<NavigationService>();
   final _session = locator<SessionService>();
+
+  final _photo = locator<ProfilePhotoService>();
+  final _customer = locator<CustomerService>();
+
+  @override
+  List<ListenableServiceMixin> get listenableServices => [_photo];
+
+  String? get photoUrl => _photo.url;
+  String get fullName => _customer.customer.fullName;
+
+  String get initials {
+    final parts =
+        fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return '';
+    return (parts.first[0] + (parts.length > 1 ? parts.last[0] : ''))
+        .toUpperCase();
+  }
+
+  Future<void> loadPhoto() => _photo.refresh();
 
   Future<void> openProfile() => _nav.navigateToProfileView();
   Future<void> openOrders() => _nav.navigateToOrdersView();

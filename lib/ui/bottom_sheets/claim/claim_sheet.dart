@@ -3,6 +3,7 @@ import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import 'package:splg_customer/services/photo_picker.dart';
 import 'claim_sheet_model.dart';
 
 /// Hoja para abrir un reclamo sobre un pedido. `request.data` trae
@@ -58,6 +59,54 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                 minLines: 3,
                 enabled: !viewModel.isBusy,
               ),
+              const SizedBox(height: 12),
+              if (viewModel.photo == null)
+                Row(
+                  children: [
+                    Expanded(
+                      child: SplgButton(
+                        key: const Key('claim-photo-camera'),
+                        title: 'Sacar foto',
+                        style: SplgButtonStyle.outlined,
+                        onPressed: viewModel.isBusy || viewModel.processingPhoto
+                            ? null
+                            : () => viewModel.attach(PhotoSource.camera),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SplgButton(
+                        key: const Key('claim-photo-gallery'),
+                        title: 'Elegir de la galería',
+                        style: SplgButtonStyle.outlined,
+                        onPressed: viewModel.isBusy || viewModel.processingPhoto
+                            ? null
+                            : () => viewModel.attach(PhotoSource.gallery),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(viewModel.photo!.bytes,
+                          key: const Key('claim-photo-preview'),
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Foto adjunta', style: type.body)),
+                    TextButton(
+                      key: const Key('claim-photo-remove'),
+                      onPressed:
+                          viewModel.isBusy ? null : viewModel.removePhoto,
+                      child: const Text('Quitar'),
+                    ),
+                  ],
+                ),
               if (viewModel.errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -69,10 +118,15 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
               SplgButton(
                 title: 'Enviar reclamo',
                 loading: viewModel.isBusy,
-                onPressed: () async {
-                  final ok = await viewModel.submit(orderId);
-                  if (ok) completer?.call(SheetResponse(confirmed: true));
-                },
+                onPressed: viewModel.processingPhoto
+                    ? null
+                    : () async {
+                        final ok = await viewModel.submit(orderId);
+                        if (ok) {
+                          completer?.call(SheetResponse(
+                              confirmed: true, data: viewModel.photoWarning));
+                        }
+                      },
               ),
               const SizedBox(height: 8),
               SplgButton(

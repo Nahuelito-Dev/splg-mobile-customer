@@ -110,7 +110,8 @@ class OrderDetailViewModel extends LoadViewModel {
       await _dialogs.showDialog(
         title: 'Reclamo enviado',
         description:
-            'Recibimos tu reclamo. Lo vamos a revisar y te contactamos.',
+            'Recibimos tu reclamo. Lo vamos a revisar y te contactamos.'
+            '${response?.data is String ? '\n\n${response!.data}' : ''}',
         buttonTitle: 'Aceptar',
       );
     }

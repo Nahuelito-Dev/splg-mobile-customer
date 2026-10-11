@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/widgets/photo_source_sheet.dart';
 import 'package:splg_customer/ui/widgets/app_header.dart';
 import 'profile_viewmodel.dart';
 
@@ -10,6 +11,9 @@ class ProfileView extends StackedView<ProfileViewModel> {
 
   @override
   ProfileViewModel viewModelBuilder(BuildContext context) => ProfileViewModel();
+
+  @override
+  void onViewModelReady(ProfileViewModel viewModel) => viewModel.loadPhoto();
 
   @override
   Widget builder(BuildContext context, ProfileViewModel model, Widget? child) {
@@ -27,9 +31,11 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       name: model.fullName,
                       phone: model.phoneNumber,
                       initials: model.initials,
+                      imageUrl: model.photoUrl,
                       linkLabel: 'Editar perfil',
                       onLink: model.editProfile,
                     ),
+                    _PhotoActions(model: model),
                     Divider(color: brasa.primaryStrong, height: 16),
                     SplgMenuItem(
                       label: 'Información personal',
@@ -86,5 +92,55 @@ class ProfileView extends StackedView<ProfileViewModel> {
         illustration: SplgIllustration.error,
       );
     }
+  }
+}
+
+/// Cambiar o quitar la foto de perfil.
+class _PhotoActions extends StatelessWidget {
+  const _PhotoActions({required this.model});
+
+  final ProfileViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final working = model.busy('photo');
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton.icon(
+              key: const Key('profile-photo-change'),
+              onPressed: working ? null : () => _choose(context),
+              icon: working
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.photo_camera_outlined, size: 18),
+              label: Text(model.hasPhoto ? 'Cambiar foto' : 'Agregar foto'),
+            ),
+            if (model.hasPhoto)
+              TextButton(
+                key: const Key('profile-photo-remove'),
+                onPressed: working ? null : model.removePhoto,
+                child: const Text('Quitar'),
+              ),
+          ],
+        ),
+        if (model.photoError != null)
+          Text(model.photoError!,
+              key: const Key('profile-photo-error'),
+              textAlign: TextAlign.center,
+              style: SplgType.of(context)
+                  .caption
+                  .copyWith(color: context.brasa.danger)),
+      ],
+    );
+  }
+
+  Future<void> _choose(BuildContext context) async {
+    final source = await choosePhotoSource(context);
+    if (source != null) await model.changePhoto(source);
   }
 }

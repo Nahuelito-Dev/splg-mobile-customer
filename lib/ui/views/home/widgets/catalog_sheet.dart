@@ -4,11 +4,13 @@ import 'package:splg_lib/splg_lib.dart';
 import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/views/home/home_viewmodel.dart';
+import 'package:splg_customer/ui/widgets/signed_image.dart';
 import 'cylinder_detail_sheet.dart';
 
 /// Catálogo de garrafas en una hoja expandida sobre el mapa del inicio. Se
 /// repinta con el viewmodel (cantidades y total) y "Continuar" lleva al checkout.
 Future<void> showCatalogSheet(BuildContext context, HomeViewModel model) {
+  model.renewCatalogPhotos();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -85,7 +87,11 @@ class _CatalogSheet extends StatelessWidget {
       itemBuilder: (context, i) {
         final c = model.cylinders[i];
         return SplgProductCard(
-          image: Image.asset('assets/cylinder_10.png', fit: BoxFit.contain),
+          image: SignedImage(
+            key: Key('cylinder-photo-${c.id}'),
+            url: model.cylinderPhoto(c.id),
+            fallback: Image.asset('assets/cylinder_10.png', fit: BoxFit.contain),
+          ),
           title: c.label,
           price: money.format(c.price),
           quantity: model.getItemQuantity(c.id),
@@ -99,7 +105,9 @@ class _CatalogSheet extends StatelessWidget {
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (_) => CylinderDetailSheet(
-                cylinder: c, onAdd: () => model.addItem(c, 1)),
+                cylinder: c,
+                photoUrl: model.cylinderPhoto(c.id),
+                onAdd: () => model.addItem(c, 1)),
           ),
         );
       },

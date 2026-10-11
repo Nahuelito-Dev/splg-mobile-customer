@@ -3,6 +3,7 @@ import 'package:splg_lib/splg_lib.dart';
 
 import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
+import 'package:splg_customer/ui/widgets/signed_image.dart';
 
 /// Detalle de una garrafa: imagen, precio, promociones con el precio unitario
 /// por tramo, métodos de pago y botón para agregar.
@@ -11,10 +12,14 @@ class CylinderDetailSheet extends StatelessWidget {
     super.key,
     required this.cylinder,
     required this.onAdd,
+    this.photoUrl,
   });
 
   final GasCylinder cylinder;
   final VoidCallback onAdd;
+
+  /// Foto firmada del back; sin ella (o vencida) va el asset.
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -46,8 +51,11 @@ class CylinderDetailSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-                child: Image.asset('assets/cylinder_10.png',
-                    height: 130, fit: BoxFit.contain)),
+                child: SignedImage(
+                    url: photoUrl,
+                    height: 130,
+                    fallback: Image.asset('assets/cylinder_10.png',
+                        height: 130, fit: BoxFit.contain))),
             const SizedBox(height: 12),
             Text(cylinder.label, style: type.heading),
             Text('${cylinder.weight} kg', style: type.caption),

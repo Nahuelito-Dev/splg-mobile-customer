@@ -6,12 +6,61 @@ import 'package:splg_lib/domain/customer.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/photo_picker.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/session_service.dart';
 
-class ProfileViewModel extends BaseViewModel {
+class ProfileViewModel extends ReactiveViewModel {
   final _customerService = locator<CustomerService>();
   final _nav = locator<NavigationService>();
   final _session = locator<SessionService>();
+
+  final _photo = locator<ProfilePhotoService>();
+  PhotoPicker picker = PhotoPicker();
+
+  @override
+  List<ListenableServiceMixin> get listenableServices => [_photo];
+
+  /// URL firmada de la foto de perfil (null = iniciales).
+  String? get photoUrl => _photo.url;
+
+  /// Tiene foto aunque la URL se esté renovando.
+  bool get hasPhoto => _photo.hasPhoto;
+
+  /// Mensaje del último intento de cambiar o quitar la foto que no salió.
+  String? photoError;
+
+  Future<void> loadPhoto() => _photo.refresh();
+
+  /// Elegir y subir: mientras el selector está abierto o se sube, un segundo
+  /// toque se ignora.
+  Future<void> changePhoto(PhotoSource source) async {
+    if (busy('photo')) return;
+    photoError = null;
+    setBusyForObject('photo', true);
+    try {
+      final picked = await picker.pick(source);
+      if (picked == null) return;
+      final r = await _photo.upload(picked);
+      if (!r.ok) photoError = r.message;
+    } on PhotoTooLarge {
+      photoError = PhotoTooLarge.message;
+    } on PhotoUnreadable {
+      photoError = PhotoUnreadable.message;
+    } catch (_) {
+      photoError = 'No pudimos leer la foto. Probá con otra.';
+    } finally {
+      setBusyForObject('photo', false);
+    }
+  }
+
+  Future<void> removePhoto() async {
+    if (busy('photo')) return;
+    photoError = null;
+    final r = await runBusyFuture(_photo.remove(), busyObject: 'photo');
+    if (!r.ok) photoError = r.message;
+    notifyListeners();
+  }
 
   Customer get customer => _customerService.customer;
   String get fullName => customer.fullName;

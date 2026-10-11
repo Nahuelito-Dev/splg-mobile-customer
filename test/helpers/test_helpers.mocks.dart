@@ -17,6 +17,7 @@ import 'package:splg_customer/domain/cancel_result.dart' as _i3;
 import 'package:splg_customer/domain/create_order_result.dart' as _i2;
 import 'package:splg_customer/domain/my_claim.dart' as _i32;
 import 'package:splg_customer/domain/orders_page.dart' as _i4;
+import 'package:splg_customer/domain/signed_url.dart' as _i37;
 import 'package:splg_customer/domain/time_slot_availability.dart' as _i27;
 import 'package:splg_customer/services/app_permissions.dart' as _i28;
 import 'package:splg_customer/services/cart_service.dart' as _i22;
@@ -27,6 +28,9 @@ import 'package:splg_customer/services/history_service.dart' as _i16;
 import 'package:splg_customer/services/location_service.dart' as _i23;
 import 'package:splg_customer/services/notification_service.dart' as _i25;
 import 'package:splg_customer/services/order_tracking_service.dart' as _i30;
+import 'package:splg_customer/services/photo_picker.dart' as _i36;
+import 'package:splg_customer/services/photo_service.dart' as _i35;
+import 'package:splg_customer/services/profile_photo_service.dart' as _i38;
 import 'package:splg_customer/services/rating_service.dart' as _i33;
 import 'package:splg_customer/services/session_service.dart' as _i34;
 import 'package:splg_customer/services/time_slot_service.dart' as _i26;
@@ -1091,6 +1095,22 @@ class MockGasCylinderService extends _i1.Mock
       ) as List<_i18.GasCylinder>);
 
   @override
+  bool get hasExpiredPhotos => (super.noSuchMethod(
+        Invocation.getter(#hasExpiredPhotos),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  String? photoUrl(String? id) => (super.noSuchMethod(
+        Invocation.method(
+          #photoUrl,
+          [id],
+        ),
+        returnValueForMissingStub: null,
+      ) as String?);
+
+  @override
   _i14.Future<List<_i18.GasCylinder>> getGasCylinders() => (super.noSuchMethod(
         Invocation.method(
           #getGasCylinders,
@@ -1726,6 +1746,19 @@ class MockAppPermissions extends _i1.Mock implements _i28.AppPermissions {
       ) as _i10.PermissionPrompter);
 
   @override
+  _i14.Future<_i29.PermissionOutcome> ensureCameraForPhoto() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #ensureCameraForPhoto,
+          [],
+        ),
+        returnValue: _i14.Future<_i29.PermissionOutcome>.value(
+            _i29.PermissionOutcome.granted),
+        returnValueForMissingStub: _i14.Future<_i29.PermissionOutcome>.value(
+            _i29.PermissionOutcome.granted),
+      ) as _i14.Future<_i29.PermissionOutcome>);
+
+  @override
   _i14.Future<bool> openSettings() => (super.noSuchMethod(
         Invocation.method(
           #openSettings,
@@ -1864,7 +1897,7 @@ class MockOrderTrackingService extends _i1.Mock
 /// See the documentation for Mockito's code generation for more information.
 class MockClaimService extends _i1.Mock implements _i31.ClaimService {
   @override
-  _i14.Future<_i7.ApiResult<void>> createClaim({
+  _i14.Future<_i7.ApiResult<String?>> createClaim({
     required String? orderId,
     required String? reason,
     required String? description,
@@ -1880,7 +1913,7 @@ class MockClaimService extends _i1.Mock implements _i31.ClaimService {
           },
         ),
         returnValue:
-            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+            _i14.Future<_i7.ApiResult<String?>>.value(_FakeApiResult_5<String?>(
           this,
           Invocation.method(
             #createClaim,
@@ -1893,7 +1926,7 @@ class MockClaimService extends _i1.Mock implements _i31.ClaimService {
           ),
         )),
         returnValueForMissingStub:
-            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+            _i14.Future<_i7.ApiResult<String?>>.value(_FakeApiResult_5<String?>(
           this,
           Invocation.method(
             #createClaim,
@@ -1905,7 +1938,7 @@ class MockClaimService extends _i1.Mock implements _i31.ClaimService {
             },
           ),
         )),
-      ) as _i14.Future<_i7.ApiResult<void>>);
+      ) as _i14.Future<_i7.ApiResult<String?>>);
 
   @override
   _i14.Future<_i7.ApiResult<_i32.ClaimsPage>> fetchMine({
@@ -2034,4 +2067,273 @@ class MockSessionService extends _i1.Mock implements _i34.SessionService {
         returnValue: _i14.Future<void>.value(),
         returnValueForMissingStub: _i14.Future<void>.value(),
       ) as _i14.Future<void>);
+}
+
+/// A class which mocks [PhotoService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockPhotoService extends _i1.Mock implements _i35.PhotoService {
+  @override
+  _i14.Future<_i7.ApiResult<void>> uploadMyPhoto(_i36.PickedPhoto? photo) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #uploadMyPhoto,
+          [photo],
+        ),
+        returnValue:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #uploadMyPhoto,
+            [photo],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #uploadMyPhoto,
+            [photo],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<void>>);
+
+  @override
+  _i14.Future<_i7.ApiResult<void>> removeMyPhoto() => (super.noSuchMethod(
+        Invocation.method(
+          #removeMyPhoto,
+          [],
+        ),
+        returnValue:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #removeMyPhoto,
+            [],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #removeMyPhoto,
+            [],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<void>>);
+
+  @override
+  _i14.Future<_i7.ApiResult<void>> uploadClaimPhoto(
+    String? claimId,
+    _i36.PickedPhoto? photo,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #uploadClaimPhoto,
+          [
+            claimId,
+            photo,
+          ],
+        ),
+        returnValue:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #uploadClaimPhoto,
+            [
+              claimId,
+              photo,
+            ],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #uploadClaimPhoto,
+            [
+              claimId,
+              photo,
+            ],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<void>>);
+
+  @override
+  _i14.Future<_i7.ApiResult<_i37.SignedUrl?>> myPhotoLink() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #myPhotoLink,
+          [],
+        ),
+        returnValue: _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>.value(
+            _FakeApiResult_5<_i37.SignedUrl?>(
+          this,
+          Invocation.method(
+            #myPhotoLink,
+            [],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>.value(
+                _FakeApiResult_5<_i37.SignedUrl?>(
+          this,
+          Invocation.method(
+            #myPhotoLink,
+            [],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>);
+
+  @override
+  _i14.Future<_i7.ApiResult<_i37.SignedUrl?>> claimPhotoLink(String? claimId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #claimPhotoLink,
+          [claimId],
+        ),
+        returnValue: _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>.value(
+            _FakeApiResult_5<_i37.SignedUrl?>(
+          this,
+          Invocation.method(
+            #claimPhotoLink,
+            [claimId],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>.value(
+                _FakeApiResult_5<_i37.SignedUrl?>(
+          this,
+          Invocation.method(
+            #claimPhotoLink,
+            [claimId],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<_i37.SignedUrl?>>);
+}
+
+/// A class which mocks [ProfilePhotoService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockProfilePhotoService extends _i1.Mock
+    implements _i38.ProfilePhotoService {
+  @override
+  bool get hasPhoto => (super.noSuchMethod(
+        Invocation.getter(#hasPhoto),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  int get listenersCount => (super.noSuchMethod(
+        Invocation.getter(#listenersCount),
+        returnValue: 0,
+        returnValueForMissingStub: 0,
+      ) as int);
+
+  @override
+  _i14.Future<void> refresh({bool? force = false}) => (super.noSuchMethod(
+        Invocation.method(
+          #refresh,
+          [],
+          {#force: force},
+        ),
+        returnValue: _i14.Future<void>.value(),
+        returnValueForMissingStub: _i14.Future<void>.value(),
+      ) as _i14.Future<void>);
+
+  @override
+  _i14.Future<_i7.ApiResult<void>> upload(_i36.PickedPhoto? photo) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #upload,
+          [photo],
+        ),
+        returnValue:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #upload,
+            [photo],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #upload,
+            [photo],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<void>>);
+
+  @override
+  _i14.Future<_i7.ApiResult<void>> remove() => (super.noSuchMethod(
+        Invocation.method(
+          #remove,
+          [],
+        ),
+        returnValue:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #remove,
+            [],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i14.Future<_i7.ApiResult<void>>.value(_FakeApiResult_5<void>(
+          this,
+          Invocation.method(
+            #remove,
+            [],
+          ),
+        )),
+      ) as _i14.Future<_i7.ApiResult<void>>);
+
+  @override
+  void clear() => super.noSuchMethod(
+        Invocation.method(
+          #clear,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void listenToReactiveValues(List<dynamic>? reactiveValues) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #listenToReactiveValues,
+          [reactiveValues],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void addListener(void Function()? listener) => super.noSuchMethod(
+        Invocation.method(
+          #addListener,
+          [listener],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void removeListener(void Function()? listener) => super.noSuchMethod(
+        Invocation.method(
+          #removeListener,
+          [listener],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void notifyListeners() => super.noSuchMethod(
+        Invocation.method(
+          #notifyListeners,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
 }

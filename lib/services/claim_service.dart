@@ -12,8 +12,8 @@ class ClaimService {
   final _customerService = locator<CustomerService>();
 
   /// Crea un reclamo para [orderId]. `reason` es el motivo (etiqueta corta) y
-  /// `description` el detalle.
-  Future<ApiResult<void>> createClaim({
+  /// `description` el detalle. Devuelve el id del reclamo creado.
+  Future<ApiResult<String?>> createClaim({
     required String orderId,
     required String reason,
     required String description,

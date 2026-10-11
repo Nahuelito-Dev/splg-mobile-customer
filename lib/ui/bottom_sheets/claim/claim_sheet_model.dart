@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/services/claim_service.dart';
+import 'package:splg_customer/services/photo_picker.dart';
+import 'package:splg_customer/services/photo_service.dart';
 
 /// Motivos frecuentes de reclamo. Son etiquetas libres (el backend guarda
 /// `reason` como string), la última abre a texto libre en la descripción.
@@ -18,6 +21,15 @@ const List<String> kClaimReasons = [
 class ClaimSheetModel extends BaseViewModel {
   final _claimService = locator<ClaimService>();
 
+  final _photoService = locator<PhotoService>();
+  PhotoPicker picker = PhotoPicker();
+
+  /// Foto adjunta (opcional), ya reducida y sin metadatos.
+  PickedPhoto? photo;
+
+  /// El reclamo se creó pero la foto no subió: se avisa sin perder el reclamo.
+  String? photoWarning;
+
   final TextEditingController descriptionController = TextEditingController();
 
   String _reason = kClaimReasons.first;
@@ -31,8 +43,38 @@ class ClaimSheetModel extends BaseViewModel {
     notifyListeners();
   }
 
+  /// Eligiendo o procesando la foto: no se puede enviar el reclamo hasta que
+  /// termine.
+  bool processingPhoto = false;
+
+  Future<void> attach(PhotoSource source) async {
+    if (isBusy || processingPhoto) return;
+    processingPhoto = true;
+    notifyListeners();
+    try {
+      final picked = await picker.pick(source);
+      if (picked == null) return;
+      photo = picked;
+      errorMessage = null;
+    } on PhotoTooLarge {
+      errorMessage = PhotoTooLarge.message;
+    } on PhotoUnreadable {
+      errorMessage = PhotoUnreadable.message;
+    } catch (_) {
+      errorMessage = PhotoUnreadable.message;
+    } finally {
+      processingPhoto = false;
+    }
+    notifyListeners();
+  }
+
+  void removePhoto() {
+    photo = null;
+    notifyListeners();
+  }
+
   Future<bool> submit(String orderId) async {
-    if (isBusy) return false;
+    if (isBusy || processingPhoto) return false;
     final description = descriptionController.text.trim();
     if (description.isEmpty) {
       errorMessage = 'Contanos qué pasó antes de enviar.';
@@ -47,13 +89,26 @@ class ClaimSheetModel extends BaseViewModel {
       reason: _reason,
       description: description,
     );
-    setBusy(false);
 
     if (!result.ok) {
+      setBusy(false);
       errorMessage = result.message;
       notifyListeners();
+      return false;
     }
-    return result.ok;
+    // El reclamo ya existe: si la foto falla no se pierde, se avisa.
+    final claimId = result.data;
+    if (photo != null) {
+      final up = claimId == null || claimId.isEmpty
+          ? const ApiResult<void>.fail('Probá de nuevo desde Mis reclamos.')
+          : await _photoService.uploadClaimPhoto(claimId, photo!);
+      if (!up.ok) {
+        photoWarning = 'Tu reclamo se envió, pero no pudimos subir la foto: '
+            '${up.message} Podés agregarla desde Mis reclamos.';
+      }
+    }
+    setBusy(false);
+    return true;
   }
 
   @override

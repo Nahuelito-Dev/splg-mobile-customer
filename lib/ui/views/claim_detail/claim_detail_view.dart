@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
+import 'package:stacked/stacked.dart';
 
 import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
 import 'package:splg_customer/ui/widgets/app_header.dart';
+import 'package:splg_customer/ui/widgets/photo_source_sheet.dart';
+import 'package:splg_customer/ui/widgets/signed_image.dart';
+import 'claim_detail_viewmodel.dart';
 
 /// Detalle de un reclamo propio: motivo, descripción, estado y la nota con la
 /// que se resolvió.
-class ClaimDetailView extends StatelessWidget {
+class ClaimDetailView extends StackedView<ClaimDetailViewModel> {
   const ClaimDetailView({super.key, required this.claim});
 
   final MyClaim claim;
 
   @override
-  Widget build(BuildContext context) {
+  ClaimDetailViewModel viewModelBuilder(BuildContext context) =>
+      ClaimDetailViewModel(claim.claimId, claim.status);
+
+  @override
+  void onViewModelReady(ClaimDetailViewModel viewModel) =>
+      viewModel.loadPhoto();
+
+  @override
+  Widget builder(
+      BuildContext context, ClaimDetailViewModel model, Widget? child) {
     final type = SplgType.of(context);
     return Scaffold(
       appBar: const AppHeader(title: 'Reclamo', bell: false),
@@ -43,6 +56,50 @@ class ClaimDetailView extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(claim.description, style: type.body),
+                    if (model.photoUrl != null) ...[
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SignedImage(
+                          key: const Key('claim-photo'),
+                          url: model.photoUrl,
+                          fit: BoxFit.cover,
+                          height: 220,
+                          fallback: const SizedBox(height: 220),
+                        ),
+                      ),
+                    ],
+                    if (model.canAttach && !model.loadingPhoto)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          key: const Key('claim-photo-add'),
+                          onPressed: model.busy('photo')
+                              ? null
+                              : () async {
+                                  final source =
+                                      await choosePhotoSource(context);
+                                  if (source != null) {
+                                    await model.attach(source);
+                                  }
+                                },
+                          icon: model.busy('photo')
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.photo_camera_outlined,
+                                  size: 18),
+                          label: Text(
+                              model.hasPhoto ? 'Cambiar foto' : 'Agregar foto'),
+                        ),
+                      ),
+                    if (model.photoError != null)
+                      Text(model.photoError!,
+                          key: const Key('claim-photo-error'),
+                          style: type.caption
+                              .copyWith(color: context.brasa.danger)),
                     const SizedBox(height: 16),
                     SplgInfoSection(
                       icon: SplgIcons.deliveries,

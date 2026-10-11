@@ -82,6 +82,18 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     _schedulePoll();
   }
 
+  String? cylinderPhoto(String id) => _gasCylinderService.photoUrl(id);
+
+  /// Si las URLs firmadas de las fotos vencieron, vuelve a pedir el catálogo en
+  /// silencio (sin loader) para renovarlas.
+  Future<void> renewCatalogPhotos() async {
+    if (isBusy || !_gasCylinderService.hasExpiredPhotos) return;
+    try {
+      await _loadCylinders();
+      if (!_closed) notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> _loadCylinders() async {
     _cylinders = await _gasCylinderService.getGasCylinders();
   }

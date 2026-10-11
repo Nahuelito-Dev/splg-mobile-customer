@@ -9,12 +9,39 @@ import 'package:stacked_services/stacked_services.dart';
 /// los llamados), con una explicación previa y con camino a Ajustes si queda
 /// denegado para siempre. Los textos específicos de la app están acá.
 class AppPermissions extends PermissionsService {
-  AppPermissions()
-      : super(
-          gateway: const PermissionHandlerGateway(),
-          prompter: NavigatorPermissionPrompter(StackedService.navigatorKey),
-          copy: _copy,
+  AppPermissions({PermissionGateway? gateway, PermissionPrompter? prompter})
+      : this._(
+          gateway ?? const PermissionHandlerGateway(),
+          prompter ?? NavigatorPermissionPrompter(StackedService.navigatorKey),
         );
+
+  AppPermissions._(PermissionGateway gateway, PermissionPrompter prompter)
+      : _photoCamera = PermissionsService(
+          gateway: gateway,
+          prompter: prompter,
+          copy: _photoCameraCopy,
+        ),
+        super(gateway: gateway, prompter: prompter, copy: _copy);
+
+  /// Misma cámara, otro motivo: el texto cambia según para qué se pide.
+  final PermissionsService _photoCamera;
+
+  /// Cámara para sacar una foto (perfil o reclamo). `ensure(camera)` queda para
+  /// el QR de la entrega.
+  Future<PermissionOutcome> ensureCameraForPhoto() =>
+      _photoCamera.ensure(AppPermission.camera);
+
+  static const Map<AppPermission, PermissionCopy> _photoCameraCopy = {
+    AppPermission.camera: PermissionCopy(
+      title: 'Cámara',
+      rationale:
+          'SPLG usa la cámara para sacar la foto de tu perfil o la de un reclamo.',
+      deniedMessage:
+          'Sin la cámara no podemos sacar la foto. Podés elegir una de tu galería.',
+      settingsMessage:
+          'La cámara está desactivada para SPLG. Activala desde Ajustes para sacar fotos, o elegí una de tu galería.',
+    ),
+  };
 
   static const Map<AppPermission, PermissionCopy> _copy = {
     AppPermission.location: PermissionCopy(
@@ -29,7 +56,7 @@ class AppPermissions extends PermissionsService {
     AppPermission.camera: PermissionCopy(
       title: 'Cámara',
       rationale:
-          'SPLG usa la cámara para escanear el código QR que te muestra el chofer al entregar el pedido y para sacar fotos de un reclamo.',
+          'SPLG usa la cámara para escanear el código QR que te muestra el chofer al entregar el pedido.',
       deniedMessage:
           'Sin la cámara no podemos escanear el QR de la entrega. Podés volver a intentarlo.',
       settingsMessage:

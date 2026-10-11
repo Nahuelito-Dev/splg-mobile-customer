@@ -7,12 +7,15 @@ import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
+import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/domain/time_slot_availability.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/claim_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/photo_service.dart';
+import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
 import 'package:splg_customer/ui/views/about/about_view.dart';
 import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
@@ -92,6 +95,8 @@ void main() {
     ]));
     when(customers.isUserLoggedIn).thenReturn(true);
     when(history.history).thenReturn(<Order>[]);
+    when((locator<PhotoService>() as MockPhotoService).claimPhotoLink(any))
+        .thenAnswer((_) async => const ApiResult.ok(null));
   });
 
   void stubPage(List<Order> orders) => when(history.fetchOrdersPage(
@@ -645,6 +650,36 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
     });
 
+    phoneTest('detalle: reclamo abierto sin foto ofrece agregarla', (t) async {
+      await t.pumpWidget(
+          app(ClaimDetailView(claim: claim('1', ClaimStatus.pending))));
+      await settle(t);
+      expect(find.text('Agregar foto'), findsOneWidget);
+      await t.tap(find.byKey(const Key('claim-photo-add')));
+      await t.pumpAndSettle();
+      expect(find.text('Sacar foto'), findsOneWidget);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
+    });
+
+    phoneTest('detalle: reclamo con foto ofrece cambiarla', (t) async {
+      final photos = locator<PhotoService>() as MockPhotoService;
+      when(photos.claimPhotoLink('1')).thenAnswer((_) async => ApiResult.ok(
+          SignedUrl('https://s3.test/f.jpg',
+              DateTime.now().add(const Duration(minutes: 5)))));
+      await t.pumpWidget(
+          app(ClaimDetailView(claim: claim('1', ClaimStatus.inProcess))));
+      await settle(t);
+      t.takeException(); // la URL de prueba no se puede descargar
+      expect(find.text('Cambiar foto'), findsOneWidget);
+    });
+
+    phoneTest('detalle: reclamo resuelto no permite subir foto', (t) async {
+      await t.pumpWidget(
+          app(ClaimDetailView(claim: claim('2', ClaimStatus.resolved))));
+      await settle(t);
+      expect(find.byKey(const Key('claim-photo-add')), findsNothing);
+    });
+
     phoneTest('detalle con la respuesta de la distribuidora', (t) async {
       await t.pumpWidget(
           app(ClaimDetailView(claim: claim('2', ClaimStatus.resolved))));
@@ -669,6 +704,29 @@ void main() {
       }
       await t.tap(find.text('Cambiar contraseña'));
       verify(nav.navigateToChangePasswordView()).called(1);
+    });
+
+    phoneTest('foto de perfil: sin foto ofrece agregar y elegir el origen',
+        (t) async {
+      await t.pumpWidget(app(const ProfileView()));
+      await settle(t);
+      expect(find.text('Agregar foto'), findsOneWidget);
+      expect(find.byKey(const Key('profile-photo-remove')), findsNothing);
+      await t.tap(find.byKey(const Key('profile-photo-change')));
+      await t.pumpAndSettle();
+      expect(find.text('Sacar foto'), findsOneWidget);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
+    });
+
+    phoneTest('foto de perfil: con foto ofrece cambiar y quitar', (t) async {
+      final pp = locator<ProfilePhotoService>() as MockProfilePhotoService;
+      when(pp.url).thenReturn('https://s3.test/foto.png');
+      when(pp.hasPhoto).thenReturn(true);
+      await t.pumpWidget(app(const ProfileView()));
+      await settle(t);
+      t.takeException(); // la URL de prueba no se puede descargar
+      expect(find.text('Cambiar foto'), findsOneWidget);
+      expect(find.byKey(const Key('profile-photo-remove')), findsOneWidget);
     });
 
     phoneTest('eliminar cuenta: avisa que es definitiva y cancelar no borra',
