@@ -36,6 +36,13 @@ class LoginViewModel extends FormViewModel {
 
   Future<void> onSignup() => _navigationService.navigateToSignupView();
 
+  /// Vuelve a la bienvenida. Se navega explícito porque al login también se
+  /// llega con el stack limpio (sesión vencida, cierre de sesión).
+  Future<void> onBack() async {
+    if (isBusy) return;
+    await _navigationService.clearStackAndShow(Routes.welcomeView);
+  }
+
   Future<void> onLogin() async {
     if (isBusy) return;
     errorMessage = null;

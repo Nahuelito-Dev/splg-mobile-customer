@@ -28,42 +28,51 @@ void main() {
           ..formValueMap['password'] = password;
 
     group('onLogin -', () {
-      test('con sesión iniciada pide el permiso de notificaciones y va al home',
-          () async {
-        final notifications =
-            locator<NotificationService>() as MockNotificationService;
-        when(customerService.signIn(any, any))
-            .thenAnswer((_) async => SignInOutcome.ok);
+      test(
+        'con sesión iniciada pide el permiso de notificaciones y va al home',
+        () async {
+          final notifications =
+              locator<NotificationService>() as MockNotificationService;
+          when(
+            customerService.signIn(any, any),
+          ).thenAnswer((_) async => SignInOutcome.ok);
 
-        await withCredentials('a@b.com', 'Test1234').onLogin();
+          await withCredentials('a@b.com', 'Test1234').onLogin();
 
-        verify(notifications.requestPermissionAndRegister()).called(1);
-        verify(nav.clearStackAndShow(Routes.homeView)).called(1);
-      });
+          verify(notifications.requestPermissionAndRegister()).called(1);
+          verify(nav.clearStackAndShow(Routes.homeView)).called(1);
+        },
+      );
 
-      test('con credenciales mal no pide permisos, no navega y avisa',
-          () async {
-        final notifications =
-            locator<NotificationService>() as MockNotificationService;
-        when(customerService.signIn(any, any))
-            .thenAnswer((_) async => SignInOutcome.badCredentials);
-        final model = withCredentials('a@b.com', 'mala');
+      test(
+        'con credenciales mal no pide permisos, no navega y avisa',
+        () async {
+          final notifications =
+              locator<NotificationService>() as MockNotificationService;
+          when(
+            customerService.signIn(any, any),
+          ).thenAnswer((_) async => SignInOutcome.badCredentials);
+          final model = withCredentials('a@b.com', 'mala');
 
-        await model.onLogin();
+          await model.onLogin();
 
-        verifyNever(notifications.requestPermissionAndRegister());
-        verifyNever(nav.clearStackAndShow(any));
-        expect(model.errorMessage, contains('No pudimos iniciar sesión'));
-        expect(model.isBusy, isFalse);
-      });
+          verifyNever(notifications.requestPermissionAndRegister());
+          verifyNever(nav.clearStackAndShow(any));
+          expect(model.errorMessage, contains('No pudimos iniciar sesión'));
+          expect(model.isBusy, isFalse);
+        },
+      );
 
       test('cuenta deshabilitada: mensaje específico', () async {
-        when(customerService.signIn(any, any))
-            .thenAnswer((_) async => SignInOutcome.disabled);
+        when(
+          customerService.signIn(any, any),
+        ).thenAnswer((_) async => SignInOutcome.disabled);
         final model = withCredentials('a@b.com', 'Test1234');
         await model.onLogin();
-        expect(model.errorMessage,
-            'Tu cuenta está deshabilitada. Contactá a tu distribuidora.');
+        expect(
+          model.errorMessage,
+          'Tu cuenta está deshabilitada. Contactá a tu distribuidora.',
+        );
         verifyNever(nav.clearStackAndShow(any));
       });
 
@@ -82,11 +91,13 @@ void main() {
       });
     });
 
-    test('"¿Olvidaste tu contraseña?" abre recuperar con el email escrito',
-        () async {
-      await withCredentials(' a@b.com ', '').onForgotPassword();
-      verify(nav.navigateToRecoverPasswordView(email: 'a@b.com')).called(1);
-    });
+    test(
+      '"¿Olvidaste tu contraseña?" abre recuperar con el email escrito',
+      () async {
+        await withCredentials(' a@b.com ', '').onForgotPassword();
+        verify(nav.navigateToRecoverPasswordView(email: 'a@b.com')).called(1);
+      },
+    );
 
     test('sin email escrito abre recuperar sin precargar', () async {
       await withCredentials('', '').onForgotPassword();
@@ -96,6 +107,13 @@ void main() {
     test('"Registrate" abre el alta', () async {
       await LoginViewModel().onSignup();
       verify(nav.navigateToSignupView()).called(1);
+    });
+    group('onBack -', () {
+      test('vuelve a la bienvenida con el stack limpio', () async {
+        await LoginViewModel().onBack();
+
+        verify(nav.clearStackAndShow(Routes.welcomeView)).called(1);
+      });
     });
   });
 }
