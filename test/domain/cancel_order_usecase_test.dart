@@ -14,8 +14,9 @@ class _FakeRepository implements OrderRepository {
   Future<CancelResult> cancelOrder(
     String orderId,
     String token,
-    String idempotencyKey,
-  ) async {
+    String idempotencyKey, {
+    String? reason,
+  }) async {
     keys.add(idempotencyKey);
     return results.removeAt(0);
   }

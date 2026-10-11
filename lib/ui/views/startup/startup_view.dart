@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
-import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'startup_viewmodel.dart';
-import 'package:splg_lib/widgets/splg_logo.dart';
 
 class StartupView extends StackedView<StartupViewModel> {
   const StartupView({super.key});
@@ -16,28 +15,22 @@ class StartupView extends StackedView<StartupViewModel> {
     Widget? child,
   ) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SplgLogo(height: 56),
-            verticalSpaceSmall,
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Cargando ...',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                horizontalSpaceSmall,
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(),
-                ),
-              ],
-            ),
-          ],
+      body: SplgGradientBackground(
+        gradient: SplgGradients.splash,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SplgLogo(height: context.sp(40), color: Colors.white),
+              const SizedBox(height: 28),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: Colors.white),
+              ),
+            ],
+          ),
         ),
       ),
     );

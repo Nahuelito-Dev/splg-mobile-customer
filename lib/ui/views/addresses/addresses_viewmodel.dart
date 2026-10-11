@@ -1,4 +1,3 @@
-import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 import 'package:splg_lib/domain/address.dart';
@@ -6,44 +5,44 @@ import 'package:splg_lib/domain/address.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/ui/common/load_view_model.dart';
 
-class AddressesViewModel extends BaseViewModel {
+/// Mis direcciones: lista, alta, edición, baja y predeterminada.
+class AddressesViewModel extends LoadViewModel {
   final _customerService = locator<CustomerService>();
-  final _navigationService = locator<NavigationService>();
+  final _nav = locator<NavigationService>();
 
   List<Address> get addresses => _customerService.customer.addresses;
 
+  /// Error de la última acción (baja, predeterminada).
   String? actionError;
 
-  Future<void> initialize() async {
-    setBusy(true);
-    await _customerService.refreshAddresses();
-    setBusy(false);
+  @override
+  Future<void> fetch() => _customerService.refreshAddresses();
+
+  Future<void> add() async {
+    await _nav.navigateToAddressFormView();
+    notifyListeners();
   }
 
-  /// Abre el mapa para elegir una nueva dirección y, si se eligió, la crea.
-  Future<void> addAddress() async {
-    final result = await _navigationService.navigateToMapView();
-    if (result is! Address) return;
-
-    setBusy(true);
-    final ok = await _customerService.createAndSyncAddress(result);
-    actionError = ok ? null : 'No se pudo guardar la dirección.';
-    setBusy(false);
+  Future<void> edit(Address address) async {
+    await _nav.navigateToAddressFormView(address: address);
+    notifyListeners();
   }
 
   Future<void> setDefault(Address address) async {
-    if (address.primary) return;
+    if (address.primary || isBusy) return;
     setBusy(true);
-    final ok = await _customerService.setDefaultAddress(address.addressId);
-    actionError = ok ? null : 'No se pudo marcar como predeterminada.';
+    final r = await _customerService.setDefaultAddress(address.addressId);
+    actionError = r.ok ? null : r.message;
     setBusy(false);
   }
 
-  Future<void> deleteAddress(Address address) async {
+  Future<void> delete(Address address) async {
+    if (isBusy) return;
     setBusy(true);
-    final ok = await _customerService.deleteAddress(address.addressId);
-    actionError = ok ? null : 'No se pudo eliminar la dirección.';
+    final r = await _customerService.deleteAddress(address.addressId);
+    actionError = r.ok ? null : r.message;
     setBusy(false);
   }
 }

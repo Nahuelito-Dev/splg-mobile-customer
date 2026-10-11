@@ -1,109 +1,92 @@
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import 'package:splg_lib/domain/customer.dart';
+
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/customer_service.dart';
-import 'package:splg_customer/ui/views/legal/legal_view.dart';
-
-import 'package:splg_lib/domain/customer.dart';
-import 'package:splg_lib/domain/address.dart';
+import 'package:splg_customer/services/session_service.dart';
 
 class ProfileViewModel extends BaseViewModel {
-  final _dialogService = locator<DialogService>();
   final _customerService = locator<CustomerService>();
-  final _navigationService = locator<NavigationService>();
+  final _nav = locator<NavigationService>();
+  final _session = locator<SessionService>();
 
-  String get email => customer.email;
+  Customer get customer => _customerService.customer;
   String get fullName => customer.fullName;
   String get phoneNumber => customer.phoneNumber;
-  Customer get customer => _customerService.customer;
+  String get email => customer.email;
 
-  Address? get primaryAddress {
-    final addresses = customer.addresses;
-    if (addresses.isEmpty) return null;
+  /// Fila tocada (queda resaltada, como en el perfil de la referencia).
+  int? selected;
 
-    try {
-      return addresses.firstWhere((addr) => addr.primary == true);
-    } catch (_) {
-      return null;
-    }
+  /// Texto del último intento de eliminar la cuenta que no salió (null = bien).
+  String? deleteError;
+
+  String get initials {
+    final parts = fullName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    final first = parts.first[0];
+    final last = parts.length > 1 ? parts.last[0] : '';
+    return (first + last).toUpperCase();
   }
 
-  String get formattedAddress {
-    final address = primaryAddress;
-    if (address == null) return 'Sin dirección';
-
-    final parts = <String>[];
-    if (address.streetName.isNotEmpty) {
-      parts.add(address.streetName);
-    }
-    if (address.city != null && address.city!.isNotEmpty) {
-      parts.add(address.city!);
-    }
-
-    return parts.isEmpty ? 'Sin dirección' : parts.join(', ');
-  }
-
-  /// Actualiza el nombre contra el backend y refresca la UI.
-  Future<bool> updateName(String name) async {
-    final ok = await _customerService.updateProfile(fullName: name);
-    if (ok) notifyListeners();
-    return ok;
-  }
-
-  /// Actualiza el teléfono contra el backend y refresca la UI.
-  Future<bool> updatePhone(String phone) async {
-    final ok = await _customerService.updateProfile(phoneNumber: phone);
-    if (ok) notifyListeners();
-    return ok;
-  }
-
-  Future<void> navigateToAddresses() async {
-    await _navigationService.navigateToAddressesView();
-    // Al volver, refrescamos por si cambió la dirección predeterminada.
+  void _select(int i) {
+    selected = i;
     notifyListeners();
   }
 
-  Future<void> navigateToTerms() async {
-    await _navigationService.navigateToLegalView(
-      document: LegalDocument.terms,
-    );
+  Future<void> openPersonalInfo() async {
+    _select(0);
+    await _nav.navigateToPersonalInfoView();
+    notifyListeners();
   }
 
-  Future<void> navigateToPrivacyPolicy() async {
-    await _navigationService.navigateToLegalView(
-      document: LegalDocument.privacy,
-    );
+  Future<void> openChangePassword() {
+    _select(1);
+    return _nav.navigateToChangePasswordView();
   }
 
-  Future<void> signOut() async {
-    final response = await _dialogService.showConfirmationDialog(
-      title: 'Cerrar sesión',
-      description: '¿Estás seguro que deseas cerrar sesión?',
-      confirmationTitle: 'Cerrar sesión',
-      cancelTitle: 'Cancelar',
-    );
+  Future<void> openAddresses() {
+    _select(2);
+    return _nav.navigateToAddressesView();
+  }
 
-    if (response?.confirmed == true) {
-      await _customerService.signOut();
-      _navigationService.clearStackAndShow(Routes.homeView);
+  Future<void> editProfile() async {
+    await _nav.navigateToEditProfileView();
+    notifyListeners();
+  }
+
+  /// Da de baja la cuenta (`DELETE /users/me`). Con pedidos en curso el back
+  /// responde 409 y [deleteError] trae el motivo. Devuelve true si se eliminó.
+  Future<bool> deleteAccount() async {
+    if (isBusy) return false;
+    _select(3);
+    deleteError = null;
+    setBusy(true);
+    final result = await _customerService.deleteAccount();
+    setBusy(false);
+    if (result.status == 401) {
+      // La baja pudo haberse hecho y la respuesta perderse: el reintento ya no
+      // tiene sesión. Se cierra igual, con un mensaje claro.
+      await _session.expire(
+          message: 'Tu sesión ya no es válida. Si tu cuenta ya se había '
+              'eliminado, no hace falta repetirlo. Si no, volvé a ingresar '
+              'e intentá de nuevo.');
+      return false;
     }
-  }
-
-  Future<void> deleteAccount() async {
-    final response = await _dialogService.showConfirmationDialog(
-      title: 'Borrar cuenta',
-      description:
-          '¿Estás seguro que deseas borrar tu cuenta? Esta acción no se puede deshacer.',
-      confirmationTitle: 'Borrar cuenta',
-      cancelTitle: 'Cancelar',
-      dialogPlatform: DialogPlatform.Material,
-    );
-
-    if (response?.confirmed == true) {
-      await _customerService.signOut();
-      _navigationService.clearStackAndShow(Routes.loginView);
+    if (!result.ok) {
+      deleteError = result.message;
+      notifyListeners();
+      return false;
     }
+    await _session.endSession();
+    await _nav.clearStackAndShow(Routes.welcomeView);
+    return true;
   }
 }

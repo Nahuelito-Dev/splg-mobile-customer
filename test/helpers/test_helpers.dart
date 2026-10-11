@@ -11,6 +11,15 @@ import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
 import 'package:splg_customer/services/app_permissions.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
+import 'package:splg_customer/services/claim_service.dart';
+import 'package:splg_customer/services/rating_service.dart';
+import 'package:splg_customer/services/session_service.dart';
+import 'package:splg_customer/domain/orders_page.dart';
+import 'package:splg_lib/domain/address.dart';
+import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_lib/permissions/app_permission.dart';
 // @stacked-import
 
@@ -31,11 +40,30 @@ import 'test_helpers.mocks.dart';
     MockSpec<TimeSlotService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<AppPermissions>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<OrderTrackingService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<ClaimService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<RatingService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<SessionService>(onMissingStub: OnMissingStub.returnDefault),
 // @stacked-mock-spec
   ],
 )
 void registerServices() {
   provideDummy<PermissionOutcome>(PermissionOutcome.granted);
+  provideDummy<ApiResult<void>>(const ApiResult.ok());
+  provideDummy<ApiResult<Address?>>(const ApiResult.ok());
+  provideDummy<ApiResult<ClaimsPage>>(
+      const ApiResult.ok(ClaimsPage(claims: [], total: 0)));
+  provideDummy<PasswordChangeResult>(PasswordChangeResult.ok);
+  provideDummy<CancelResult>(const CancelResult.ok());
+  provideDummy<SignInOutcome>(SignInOutcome.ok);
+  provideDummy<OrdersPage>(const OrdersPage(orders: [], total: 0, offset: 0));
+  provideDummy<Order>(Order(
+    id: 'dummy',
+    items: [],
+    total: 0,
+    status: OrderStatus.pending,
+    createdAt: DateTime(2026),
+    paymentMethod: PaymentMethod.cash,
+  ));
   getAndRegisterNavigationService();
   getAndRegisterBottomSheetService();
   getAndRegisterDialogService();
@@ -48,6 +76,9 @@ void registerServices() {
   getAndRegisterTimeSlotService();
   getAndRegisterAppPermissions();
   getAndRegisterOrderTrackingService();
+  getAndRegisterClaimService();
+  getAndRegisterRatingService();
+  getAndRegisterSessionService();
 // @stacked-mock-register
 }
 
@@ -172,5 +203,26 @@ MockOrderTrackingService getAndRegisterOrderTrackingService() {
   _removeRegistrationIfExists<OrderTrackingService>();
   final service = MockOrderTrackingService();
   locator.registerSingleton<OrderTrackingService>(service);
+  return service;
+}
+
+MockClaimService getAndRegisterClaimService() {
+  _removeRegistrationIfExists<ClaimService>();
+  final service = MockClaimService();
+  locator.registerSingleton<ClaimService>(service);
+  return service;
+}
+
+MockRatingService getAndRegisterRatingService() {
+  _removeRegistrationIfExists<RatingService>();
+  final service = MockRatingService();
+  locator.registerSingleton<RatingService>(service);
+  return service;
+}
+
+MockSessionService getAndRegisterSessionService() {
+  _removeRegistrationIfExists<SessionService>();
+  final service = MockSessionService();
+  locator.registerSingleton<SessionService>(service);
   return service;
 }

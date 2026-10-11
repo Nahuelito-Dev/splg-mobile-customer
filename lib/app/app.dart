@@ -28,6 +28,22 @@ import 'package:splg_customer/ui/bottom_sheets/claim/claim_sheet.dart';
 import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart';
 import 'package:splg_customer/ui/views/legal/legal_view.dart';
 import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart';
+import 'package:splg_customer/ui/views/welcome/welcome_view.dart';
+import 'package:splg_customer/ui/views/recover_password/recover_password_view.dart';
+import 'package:splg_customer/ui/views/signup_done/signup_done_view.dart';
+import 'package:splg_customer/ui/views/orders/orders_view.dart';
+import 'package:splg_customer/ui/views/order_detail/order_detail_view.dart';
+import 'package:splg_customer/ui/views/cancel_order/cancel_order_view.dart';
+import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
+import 'package:splg_customer/ui/views/claims/claims_view.dart';
+import 'package:splg_customer/ui/views/claim_detail/claim_detail_view.dart';
+import 'package:splg_customer/ui/views/notifications/notifications_view.dart';
+import 'package:splg_customer/ui/views/help/help_view.dart';
+import 'package:splg_customer/ui/views/about/about_view.dart';
+import 'package:splg_customer/ui/views/personal_info/personal_info_view.dart';
+import 'package:splg_customer/ui/views/edit_profile/edit_profile_view.dart';
+import 'package:splg_customer/ui/views/change_password/change_password_view.dart';
+import 'package:splg_customer/services/session_service.dart';
 // @stacked-import
 
 @StackedApp(
@@ -44,6 +60,21 @@ import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart
     MaterialRoute(page: QrScanView),
     MaterialRoute(page: LegalView),
     MaterialRoute(page: PaymentWebViewView),
+    MaterialRoute(page: WelcomeView),
+    MaterialRoute(page: RecoverPasswordView),
+    MaterialRoute(page: SignupDoneView),
+    MaterialRoute(page: OrdersView),
+    MaterialRoute(page: OrderDetailView),
+    MaterialRoute(page: CancelOrderView),
+    MaterialRoute(page: AddressFormView),
+    MaterialRoute(page: ClaimsView),
+    MaterialRoute(page: ClaimDetailView),
+    MaterialRoute(page: NotificationsView),
+    MaterialRoute(page: HelpView),
+    MaterialRoute(page: AboutView),
+    MaterialRoute(page: PersonalInfoView),
+    MaterialRoute(page: EditProfileView),
+    MaterialRoute(page: ChangePasswordView),
 // @stacked-route
   ],
   dependencies: [
@@ -61,6 +92,7 @@ import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart
     LazySingleton(classType: ClaimService),
     LazySingleton(classType: NotificationService),
     LazySingleton(classType: AppPermissions),
+    LazySingleton(classType: SessionService),
 // @stacked-service
   ],
   bottomsheets: [

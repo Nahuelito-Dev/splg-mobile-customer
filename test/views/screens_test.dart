@@ -1,0 +1,834 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:mockito/mockito.dart';
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/my_claim.dart';
+import 'package:splg_customer/domain/time_slot_availability.dart';
+import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/claim_service.dart';
+import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/gas_cylinder_service.dart';
+import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/time_slot_service.dart';
+import 'package:splg_customer/ui/views/about/about_view.dart';
+import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
+import 'package:splg_customer/ui/views/addresses/addresses_view.dart';
+import 'package:splg_customer/ui/views/cancel_order/cancel_order_view.dart';
+import 'package:splg_customer/ui/views/change_password/change_password_view.dart';
+import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
+import 'package:splg_customer/ui/views/claim_detail/claim_detail_view.dart';
+import 'package:splg_customer/ui/views/claims/claims_view.dart';
+import 'package:splg_customer/ui/views/edit_profile/edit_profile_view.dart';
+import 'package:splg_customer/ui/views/help/help_view.dart';
+import 'package:splg_customer/ui/views/home/home_view.dart';
+import 'package:splg_customer/ui/views/login/login_view.dart';
+import 'package:splg_customer/ui/views/notifications/notifications_view.dart';
+import 'package:splg_customer/ui/views/order_detail/order_detail_view.dart';
+import 'package:splg_customer/ui/views/orders/orders_view.dart';
+import 'package:splg_customer/ui/views/personal_info/personal_info_view.dart';
+import 'package:splg_customer/ui/views/profile/profile_view.dart';
+import 'package:splg_customer/ui/views/recover_password/recover_password_view.dart';
+import 'package:splg_customer/ui/views/signup/signup_view.dart';
+import 'package:splg_customer/ui/views/signup_done/signup_done_view.dart';
+import 'package:splg_customer/ui/views/welcome/welcome_view.dart';
+import 'package:splg_customer/ui/widgets/app_drawer/app_drawer.dart';
+import 'dart:async';
+
+import 'package:geolocator/geolocator.dart';
+import 'package:splg_customer/domain/orders_page.dart';
+import 'package:splg_customer/services/location_service.dart';
+import 'package:splg_customer/ui/views/home/home_viewmodel.dart';
+import 'package:splg_customer/ui/views/home/widgets/home_map.dart';
+import 'package:splg_customer/services/session_service.dart';
+import 'package:splg_lib/domain/discount.dart';
+import 'package:splg_lib/splg_lib.dart';
+import 'package:stacked_services/stacked_services.dart';
+
+import '../helpers/fixtures.dart';
+import '../helpers/test_helpers.dart';
+import '../helpers/test_helpers.mocks.dart';
+
+Widget app(Widget home) => MaterialApp(theme: AppTheme.lightTheme, home: home);
+
+/// Una prueba de widget en una pantalla de teléfono (393x852, 1x).
+void phoneTest(String description, Future<void> Function(WidgetTester) body) {
+  testWidgets(description, (t) async {
+    t.view.physicalSize = const Size(393, 852);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    await body(t);
+  });
+}
+
+Future<void> settle(WidgetTester t) async {
+  await t.pump();
+  await t.pump(const Duration(milliseconds: 100));
+}
+
+void main() {
+  late MockCustomerService customers;
+  late MockHistoryService history;
+  late MockNavigationService nav;
+  late MockClaimService claims;
+
+  setUpAll(() => initializeDateFormatting('es_AR', null));
+  setUp(() => HomeMap.placeholder = true);
+  tearDown(() => HomeMap.placeholder = false);
+
+  setUp(() {
+    registerServices();
+    customers = locator<CustomerService>() as MockCustomerService;
+    history = locator<HistoryService>() as MockHistoryService;
+    nav = locator<NavigationService>() as MockNavigationService;
+    claims = locator<ClaimService>() as MockClaimService;
+    when(customers.customer).thenReturn(customerWith([
+      addr('a1', 'Buenos Aires 4114', primary: true, city: 'Posadas'),
+      addr('a2', 'Mitre 123', city: 'Posadas'),
+    ]));
+    when(customers.isUserLoggedIn).thenReturn(true);
+    when(history.history).thenReturn(<Order>[]);
+  });
+
+  void stubPage(List<Order> orders) => when(history.fetchOrdersPage(
+        limit: anyNamed('limit'),
+        offset: anyNamed('offset'),
+      )).thenAnswer((_) async =>
+          OrdersPage(orders: orders, total: orders.length, offset: 0));
+
+  tearDown(() => locator.reset());
+
+  group('Acceso', () {
+    phoneTest('bienvenida: "Comenzar" va al login', (t) async {
+      await t.pumpWidget(app(const WelcomeView()));
+      expect(find.textContaining('sin salir de casa'), findsOneWidget);
+      await t.tap(find.text('Comenzar'));
+      verify(nav.navigateToLoginView()).called(1);
+    });
+
+    phoneTest('login: campos, recuperar y registrarse', (t) async {
+      await t.pumpWidget(app(const LoginView()));
+      expect(find.text('¡Hola!'), findsOneWidget);
+      expect(find.text('Continuar'), findsOneWidget);
+      await t.tap(find.text('Registrarse'));
+      verify(nav.navigateToSignupView()).called(1);
+      await t.tap(find.text('¿Olvidaste tu contraseña?'));
+      verify(nav.navigateToRecoverPasswordView(email: null)).called(1);
+    });
+
+    phoneTest('login: sin datos muestra el error', (t) async {
+      await t.pumpWidget(app(const LoginView()));
+      await t.tap(find.text('Continuar'));
+      await settle(t);
+      expect(find.text('Ingresá tu email y contraseña.'), findsOneWidget);
+    });
+
+    phoneTest('registro: paso 1 con errores y paso 2', (t) async {
+      await t.pumpWidget(app(const SignupView()));
+      expect(find.text('1. Tus datos'), findsOneWidget);
+      await t.tap(find.text('Siguiente'));
+      await settle(t);
+      expect(find.text('Ingresá tu nombre y apellido.'), findsOneWidget);
+      expect(find.text('Ingresá un teléfono válido.'), findsOneWidget);
+
+      await t.enterText(find.byKey(const Key('signup-name')), 'QA Test');
+      await t.enterText(find.byKey(const Key('signup-phone')), '3815550999');
+      await t.tap(find.text('Siguiente'));
+      await settle(t);
+      expect(find.text('2. Tu cuenta'), findsOneWidget);
+      expect(find.text('Aceptar Términos y condiciones'), findsOneWidget);
+      await t.tap(find.text('Registrarme'));
+      await settle(t);
+      expect(find.byKey(const Key('signup-error')), findsOneWidget);
+    });
+
+    phoneTest('recuperar contraseña pide un email válido', (t) async {
+      await t.pumpWidget(app(const RecoverPasswordView()));
+      expect(find.text('RECUPERAR CONTRASEÑA'), findsOneWidget);
+      await t.tap(find.text('Enviar'));
+      await settle(t);
+      expect(find.text('Ingresá un email válido.'), findsOneWidget);
+    });
+
+    phoneTest('registro completado', (t) async {
+      await t.pumpWidget(app(const SignupDoneView()));
+      expect(find.text('¡Registro completado!'), findsOneWidget);
+      await t.tap(find.text('Ir al inicio'));
+      verify(nav.clearStackAndShow(Routes.homeView)).called(1);
+    });
+  });
+
+  group('Menú lateral', () {
+    phoneTest('lista todo y cada ítem navega', (t) async {
+      await t.pumpWidget(app(const Scaffold(drawer: AppDrawer())));
+      t.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+      await t.pumpAndSettle();
+      for (final item in [
+        'Mi perfil',
+        'Mis pedidos',
+        'Mis direcciones',
+        'Mis reclamos',
+        'Notificaciones',
+        'Ayuda',
+        'Términos y condiciones',
+        'Políticas de privacidad',
+        'Acerca de SPLG',
+        'Cerrar sesión',
+      ]) {
+        expect(find.text(item), findsOneWidget, reason: item);
+      }
+      await t.tap(find.text('Mis pedidos'));
+      await t.pumpAndSettle();
+      verify(nav.navigateToOrdersView()).called(1);
+    });
+
+    phoneTest('cerrar sesión pide confirmación y no cierra si cancelás',
+        (t) async {
+      await t.pumpWidget(app(const Scaffold(drawer: AppDrawer())));
+      t.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cerrar sesión'));
+      await t.pumpAndSettle();
+      expect(find.text('¿Querés cerrar sesión?'), findsOneWidget);
+      await t.tap(find.text('Cancelar'));
+      await t.pumpAndSettle();
+      verifyNever(customers.signOut());
+    });
+
+    phoneTest('cerrar sesión confirmado cierra y va al login', (t) async {
+      await t.pumpWidget(app(const Scaffold(drawer: AppDrawer())));
+      t.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cerrar sesión'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cerrar sesión').last);
+      await t.pumpAndSettle();
+      verify(locator<SessionService>().logout()).called(1);
+    });
+  });
+
+  group('Inicio', () {
+    setUp(() {
+      locator.unregister<CartService>();
+      locator.registerSingleton<CartService>(FakeCart());
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenAnswer((_) async => [
+            cylinder(price: 14900, discounts: [
+              Discount(quantity: 2, percentage: 5),
+              Discount(quantity: 4, percentage: 12),
+            ]),
+            cylinder(id: 'g2', price: 8500),
+          ]);
+    });
+
+    phoneTest('mapa, botones flotantes y hoja inferior como Tutu', (t) async {
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(find.byKey(const Key('home-map-placeholder')), findsOneWidget);
+      expect(find.byTooltip('Abrir menú'), findsOneWidget);
+      expect(find.byTooltip('Mi ubicación'), findsOneWidget);
+      expect(find.text('Entregar en: Buenos Aires 4114'), findsOneWidget);
+      expect(find.text('¿Qué necesitás?'), findsOneWidget);
+      expect(find.byTooltip('Agregar dirección'), findsOneWidget);
+      // El catálogo no se muestra hasta abrirlo; sin barra inferior.
+      expect(find.text('Elegí tus garrafas'), findsNothing);
+      expect(find.byType(BottomNavigationBar), findsNothing);
+      // Menú arriba a la izquierda, "Mi ubicación" abajo a la derecha.
+      final menu = t.getCenter(find.byTooltip('Abrir menú'));
+      final locate = t.getCenter(find.byTooltip('Mi ubicación'));
+      expect(menu.dx, lessThan(100));
+      expect(menu.dy, lessThan(120));
+      expect(locate.dx, greaterThan(300));
+      expect(locate.dy, greaterThan(menu.dy));
+    });
+
+    phoneTest('el mapa se centra y marca la dirección elegida', (t) async {
+      when(customers.customer).thenReturn(customerWith([
+        Address(
+            addressId: 'a1',
+            streetName: 'Buenos Aires 4114',
+            primary: true,
+            latitude: '-27.3671',
+            longitude: '-55.8961'),
+      ]));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      final map = t.widget<HomeMap>(find.byType(HomeMap));
+      expect(map.delivery!.latitude, closeTo(-27.3671, 1e-6));
+      expect(map.delivery!.longitude, closeTo(-55.8961, 1e-6));
+    });
+
+    phoneTest('una dirección en 0,0 no se marca', (t) async {
+      when(customers.customer).thenReturn(customerWith([
+        Address(
+            addressId: 'a1',
+            streetName: 'X',
+            primary: true,
+            latitude: '0',
+            longitude: '0'),
+      ]));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(t.widget<HomeMap>(find.byType(HomeMap)).delivery, isNull);
+    });
+
+    phoneTest('catálogo con promociones y total en la hoja', (t) async {
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byKey(const Key('home-catalog-field')));
+      await t.pumpAndSettle();
+      expect(find.text('Elegí tus garrafas'), findsWidgets);
+      expect(find.text('−5% x2'), findsOneWidget);
+
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await t.pumpAndSettle();
+      expect(find.textContaining('Continuar · \$28.310'), findsWidgets);
+      await t.tap(find.textContaining('Continuar ·').last);
+      await t.pumpAndSettle();
+      verify(nav.navigateToCheckoutView()).called(1);
+    });
+
+    phoneTest('la píldora abre las direcciones y el + el alta', (t) async {
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.text('Entregar en: Buenos Aires 4114'));
+      await settle(t);
+      verify(locator<BottomSheetService>().showCustomSheet(
+        variant: anyNamed('variant'),
+        title: anyNamed('title'),
+        data: anyNamed('data'),
+      )).called(1);
+      await t.tap(find.byTooltip('Agregar dirección'));
+      await settle(t);
+      verify(nav.navigateToAddressFormView()).called(1);
+    });
+
+    phoneTest('Mi ubicación sólo pide la posición al tocarlo', (t) async {
+      final location = locator<LocationService>() as MockLocationService;
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      verifyNever(location.getCurrentPosition());
+      when(location.getCurrentPosition()).thenAnswer((_) async => Position(
+            latitude: -27.36,
+            longitude: -55.89,
+            timestamp: DateTime(2026),
+            accuracy: 1,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            headingAccuracy: 0,
+            speed: 0,
+            speedAccuracy: 0,
+          ));
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await settle(t);
+      verify(location.getCurrentPosition()).called(1);
+      final map = t.widget<HomeMap>(find.byType(HomeMap));
+      expect(map.showUserLocation, isTrue);
+      expect(map.user!.latitude, closeTo(-27.36, 1e-6));
+    });
+
+    phoneTest('Mi ubicación sin permiso no rompe ni habilita el punto',
+        (t) async {
+      final location = locator<LocationService>() as MockLocationService;
+      when(location.getCurrentPosition()).thenThrow(
+          const LocationUnavailableException(PermissionOutcome.denied));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await settle(t);
+      expect(t.widget<HomeMap>(find.byType(HomeMap)).showUserLocation, isFalse);
+    });
+
+    phoneTest('con el GPS apagado avisa y ofrece ir a Ajustes', (t) async {
+      final location = locator<LocationService>() as MockLocationService;
+      when(location.getCurrentPosition()).thenThrow(
+          const LocationUnavailableException(PermissionOutcome.granted,
+              serviceDisabled: true));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await settle(t);
+      expect(find.byKey(const Key('home-location-notice')), findsOneWidget);
+      expect(find.textContaining('Activá la ubicación'), findsOneWidget);
+      await t.tap(find.text('Ajustes'));
+      verify(location.openLocationSettings()).called(1);
+      await t.tap(find.byTooltip('Cerrar aviso'));
+      await settle(t);
+      expect(find.byKey(const Key('home-location-notice')), findsNothing);
+    });
+
+    phoneTest('Mi ubicación: un segundo toque mientras busca no repite',
+        (t) async {
+      final location = locator<LocationService>() as MockLocationService;
+      final gate = Completer<Position>();
+      when(location.getCurrentPosition()).thenAnswer((_) => gate.future);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await settle(t);
+      verify(location.getCurrentPosition()).called(1);
+      gate.completeError(Exception('x'));
+      await settle(t);
+    });
+
+    phoneTest('Mi ubicación: si no responde en 15 s avisa', (t) async {
+      final location = locator<LocationService>() as MockLocationService;
+      when(location.getCurrentPosition())
+          .thenAnswer((_) => Completer<Position>().future);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Mi ubicación'));
+      await t.pump(HomeViewModel.locateTimeout + const Duration(seconds: 1));
+      expect(find.textContaining('No pudimos ubicarte'), findsOneWidget);
+    });
+
+    phoneTest('si el catálogo falló, abrir "¿Qué necesitás?" reintenta',
+        (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenThrow(Exception('x'));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+      await t.tap(find.byKey(const Key('home-catalog-field')));
+      await t.pumpAndSettle();
+      expect(find.text('Garrafa 10kg'), findsOneWidget);
+      expect(find.text('No pudimos cargar'), findsNothing);
+    });
+
+    phoneTest('el botón de pedidos abre Mis pedidos', (t) async {
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Ir a mis pedidos'));
+      verify(nav.navigateToOrdersView()).called(1);
+    });
+
+    phoneTest('el menú abre el cajón', (t) async {
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Abrir menú'));
+      await t.pumpAndSettle();
+      expect(find.text('Mis pedidos'), findsOneWidget);
+    });
+
+    phoneTest('con un pedido en curso muestra el banner', (t) async {
+      when(history.history)
+          .thenReturn([order(id: 'abc123456', status: OrderStatus.pending)]);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(find.text('Pedido en curso #123456'), findsOneWidget);
+      expect(find.text('Buscando repartidor'), findsOneWidget);
+    });
+
+    phoneTest('si no carga el catálogo ofrece reintentar', (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenThrow(Exception('x'));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byKey(const Key('home-catalog-field')));
+      await t.pumpAndSettle();
+      expect(find.text('No pudimos cargar'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    });
+  });
+
+  group('Mis pedidos', () {
+    phoneTest('lista con estado, total y forma de pago', (t) async {
+      final p2 = order(id: 'p2', status: OrderStatus.delivered, total: 5000);
+      stubPage([order(id: 'p1', status: OrderStatus.pending), p2]);
+      await t.pumpWidget(app(const OrdersView()));
+      await settle(t);
+      expect(find.text('PENDIENTE'), findsOneWidget);
+      expect(find.text('ENTREGADO'), findsOneWidget);
+      expect(find.textContaining('Efectivo'), findsWidgets);
+      await t.tap(find.byKey(const Key('order-p2')));
+      verify(nav.navigateTo<dynamic>(
+        Routes.orderDetailView,
+        arguments: OrderDetailViewArguments(orderId: 'p2', order: p2),
+        id: anyNamed('id'),
+        preventDuplicates: anyNamed('preventDuplicates'),
+        parameters: anyNamed('parameters'),
+        transition: anyNamed('transition'),
+      )).called(1);
+    });
+
+    phoneTest('vacío', (t) async {
+      stubPage(const []);
+      await t.pumpWidget(app(const OrdersView()));
+      await settle(t);
+      expect(find.text('¡Nada por aquí!'), findsOneWidget);
+      expect(find.text('Todavía no hiciste ningún pedido.'), findsOneWidget);
+    });
+
+    phoneTest('detalle de un pedido pendiente: cancelar y modificar',
+        (t) async {
+      when(history.fetchOrder('o1'))
+          .thenAnswer((_) async => order(status: OrderStatus.pending));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.byKey(const Key('detail-total')), findsOneWidget);
+      expect(find.text('Cancelar pedido'), findsOneWidget);
+      expect(find.text('Modificar pedido'), findsOneWidget);
+      expect(find.text('Calificar al repartidor'), findsNothing);
+    });
+
+    phoneTest('detalle de un pedido entregado: calificar, reclamar, repetir',
+        (t) async {
+      when(history.fetchOrder('o1'))
+          .thenAnswer((_) async => order(status: OrderStatus.delivered));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.text('Calificar al repartidor'), findsOneWidget);
+      expect(find.text('Hacer un reclamo'), findsOneWidget);
+      expect(find.text('Repetir pedido'), findsOneWidget);
+      expect(find.text('Cancelar pedido'), findsNothing);
+    });
+
+    phoneTest('detalle de un pedido que no existe muestra el error', (t) async {
+      when(history.fetchOrder('nada')).thenThrow(Exception('x'));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'nada')));
+      await settle(t);
+      expect(find.text('No pudimos cargar'), findsOneWidget);
+    });
+
+    phoneTest('cancelar: elegir motivo, "Otro" pide texto, confirma',
+        (t) async {
+      when(history.cancelOrder('o1', reason: anyNamed('reason')))
+          .thenAnswer((_) async => const CancelResult.ok());
+      await t.pumpWidget(app(const CancelOrderView(orderId: 'o1')));
+      final confirm = find.text('Confirmar cancelación');
+      expect(t.widget<SplgButton>(find.byType(SplgButton).first).onPressed,
+          isNull);
+      await t.tap(find.text('Otro'));
+      await settle(t);
+      expect(find.text('0/300'), findsOneWidget);
+      await t.enterText(find.byType(TextField), 'Me mudé');
+      await settle(t);
+      await t.tap(confirm);
+      await settle(t);
+      verify(history.cancelOrder('o1', reason: 'Me mudé')).called(1);
+      expect(find.text('Pedido cancelado'), findsOneWidget);
+    });
+
+    phoneTest('cancelar: muestra el rechazo del back', (t) async {
+      when(history.cancelOrder('o1', reason: anyNamed('reason'))).thenAnswer(
+          (_) async => const CancelResult.rejected(
+              'El pedido ya está en camino. Contacte al soporte.'));
+      await t.pumpWidget(app(const CancelOrderView(orderId: 'o1')));
+      await t.tap(find.text('Pedí por error'));
+      await settle(t);
+      await t.tap(find.text('Confirmar cancelación'));
+      await settle(t);
+      expect(find.byKey(const Key('cancel-error')), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    });
+  });
+
+  group('Direcciones', () {
+    phoneTest('lista con predeterminada y alta', (t) async {
+      await t.pumpWidget(app(const AddressesView()));
+      await settle(t);
+      expect(find.text('Buenos Aires 4114'), findsOneWidget);
+      expect(find.text('Predeterminada'), findsOneWidget);
+      await t.tap(find.byKey(const Key('address-new')));
+      verify(nav.navigateToAddressFormView()).called(1);
+    });
+
+    phoneTest('menú de la fila: editar, predeterminar y eliminar', (t) async {
+      when(customers.setDefaultAddress('a2'))
+          .thenAnswer((_) async => const ApiResult.ok());
+      await t.pumpWidget(app(const AddressesView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Opciones').last);
+      await t.pumpAndSettle();
+      expect(find.text('Editar'), findsOneWidget);
+      expect(find.text('Eliminar'), findsOneWidget);
+      await t.tap(find.text('Marcar como predeterminada'));
+      await t.pumpAndSettle();
+      verify(customers.setDefaultAddress('a2')).called(1);
+    });
+
+    phoneTest('eliminar pide confirmación', (t) async {
+      when(customers.deleteAddress('a2'))
+          .thenAnswer((_) async => const ApiResult.ok());
+      await t.pumpWidget(app(const AddressesView()));
+      await settle(t);
+      await t.tap(find.byTooltip('Opciones').last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Eliminar'));
+      await t.pumpAndSettle();
+      expect(find.text('Eliminar dirección'), findsOneWidget);
+      verifyNever(customers.deleteAddress(any));
+      await t.tap(find.text('Eliminar').last);
+      await t.pumpAndSettle();
+      verify(customers.deleteAddress('a2')).called(1);
+    });
+
+    phoneTest('sin direcciones: estado vacío', (t) async {
+      when(customers.customer).thenReturn(customerWith());
+      await t.pumpWidget(app(const AddressesView()));
+      await settle(t);
+      expect(
+          find.text('Todavía no tenés direcciones guardadas.'), findsOneWidget);
+    });
+
+    phoneTest('formulario: valida y guarda', (t) async {
+      when(customers.saveAddress(any, editing: anyNamed('editing')))
+          .thenAnswer((_) async => const ApiResult.ok());
+      await t.pumpWidget(app(const AddressFormView()));
+      await t.tap(find.text('Guardar'));
+      await settle(t);
+      expect(find.text('Ingresá la calle.'), findsOneWidget);
+      await t.enterText(find.byKey(const Key('addr-street')), 'Mitre');
+      await t.enterText(find.byKey(const Key('addr-number')), '100');
+      await t.enterText(find.byKey(const Key('addr-city')), 'Posadas');
+      await t.tap(find.text('Guardar'));
+      await settle(t);
+      verify(customers.saveAddress(any, editing: anyNamed('editing')))
+          .called(1);
+    });
+
+    phoneTest('formulario de edición precarga la dirección', (t) async {
+      await t.pumpWidget(app(AddressFormView(
+          address: addr('a1', 'Buenos Aires 4114', city: 'Posadas'))));
+      expect(find.text('Editar dirección'), findsOneWidget);
+      expect(find.text('Buenos Aires'), findsOneWidget);
+      expect(find.text('4114'), findsOneWidget);
+    });
+  });
+
+  group('Reclamos', () {
+    MyClaim claim(String id, ClaimStatus s) => MyClaim(
+          claimId: id,
+          status: s,
+          reason: 'Garrafa en mal estado',
+          description: 'Pierde gas',
+          createdAt: DateTime(2026, 10, 9, 12),
+          orderId: 'o123456',
+          orderTotal: 14900,
+          resolutionNote:
+              s == ClaimStatus.resolved ? 'Se repuso la garrafa' : null,
+        );
+
+    phoneTest('lista con estados', (t) async {
+      when(claims.fetchMine(limit: 20, offset: 0)).thenAnswer((_) async =>
+          ApiResult.ok(ClaimsPage(claims: [
+            claim('1', ClaimStatus.pending),
+            claim('2', ClaimStatus.resolved)
+          ], total: 2)));
+      await t.pumpWidget(app(const ClaimsView()));
+      await settle(t);
+      expect(find.text('PENDIENTE'), findsOneWidget);
+      expect(find.text('RESUELTO'), findsOneWidget);
+    });
+
+    phoneTest('vacío y con error', (t) async {
+      when(claims.fetchMine(limit: 20, offset: 0)).thenAnswer(
+          (_) async => const ApiResult.ok(ClaimsPage(claims: [], total: 0)));
+      await t.pumpWidget(app(const ClaimsView()));
+      await settle(t);
+      expect(find.textContaining('No hiciste ningún reclamo'), findsOneWidget);
+    });
+
+    phoneTest('error de carga con reintento', (t) async {
+      when(claims.fetchMine(limit: 20, offset: 0)).thenAnswer((_) async =>
+          const ApiResult.fail('Sin conexión. Revisá tu internet.'));
+      await t.pumpWidget(app(const ClaimsView()));
+      await settle(t);
+      expect(find.text('Sin conexión'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    });
+
+    phoneTest('detalle con la respuesta de la distribuidora', (t) async {
+      await t.pumpWidget(
+          app(ClaimDetailView(claim: claim('2', ClaimStatus.resolved))));
+      expect(find.text('Garrafa en mal estado'), findsOneWidget);
+      expect(find.textContaining('Se repuso la garrafa'), findsOneWidget);
+      expect(find.textContaining('#123456'), findsOneWidget);
+    });
+  });
+
+  group('Perfil', () {
+    phoneTest('muestra los datos y las acciones', (t) async {
+      await t.pumpWidget(app(const ProfileView()));
+      expect(find.text('Ana Pérez'), findsOneWidget);
+      expect(find.text('Editar perfil'), findsOneWidget);
+      for (final x in [
+        'Información personal',
+        'Cambiar contraseña',
+        'Mis direcciones',
+        'Eliminar cuenta'
+      ]) {
+        expect(find.text(x), findsOneWidget);
+      }
+      await t.tap(find.text('Cambiar contraseña'));
+      verify(nav.navigateToChangePasswordView()).called(1);
+    });
+
+    phoneTest('eliminar cuenta: avisa que es definitiva y cancelar no borra',
+        (t) async {
+      await t.pumpWidget(app(const ProfileView()));
+      await t.tap(find.text('Eliminar cuenta'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Es definitiva'), findsOneWidget);
+      expect(find.textContaining('email'), findsWidgets);
+      await t.tap(find.text('Cancelar'));
+      await t.pumpAndSettle();
+      verifyNever(customers.deleteAccount());
+    });
+
+    phoneTest('eliminar cuenta con pedido en curso muestra el 409', (t) async {
+      when(customers.deleteAccount()).thenAnswer((_) async =>
+          const ApiResult.fail('Tenés pedidos en curso: esperá o cancelalos.'));
+      await t.pumpWidget(app(const ProfileView()));
+      await t.tap(find.text('Eliminar cuenta'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Eliminar cuenta').last);
+      await t.pumpAndSettle();
+      verify(customers.deleteAccount()).called(1);
+      expect(find.text('No pudimos eliminar tu cuenta'), findsOneWidget);
+      expect(find.text('Tenés pedidos en curso: esperá o cancelalos.'),
+          findsOneWidget);
+    });
+
+    phoneTest('eliminar cuenta confirmado va a la bienvenida', (t) async {
+      when(customers.deleteAccount())
+          .thenAnswer((_) async => const ApiResult.ok());
+      await t.pumpWidget(app(const ProfileView()));
+      await t.tap(find.text('Eliminar cuenta'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Eliminar cuenta').last);
+      await t.pumpAndSettle();
+      verify(nav.clearStackAndShow(Routes.welcomeView)).called(1);
+    });
+
+    phoneTest('información personal y edición', (t) async {
+      await t.pumpWidget(app(const PersonalInfoView()));
+      expect(find.textContaining('ana@splg.com'), findsOneWidget);
+      expect(find.textContaining('Buenos Aires 4114, Posadas'), findsOneWidget);
+      await t.pumpWidget(app(const EditProfileView()));
+      expect(find.text('Ana Pérez'), findsOneWidget);
+    });
+
+    phoneTest('cambiar contraseña: el botón se habilita al completar',
+        (t) async {
+      await t.pumpWidget(app(const ChangePasswordView()));
+      expect(find.text('Confirmar'), findsOneWidget);
+      expect(t.widget<SplgButton>(find.byType(SplgButton)).onPressed, isNull);
+    });
+  });
+
+  group('Contenido', () {
+    phoneTest('ayuda: busca y filtra', (t) async {
+      await t.pumpWidget(app(const HelpView()));
+      expect(find.text('¿Cómo hago un pedido?'), findsOneWidget);
+      await t.enterText(find.byType(TextField), 'contraseña');
+      await settle(t);
+      expect(find.text('¿Cómo cambio mi contraseña?'), findsOneWidget);
+      expect(find.text('¿Cómo hago un pedido?'), findsNothing);
+      await t.enterText(find.byType(TextField), 'zzzz');
+      await settle(t);
+      expect(
+          find.text('No encontramos nada con esa búsqueda.'), findsOneWidget);
+    });
+
+    phoneTest('acerca de', (t) async {
+      await t.pumpWidget(app(const AboutView()));
+      expect(find.text('¿Qué es SPLG?'), findsOneWidget);
+    });
+
+    phoneTest('notificaciones: vacío y con lista agrupada', (t) async {
+      await t.pumpWidget(app(const NotificationsView()));
+      expect(find.text('¡Nada por aquí!'), findsOneWidget);
+      await t.pumpWidget(app(NotificationsScreen(
+        now: DateTime(2026, 10, 10),
+        items: [
+          AppNotification(
+              title: 'Tu pedido salió',
+              content: 'Ya va para tu casa',
+              createdAt: DateTime(2026, 10, 10, 9)),
+          AppNotification(
+              title: 'Ayer', content: 'x', createdAt: DateTime(2026, 10, 9, 9)),
+        ],
+      )));
+      expect(find.text('Hoy'), findsOneWidget);
+      expect(find.text('Ayer'), findsWidgets);
+    });
+  });
+
+  group('Confirmación', () {
+    setUp(() {
+      locator.unregister<CartService>();
+      final cart = FakeCart();
+      cart.setOrder(order(
+        items: [
+          OrderItem(
+              cylinder: cylinder(price: 1000, discounts: [
+                Discount(quantity: 2, percentage: 10),
+              ]),
+              quantity: 2),
+        ],
+        address: addr('a1', 'Buenos Aires 4114'),
+      ));
+      locator.registerSingleton<CartService>(cart);
+      final slots = locator<TimeSlotService>() as MockTimeSlotService;
+      when(slots.availabilityFor(any)).thenAnswer((_) async => const [
+            TimeSlotAvailability(
+                timeSlotId: 's1',
+                name: 'Mañana',
+                startTime: '08:00:00',
+                endTime: '12:00:00',
+                remaining: 5),
+            TimeSlotAvailability(
+                timeSlotId: 's2',
+                name: 'Tarde',
+                startTime: '16:00:00',
+                endTime: '20:00:00',
+                remaining: 0),
+          ]);
+    });
+
+    phoneTest('resumen, total y franjas; la llena queda deshabilitada',
+        (t) async {
+      await t.pumpWidget(app(const CheckoutView()));
+      await settle(t);
+      expect(find.text('Confirmación'), findsOneWidget);
+      expect(find.text('Buenos Aires 4114'), findsOneWidget);
+      expect(find.text('\$1.800'), findsWidgets);
+      expect(find.text('Sin cupo'), findsOneWidget);
+      // Sin franja elegida no se puede confirmar.
+      expect(
+          t
+              .widget<SplgButton>(
+                  find.widgetWithText(SplgButton, 'Confirmar pedido'))
+              .onPressed,
+          isNull);
+      await t.tap(find.byKey(const Key('slot-s1')));
+      await settle(t);
+      expect(
+          t
+              .widget<SplgButton>(
+                  find.widgetWithText(SplgButton, 'Confirmar pedido'))
+              .onPressed,
+          isNotNull);
+    });
+
+    phoneTest('forma de pago: despliega y suma el recargo de transferencia',
+        (t) async {
+      await t.pumpWidget(app(const CheckoutView()));
+      await settle(t);
+      await t.tap(find.byKey(const Key('checkout-payment')));
+      await settle(t);
+      expect(find.text('Transferencia (+10%)'), findsOneWidget);
+      await t.tap(find.byKey(const Key('pay-online')));
+      await settle(t);
+      expect(find.text('\$1.980'), findsWidgets);
+    });
+  });
+}

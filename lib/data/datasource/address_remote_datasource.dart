@@ -1,12 +1,19 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
+import 'package:splg_lib/network/api_error_text.dart';
+
 import 'package:splg_customer/core/network/api_client.dart';
+import 'package:splg_customer/core/network/api_result.dart';
 
 class AddressRemoteDataSource {
   final _apiClient = ApiClient();
 
   Future<bool> createAddress(
-      Map<String, dynamic> addressData, String token, String userId) async {
+    Map<String, dynamic> addressData,
+    String token,
+    String userId,
+  ) async {
     try {
       addressData.remove('address_id');
       addressData['user_id'] = userId;
@@ -25,65 +32,54 @@ class AddressRemoteDataSource {
   }
 
   /// Lista las direcciones del usuario (`GET /user-address/user/:userId`).
+  /// Ante cualquier error lanza: una falla no es "no tiene direcciones".
   Future<List<Map<String, dynamic>>> fetchByUser(
-      String userId, String token) async {
-    try {
-      final response = await _apiClient.get('user-address/user/$userId', token);
-      if (response.statusCode == 200 && response.data is List) {
-        return (response.data as List)
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-      }
-    } catch (e) {
-      log('e in fetchByUser: ${e.toString()}');
-    }
-    return const [];
+    String userId,
+    String token,
+  ) async {
+    final response = await _apiClient.get('user-address/user/$userId', token);
+    final data = response.data;
+    if (data is! List) throw const FormatException('Direcciones ilegibles');
+    return data
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
+  /// Alta de una dirección ya geocodificada (`POST /user-address`). El body
+  /// lleva los nombres del DTO del back (camelCase) y `latitude`/`longitude`
+  /// obligatorios.
+  Future<ApiResult<void>> create(Map<String, dynamic> body, String token) =>
+      _send(() => _apiClient.post('user-address', body, token));
+
   /// Actualiza una dirección (`PATCH /user-address/:id`).
-  Future<bool> updateAddress(
-      String addressId, Map<String, dynamic> addressData, String token) async {
-    try {
-      addressData.remove('address_id');
-      addressData.remove('user_id');
-      final response = await _apiClient.patch(
-        'user-address/$addressId',
-        addressData,
-        token,
-      );
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (e) {
-      log('e in updateAddress: ${e.toString()}');
-    }
-    return false;
-  }
+  Future<ApiResult<void>> update(
+    String addressId,
+    Map<String, dynamic> body,
+    String token,
+  ) =>
+      _send(() => _apiClient.patch('user-address/$addressId', body, token));
 
   /// Marca una dirección como predeterminada
   /// (`PATCH /user-address/:id/set-default`).
-  Future<bool> setDefault(String addressId, String token) async {
-    try {
-      final response = await _apiClient.patch(
-        'user-address/$addressId/set-default',
-        const {},
-        token,
+  Future<ApiResult<void>> setDefault(String addressId, String token) => _send(
+        () =>
+            _apiClient.patch('user-address/$addressId/set-default', {}, token),
       );
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (e) {
-      log('e in setDefault: ${e.toString()}');
-    }
-    return false;
-  }
 
   /// Elimina una dirección (`DELETE /user-address/:id`).
-  Future<bool> deleteAddress(String addressId, String token) async {
+  Future<ApiResult<void>> delete(String addressId, String token) =>
+      _send(() => _apiClient.delete('user-address/$addressId', token));
+
+  Future<ApiResult<void>> _send(Future<Response> Function() call) async {
     try {
-      final response =
-          await _apiClient.delete('user-address/$addressId', token);
-      return response.statusCode == 200 || response.statusCode == 204;
+      final r = await call();
+      final code = r.statusCode ?? 0;
+      return code >= 200 && code < 300
+          ? const ApiResult.ok()
+          : const ApiResult.fail(ApiErrorText.generic);
     } catch (e) {
-      log('e in deleteAddress: ${e.toString()}');
+      return ApiResult.fromError(e);
     }
-    return false;
   }
 }

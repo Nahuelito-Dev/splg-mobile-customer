@@ -15,9 +15,14 @@ class CancelOrderUseCase {
   final String Function() _newKey;
   final Map<String, String> _keys = {};
 
-  Future<CancelResult> call(String orderId, String token) async {
+  /// Descarta las claves de intenciones en curso (al cerrar la sesión).
+  void clear() => _keys.clear();
+
+  Future<CancelResult> call(String orderId, String token,
+      {String? reason}) async {
     final key = _keys.putIfAbsent(orderId, _newKey);
-    final result = await _orderRepository.cancelOrder(orderId, token, key);
+    final result = await _orderRepository.cancelOrder(orderId, token, key,
+        reason: reason);
     if (result.success || !result.retryable) _keys.remove(orderId);
     return result;
   }

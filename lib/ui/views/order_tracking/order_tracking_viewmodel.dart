@@ -362,7 +362,7 @@ class OrderTrackingViewModel extends BaseViewModel {
     // El pedido ya quedo `delivered` en el backend: refrescamos el historial
     // (para que Home/History lo muestren al toque) y cerramos el tracking,
     // que no tiene mas nada que seguir.
-    await _historyService.refreshHistory();
+    await _historyService.tryRefreshHistory();
     _trackingService.disconnect();
 
     // Momento de mayor señal para calificar al chofer (CU-025). El cliente

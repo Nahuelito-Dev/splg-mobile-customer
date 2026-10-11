@@ -40,6 +40,9 @@ class LocationService {
     return await Geolocator.getCurrentPosition();
   }
 
+  /// Ajustes de ubicación del sistema (para cuando el GPS está apagado).
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
+
   Future<Placemark?> getAddressFromLatLng(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);

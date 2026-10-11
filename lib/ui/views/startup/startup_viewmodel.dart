@@ -54,6 +54,10 @@ class StartupViewModel extends BaseViewModel {
     // NotificationService maneja sus propios errores internamente.
     unawaited(_notificationService.initialize());
 
-    _navigationService.replaceWithHomeView();
+    if (_customerService.isUserLoggedIn) {
+      _navigationService.replaceWithHomeView();
+    } else {
+      _navigationService.replaceWithWelcomeView();
+    }
   }
 }

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
-
-import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'address_list_sheet_model.dart';
 
@@ -22,58 +20,52 @@ class AddressListSheet extends StackedView<AddressListSheetModel> {
     AddressListSheetModel viewModel,
     Widget? child,
   ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-        ),
-      ),
+    final type = SplgType.of(context);
+    final data = request.data;
+    final selectedId = data is Map ? data['selectedId']?.toString() : null;
+    return SplgBottomPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Mis Direcciones',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          verticalSpaceMedium,
+          Text('Mis direcciones', style: type.heading),
+          const SizedBox(height: 12),
           if (viewModel.addresses.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text('No tienes direcciones guardadas'),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(
+                  child: Text('Todavía no tenés direcciones guardadas.')),
             )
           else
             Flexible(
-              child: ListView.separated(
+              child: ListView(
                 shrinkWrap: true,
-                itemCount: viewModel.addresses.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: Theme.of(context).colorScheme.outline.withAlpha(20),
-                ),
-                itemBuilder: (context, index) {
-                  final address = viewModel.addresses[index];
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      Icons.location_on_outlined,
-                      color: Theme.of(context).colorScheme.primary,
+                children: [
+                  for (final a in viewModel.addresses)
+                    SplgRadioRow(
+                      key: Key('sheet-address-${a.addressId}'),
+                      icon: SplgIcons.location,
+                      title: a.streetName,
+                      subtitle: a.city,
+                      selected: viewModel.isSelected(a, selectedId),
+                      onTap: () {
+                        if (completer != null) {
+                          viewModel.selectAddress(a, completer!);
+                        }
+                      },
                     ),
-                    title: Text(address.streetName),
-                    subtitle: Text(address.city ?? 'Sin ciudad'),
-                    onTap: () {
-                      if (completer != null) {
-                        viewModel.selectAddress(address, completer!);
-                      }
-                    },
-                  );
-                },
+                ],
               ),
             ),
+          const SizedBox(height: 12),
+          SplgButton(
+            key: const Key('sheet-add-address'),
+            title: 'Agregar dirección',
+            style: SplgButtonStyle.outlined,
+            onPressed: completer == null
+                ? null
+                : () => viewModel.addAddress(completer!),
+          ),
         ],
       ),
     );

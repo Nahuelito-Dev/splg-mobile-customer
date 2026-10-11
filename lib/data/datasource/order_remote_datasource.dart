@@ -57,26 +57,25 @@ class OrderRemoteDatasource {
     return (false, null);
   }
 
-  Future<(bool, dynamic)> fetchCustomerHistory(
+  /// `GET /orders/customer/:userId?limit&offset`. Ante cualquier error
+  /// (red, 4xx, 5xx) lanza: una falla no es una lista vacía.
+  Future<dynamic> fetchCustomerHistory(
     String customerId,
     String token, {
     int limit = 20,
     int offset = 0,
   }) async {
-    try {
-      final response = await _apiClient.get(
-        'orders/customer/$customerId?limit=$limit&offset=$offset',
-        token,
-      );
+    final response = await _apiClient.get(
+      'orders/customer/$customerId?limit=$limit&offset=$offset',
+      token,
+    );
+    return response.data;
+  }
 
-      if (response.statusCode == 200) {
-        return (true, response.data);
-      }
-    } catch (e) {
-      log('e in fetchCustomerHistory: ${e.toString()}');
-    }
-
-    return (false, null);
+  /// `GET /orders/:id`. Lanza ante cualquier error.
+  Future<dynamic> fetchOrder(String orderId, String token) async {
+    final response = await _apiClient.get('orders/$orderId', token);
+    return response.data;
   }
 
   /// `PATCH /orders/:id/cancel`: el cliente no puede usar `/status` (sólo
@@ -85,12 +84,16 @@ class OrderRemoteDatasource {
   Future<CancelResult> cancelOrder(
     String orderId,
     String token,
-    String idempotencyKey,
-  ) async {
+    String idempotencyKey, {
+    String? reason,
+  }) async {
     try {
       final response = await _apiClient.patch(
         'orders/$orderId/cancel',
-        {},
+        {
+          if (reason != null && reason.trim().isNotEmpty)
+            'reason': reason.trim()
+        },
         token,
         {'Idempotency-Key': idempotencyKey},
       );

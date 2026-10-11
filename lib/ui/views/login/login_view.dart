@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked/stacked_annotations.dart';
 
 import 'package:splg_customer/ui/common/app_strings.dart';
-import 'package:splg_customer/ui/views/login/login_view.form.dart';
 
+import 'login_view.form.dart';
 import 'login_viewmodel.dart';
-import 'package:splg_lib/widgets/splg_logo.dart';
 
 @FormView(fields: [
-  FormTextField(
-    name: 'email',
-  ),
-  FormTextField(
-    name: 'password',
-  ),
+  FormTextField(name: 'email'),
+  FormTextField(name: 'password'),
 ])
 class LoginView extends StackedView<LoginViewModel> with $LoginView {
   const LoginView({super.key});
@@ -25,155 +21,111 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
     LoginViewModel viewModel,
     Widget? child,
   ) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: Theme.of(context).colorScheme.primary),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SplgLogo(height: 56),
-                        const SizedBox(height: 46),
-                        Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 4,
-                          child: Padding(
-                            padding: const EdgeInsets.only(
-                                top: 36, bottom: 28, left: 24, right: 24),
-                            child: _buildEmailAndPassword(context, viewModel),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSignUpButton(context, viewModel),
-                      ],
-                    ),
+    final type = SplgType.of(context);
+    final hasError = viewModel.errorMessage != null;
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(
+                      top: context.sp(14), bottom: context.sp(10)),
+                  child: Center(
+                    child: SplgIllustration.mailSent
+                        .image(height: context.sp(150)),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmailAndPassword(
-      BuildContext context, LoginViewModel viewModel) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final border = OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: colorScheme.outline.withAlpha(70),
-        ));
-
-    return Column(
-      children: [
-        TextFormField(
-          controller: emailController,
-          focusNode: emailFocusNode,
-          enabled: !viewModel.isBusy,
-          decoration: InputDecoration(
-              fillColor: Theme.of(context).colorScheme.surface,
-              prefixIcon: Icon(Icons.email_outlined,
-                  color: colorScheme.outline.withAlpha(70)),
-              hintText: loginViewHintEmail,
-              hintStyle: TextStyle(color: colorScheme.outline.withAlpha(70)),
-              border: border,
-              enabledBorder: border,
-              disabledBorder: border,
-              errorText: viewModel.emaileError),
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: passwordController,
-          focusNode: passwordFocusNode,
-          enabled: !viewModel.isBusy,
-          decoration: InputDecoration(
-              fillColor: Theme.of(context).colorScheme.surface,
-              prefixIcon: Icon(Icons.lock_outline,
-                  color: colorScheme.outline.withAlpha(70)),
-              hintText: loginViewHintPassword,
-              hintStyle: TextStyle(color: colorScheme.outline.withAlpha(70)),
-              border: border,
-              enabledBorder: border,
-              disabledBorder: border,
-              errorText: viewModel.passwordError,
-              suffixIcon: IconButton(
-                onPressed: viewModel.togglePasswordVisibility,
-                icon: Icon(
-                    viewModel.isPasswordVisible
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: colorScheme.outline.withAlpha(70)),
-              )),
-          obscureText: !viewModel.isPasswordVisible,
-          textInputAction: TextInputAction.done,
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: !viewModel.isBusy ? viewModel.onForgotPassword : null,
-            child: const Text(loginViewForgotPassword),
-          ),
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+                Text('¡Hola!',
+                    style: type.title.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: context.sp(18),
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                SplgTextField(
+                  controller: emailController,
+                  focusNode: emailFocusNode,
+                  enabled: !viewModel.isBusy,
+                  hint: loginViewHintEmail,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                ),
+                const SizedBox(height: 15),
+                SplgTextField(
+                  controller: passwordController,
+                  focusNode: passwordFocusNode,
+                  enabled: !viewModel.isBusy,
+                  hint: loginViewHintPassword,
+                  obscure: !viewModel.showPassword,
+                  textInputAction: TextInputAction.done,
+                  suffixIcon: IconButton(
+                    tooltip: viewModel.showPassword
+                        ? 'Ocultar contraseña'
+                        : 'Mostrar contraseña',
+                    icon: Icon(
+                      viewModel.showPassword ? SplgIcons.eyeOff : SplgIcons.eye,
+                      size: 22,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    onPressed: viewModel.togglePasswordVisibility,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed:
+                        viewModel.isBusy ? null : viewModel.onForgotPassword,
+                    child: Text(loginViewForgotPassword,
+                        style: type.captionStrong
+                            .copyWith(fontSize: context.sp(10))),
+                  ),
+                ),
+                if (hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      viewModel.errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: type.body.copyWith(color: context.brasa.danger),
+                    ),
+                  ),
+                SplgButton(
+                  title: loginViewButton,
+                  loading: viewModel.isBusy,
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    viewModel.onLogin();
+                  },
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(loginViewNoAccount, style: type.caption),
+                    InkWell(
+                      onTap: viewModel.isBusy ? null : viewModel.onSignup,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(loginViewSignup,
+                            style: type.captionStrong.copyWith(
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline)),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: context.sp(40)),
+                Center(child: SplgLogo(height: context.sp(14))),
+              ],
             ),
-            minimumSize: const Size.fromHeight(44),
           ),
-          onPressed: !viewModel.isBusy
-              ? () {
-                  FocusScope.of(context).unfocus();
-                  viewModel.onLogin();
-                }
-              : null,
-          child: const Text(
-            loginViewButton,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSignUpButton(BuildContext context, LoginViewModel viewModel) {
-    return TextButton(
-      onPressed: !viewModel.isBusy ? viewModel.navigateToSignup : null,
-      child: Text.rich(
-        TextSpan(
-          text: loginViewNoAccount,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-          children: [
-            TextSpan(
-              text: loginViewSignup,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
         ),
       ),
     );

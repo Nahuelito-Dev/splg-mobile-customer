@@ -12,6 +12,8 @@ import 'package:splg_lib/domain/discount.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/domain/pricing.dart';
+import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
@@ -42,15 +44,21 @@ class CheckoutViewModel extends ReactiveViewModel {
     // El carrito se arma antes del login (sin dirección): al llegar acá se
     // toma la predeterminada (o la primera) de las direcciones guardadas.
     var address = _cartService.order?.address;
-    if (address == null) {
-      final saved = _customerService.customer.addresses;
-      if (saved.isNotEmpty) {
-        address = saved.firstWhere((a) => a.primary, orElse: () => saved.first);
-        // initialize() corre dentro del build: notificar al carrito ahí
-        // dispara "setState durante build", así que se difiere.
-        final selected = address;
-        Future.microtask(() => _setOrderAddress(selected));
+    final saved = _customerService.customer.addresses;
+    if (address != null && saved.isNotEmpty) {
+      // Si se borró o editó en otra pantalla, vale la vigente (o ninguna).
+      address = _current(address);
+      final current = address;
+      if (current != null && current != _cartService.order?.address) {
+        Future.microtask(() => _setOrderAddress(current));
       }
+    }
+    if (address == null && saved.isNotEmpty) {
+      address = saved.firstWhere((a) => a.primary, orElse: () => saved.first);
+      // initialize() corre dentro del build: notificar al carrito ahí
+      // dispara "setState durante build", así que se difiere.
+      final selected = address;
+      Future.microtask(() => _setOrderAddress(selected));
     }
     addressController.text = address?.streetName ?? '';
     _selectedPaymentMethod =
@@ -62,30 +70,67 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   void setPaymentMethod(PaymentMethod method) {
     _selectedPaymentMethod = method;
+    paymentOpen = false;
     rebuildUi();
   }
 
-  Future<void> openMap() async {
-    final result = await _navigationService.navigateToMapView();
-    if (result != null && result is Address) {
-      addressController.text = result.streetName;
-      _setOrderAddress(result);
-      _customerService.addAddress(result);
-    }
+  /// Desplegables de la confirmación.
+  bool paymentOpen = false;
+  bool slotsOpen = true;
+
+  void togglePayment() {
+    paymentOpen = !paymentOpen;
+    rebuildUi();
   }
 
+  void toggleSlots() {
+    slotsOpen = !slotsOpen;
+    rebuildUi();
+  }
+
+  /// Etiqueta de la franja elegida, o null.
+  String? get selectedSlotLabel => _selectedSlot?.label;
+
   Future<void> showAddressList() async {
+    if (_customerService.customer.addresses.isEmpty) {
+      await _addAddress();
+      return;
+    }
     final response = await _bottomSheetService.showCustomSheet(
       variant: BottomSheetType.addressList,
       title: 'Selecciona una dirección',
+      data: {'selectedId': _cartService.order?.address?.addressId},
     );
 
-    if (response?.confirmed == true && response?.data is Address) {
+    if (response?.data == AddressListSheetModel.addNew) {
+      await _addAddress();
+    } else if (response?.confirmed == true && response?.data is Address) {
       final address = response!.data as Address;
       addressController.text = address.streetName;
       _setOrderAddress(address);
       rebuildUi();
     }
+  }
+
+  /// La dirección vigente con ese id en `customer.addresses`, o null si ya no
+  /// existe.
+  Address? _current(Address? a) {
+    if (a == null) return null;
+    for (final s in _customerService.customer.addresses) {
+      if (s.addressId == a.addressId) return s;
+    }
+    return null;
+  }
+
+  /// Alta desde la hoja (o sin direcciones): el formulario devuelve la dirección
+  /// creada y esa queda elegida. Si se cancela no cambia nada.
+  Future<void> _addAddress() async {
+    final created = await _navigationService.navigateToAddressFormView();
+    if (created is! Address) return;
+    final a = _current(created) ?? created;
+    addressController.text = a.streetName;
+    _setOrderAddress(a);
+    rebuildUi();
   }
 
   void _setOrderAddress(Address address) {
@@ -137,48 +182,10 @@ class CheckoutViewModel extends ReactiveViewModel {
     return null;
   }
 
-  // Discount and Total Calculation Logic
-  double getSubtotal(OrderItem item) {
-    double subtotal = item.cylinder.price * item.quantity;
+  double getSubtotal(OrderItem item) => Pricing.subtotal(item);
 
-    // Find best discount for the quantity of this specific cylinder
-    if (item.cylinder.discounts != null &&
-        item.cylinder.discounts!.isNotEmpty) {
-      Discount? bestDiscount;
-      // Assumes discounts are sorted by quantity ascending or logic handles it.
-      // We check all discounts and find the one that fits.
-      for (final discount in item.cylinder.discounts!) {
-        if (item.quantity >= discount.quantity) {
-          // Keep the one with highest quantity threshold that we met
-          if (bestDiscount == null ||
-              discount.quantity > bestDiscount.quantity) {
-            bestDiscount = discount;
-          }
-        }
-      }
-
-      if (bestDiscount != null) {
-        subtotal = subtotal * (1 - bestDiscount.percentage / 100);
-      }
-    }
-    return subtotal;
-  }
-
-  Discount? getAppliedDiscount(OrderItem item) {
-    if (item.cylinder.discounts == null || item.cylinder.discounts!.isEmpty) {
-      return null;
-    }
-
-    Discount? bestDiscount;
-    for (final discount in item.cylinder.discounts!) {
-      if (item.quantity >= discount.quantity) {
-        if (bestDiscount == null || discount.quantity > bestDiscount.quantity) {
-          bestDiscount = discount;
-        }
-      }
-    }
-    return bestDiscount;
-  }
+  Discount? getAppliedDiscount(OrderItem item) =>
+      Pricing.applied(item.cylinder, item.quantity);
 
   double get itemsTotal {
     if (order == null) return 0;
@@ -201,7 +208,11 @@ class CheckoutViewModel extends ReactiveViewModel {
         _selectedTimeSlotId != null;
   }
 
-  DateTime _selectedDate = DateTime.now();
+  /// Reloj del checkout; los tests lo fijan para que el golden no dependa del día.
+  @visibleForTesting
+  static DateTime Function() now = DateTime.now;
+
+  DateTime _selectedDate = now();
   DateTime get selectedDate => _selectedDate;
 
   String get formattedDate =>
@@ -223,6 +234,32 @@ class CheckoutViewModel extends ReactiveViewModel {
     }
   }
 
+  /// Antes de mandar el pedido: relee las direcciones (si no puede, usa las
+  /// locales) y comprueba que la elegida siga existiendo. Si no, la saca del
+  /// carrito y avisa.
+  Future<bool> _addressStillValid() async {
+    try {
+      await _customerService.refreshAddresses();
+    } catch (_) {}
+    final chosen = _cartService.order?.address;
+    final current = _current(chosen);
+    if (current != null) {
+      if (current != chosen) _setOrderAddress(current);
+      return true;
+    }
+    addressController.clear();
+    final order = _cartService.order;
+    if (order != null) _cartService.setOrder(order.copyWith(address: null));
+    rebuildUi();
+    await _dialogService.showDialog(
+      title: 'Dirección no disponible',
+      description:
+          'La dirección elegida ya no existe. Elegí otra para continuar.',
+      buttonTitle: 'Aceptar',
+    );
+    return false;
+  }
+
   final TextEditingController deliveryDetailsController =
       TextEditingController();
 
@@ -240,6 +277,12 @@ class CheckoutViewModel extends ReactiveViewModel {
     }
 
     setBusy(true);
+
+    // La dirección tiene que seguir vigente: pudo borrarse desde otra pantalla.
+    if (!await _addressStillValid()) {
+      setBusy(false);
+      return;
+    }
 
     // Update order with new fields. La franja seleccionada aporta la ventana
     // horaria para mostrar; su id se manda aparte al backend (timeSlotId).
@@ -297,9 +340,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       // Con el pedido hecho es cuando tiene sentido el aviso de estados.
       unawaited(_notificationService.requestPermissionAndRegister());
 
-      final trackedOrderId = _historyService.history.isNotEmpty
-          ? _historyService.history.first.id
-          : updatedOrder.id;
+      final trackedOrderId = result.order?.id ?? updatedOrder.id;
       await _navigationService.replaceWithOrderTrackingView(
         orderId: trackedOrderId,
       );

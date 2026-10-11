@@ -3,21 +3,29 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/ui/views/startup/startup_viewmodel.dart';
+import 'package:stacked_services/stacked_services.dart';
 
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
 
 void main() {
   group('StartupViewModel -', () {
-    setUp(() => registerServices());
+    late MockCustomerService customer;
+    late MockNavigationService nav;
+
+    setUp(() {
+      registerServices();
+      customer = locator<CustomerService>() as MockCustomerService;
+      nav = locator<NavigationService>() as MockNavigationService;
+    });
     tearDown(() => locator.reset());
 
-    test('entra al home aunque el permiso de notificaciones siga pendiente',
+    test('sin sesión entra a la bienvenida aunque el permiso siga pendiente',
         () async {
-      final customer = locator<CustomerService>() as MockCustomerService;
       when(customer.isUserLoggedIn).thenReturn(false);
       final notifications =
           locator<NotificationService>() as MockNotificationService;
@@ -31,6 +39,18 @@ void main() {
           );
 
       verify(notifications.initialize()).called(1);
+      verify(nav.replaceWithWelcomeView()).called(1);
+      verifyNever(nav.replaceWithHomeView());
+    });
+
+    test('con sesión válida entra directo al inicio', () async {
+      when(customer.isUserLoggedIn).thenReturn(true);
+      when(customer.init()).thenAnswer((_) async => true);
+
+      await StartupViewModel().runStartupLogic();
+
+      verify(nav.replaceWithHomeView()).called(1);
+      verifyNever(nav.replaceWithWelcomeView());
     });
   });
 }

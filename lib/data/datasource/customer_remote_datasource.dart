@@ -3,6 +3,8 @@ import 'dart:developer';
 import 'package:dio/dio.dart';
 
 import 'package:splg_customer/core/network/api_client.dart';
+import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_lib/network/api_error_text.dart';
 
 /// El back responde 409 cuando el email o el teléfono ya tienen cuenta.
 class RegistrationConflictException implements Exception {
@@ -13,15 +15,13 @@ class CustomerRemoteDatasource {
   final _apiClient = ApiClient();
 
   Future<(bool, dynamic)> createCustomer(
-      Map<String, dynamic> customerData) async {
+    Map<String, dynamic> customerData,
+  ) async {
     try {
       // Alta pública de clientes. La ruta anterior
       // (users/customer-registration) sigue andando para las versiones ya
       // publicadas, pero se va a retirar.
-      final response = await _apiClient.post(
-        'auth/registro',
-        customerData,
-      );
+      final response = await _apiClient.post('auth/registro', customerData);
 
       if (response.statusCode == 201) {
         return (true, response.data);
@@ -39,7 +39,9 @@ class CustomerRemoteDatasource {
   }
 
   Future<(bool, dynamic)> fetchCustomerByEmail(
-      String email, String token) async {
+    String email,
+    String token,
+  ) async {
     try {
       final response = await _apiClient.get('users/email/$email', token);
 
@@ -55,14 +57,33 @@ class CustomerRemoteDatasource {
 
   /// Actualiza datos del propio usuario (`PATCH /users/:id`). Solo se mandan
   /// los campos a cambiar (p.ej. full_name, phone_number).
-  Future<bool> updateUser(
-      String userId, Map<String, dynamic> data, String token) async {
+  Future<ApiResult<void>> updateUser(
+    String userId,
+    Map<String, dynamic> data,
+    String token,
+  ) async {
     try {
       final response = await _apiClient.patch('users/$userId', data, token);
-      return response.statusCode == 200 || response.statusCode == 204;
+      return response.statusCode == 200 || response.statusCode == 204
+          ? const ApiResult.ok()
+          : const ApiResult.fail(ApiErrorText.generic);
     } catch (e) {
       log('e in updateUser: ${e.toString()}');
+      return ApiResult.fromError(e);
     }
-    return false;
+  }
+
+  /// Baja lógica de la propia cuenta (`DELETE /users/me`). Con pedidos en
+  /// curso el back responde 409 con el motivo.
+  Future<ApiResult<void>> deleteMe(String token) async {
+    try {
+      final response = await _apiClient.delete('users/me', token);
+      return response.statusCode == 200 || response.statusCode == 204
+          ? const ApiResult.ok()
+          : const ApiResult.fail(ApiErrorText.generic);
+    } catch (e) {
+      log('e in deleteMe: ${e.toString()}');
+      return ApiResult.fromError(e);
+    }
   }
 }

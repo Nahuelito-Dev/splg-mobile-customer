@@ -22,6 +22,7 @@ import '../services/location_service.dart';
 import '../services/notification_service.dart';
 import '../services/order_tracking_service.dart';
 import '../services/rating_service.dart';
+import '../services/session_service.dart';
 import '../services/time_slot_service.dart';
 
 final locator = StackedLocator.instance;
@@ -49,4 +50,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => ClaimService());
   locator.registerLazySingleton(() => NotificationService());
   locator.registerLazySingleton(() => AppPermissions());
+  locator.registerLazySingleton(() => SessionService());
 }

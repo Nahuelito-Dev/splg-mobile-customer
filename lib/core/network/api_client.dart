@@ -5,6 +5,26 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import 'package:splg_customer/core/config/app_config.dart';
 
+/// Ante un 401 en un pedido autenticado avisa que la sesión dejó de valer.
+class UnauthorizedInterceptor extends Interceptor {
+  UnauthorizedInterceptor(this.onUnauthorized);
+
+  final void Function() onUnauthorized;
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    // La baja de cuenta maneja su propio 401 (mensaje específico).
+    final isAccountDelete = err.requestOptions.method == 'DELETE' &&
+        err.requestOptions.path.endsWith('users/me');
+    if (err.response?.statusCode == 401 &&
+        !isAccountDelete &&
+        err.requestOptions.headers.containsKey('Authorization')) {
+      onUnauthorized();
+    }
+    handler.next(err);
+  }
+}
+
 class ApiClient {
   static final instance = ApiClient._();
 
@@ -20,14 +40,20 @@ class ApiClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     ),
-  )..interceptors.add(PrettyDioLogger(
+  )
+    ..interceptors.add(PrettyDioLogger(
       requestHeader: true,
       requestBody: true,
       responseBody: false,
       responseHeader: false,
       error: true,
       compact: true,
-    ));
+    ))
+    ..interceptors.add(UnauthorizedInterceptor(() => onUnauthorized?.call()));
+
+  /// Qué hacer cuando el back responde 401 a un pedido con token (se asigna al
+  /// arrancar: lleva al login).
+  static void Function()? onUnauthorized;
 
   Future<Response> get(String path, [String? token]) async {
     try {

@@ -76,6 +76,18 @@ class NotificationService {
     await registerCurrentToken();
   }
 
+  /// Borra el token FCM del dispositivo (cierre de sesión o baja de cuenta):
+  /// así las notificaciones del usuario anterior no le llegan al siguiente.
+  Future<void> clearToken() async {
+    _askedThisSession = false;
+    if (!AppConfig.pushEnabled) return;
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      log('NotificationService.clearToken error: $e');
+    }
+  }
+
   /// Obtiene el token FCM actual y lo registra contra el backend si hay
   /// sesión iniciada. Se expone aparte de [initialize] para poder re-llamarlo
   /// justo después de un login/registro exitoso (antes puede no haber

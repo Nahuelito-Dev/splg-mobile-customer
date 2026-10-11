@@ -32,6 +32,7 @@ class ClaimSheetModel extends BaseViewModel {
   }
 
   Future<bool> submit(String orderId) async {
+    if (isBusy) return false;
     final description = descriptionController.text.trim();
     if (description.isEmpty) {
       errorMessage = 'Contanos qué pasó antes de enviar.';
@@ -41,18 +42,18 @@ class ClaimSheetModel extends BaseViewModel {
 
     setBusy(true);
     errorMessage = null;
-    final ok = await _claimService.createClaim(
+    final result = await _claimService.createClaim(
       orderId: orderId,
       reason: _reason,
       description: description,
     );
     setBusy(false);
 
-    if (!ok) {
-      errorMessage = 'No se pudo enviar el reclamo. Intentá de nuevo.';
+    if (!result.ok) {
+      errorMessage = result.message;
       notifyListeners();
     }
-    return ok;
+    return result.ok;
   }
 
   @override

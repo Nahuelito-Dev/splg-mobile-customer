@@ -1,11 +1,34 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/data/datasource/gascylinder_remote_datasource.dart';
+import 'package:splg_customer/data/repository/gascylinder_repository_imp.dart';
 
-import '../helpers/test_helpers.dart';
+class _Datasource extends GasCylinderRemoteDatasource {
+  _Datasource(this.run);
+
+  final Future<dynamic> Function() run;
+
+  @override
+  Future<dynamic> getGasCylinders() => run();
+}
 
 void main() {
-  group('GasCylinderServiceTest -', () {
-    setUp(() => registerServices());
-    tearDown(() => locator.reset());
+  group('Catálogo de garrafas', () {
+    test('un error del datasource se propaga, no es una lista vacía', () {
+      final repo = GasCylinderRepositoryImp(
+          _Datasource(() async => throw Exception('sin red')));
+      expect(repo.getGasCylinders(), throwsException);
+    });
+
+    test('un cuerpo ilegible se propaga', () {
+      final repo =
+          GasCylinderRepositoryImp(_Datasource(() async => 'no es un mapa'));
+      expect(repo.getGasCylinders(), throwsA(anything));
+    });
+
+    test('un catálogo realmente vacío es una lista vacía', () async {
+      final repo = GasCylinderRepositoryImp(
+          _Datasource(() async => {'gasCylinders': <dynamic>[]}));
+      expect(await repo.getGasCylinders(), isEmpty);
+    });
   });
 }

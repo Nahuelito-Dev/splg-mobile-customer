@@ -1,220 +1,170 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:splg_lib/domain/address.dart';
-
+import 'package:splg_customer/ui/widgets/load_scaffold.dart';
 import 'addresses_viewmodel.dart';
 
-/// Gestión de direcciones del cliente: listar, agregar (vía mapa), marcar
+/// Gestión de direcciones del cliente: listar, agregar, editar, marcar
 /// predeterminada y eliminar.
 class AddressesView extends StackedView<AddressesViewModel> {
   const AddressesView({super.key});
-
-  @override
-  Widget builder(
-    BuildContext context,
-    AddressesViewModel viewModel,
-    Widget? child,
-  ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: colorScheme.primary),
-        title: Text(
-          'Mis direcciones',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: viewModel.isBusy ? null : viewModel.addAddress,
-        icon: const Icon(Icons.add_location_alt_outlined),
-        label: const Text('Agregar'),
-      ),
-      body: SafeArea(
-        child: viewModel.isBusy
-            ? const Center(child: CircularProgressIndicator())
-            : viewModel.addresses.isEmpty
-                ? _buildEmpty(theme)
-                : _buildList(context, viewModel, colorScheme),
-      ),
-    );
-  }
-
-  Widget _buildEmpty(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_off_outlined, size: 64),
-            const SizedBox(height: 16),
-            Text(
-              'Todavía no tenés direcciones guardadas.\n'
-              'Agregá una con el botón de abajo.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildList(
-    BuildContext context,
-    AddressesViewModel viewModel,
-    ColorScheme colorScheme,
-  ) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: viewModel.addresses.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final address = viewModel.addresses[index];
-        return _AddressCard(
-          address: address,
-          colorScheme: colorScheme,
-          onSetDefault: () => viewModel.setDefault(address),
-          onDelete: () => _confirmDelete(context, viewModel, address),
-        );
-      },
-    );
-  }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    AddressesViewModel viewModel,
-    Address address,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Eliminar dirección'),
-        content: Text('¿Eliminar "${address.streetName}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await viewModel.deleteAddress(address);
-    }
-  }
 
   @override
   AddressesViewModel viewModelBuilder(BuildContext context) =>
       AddressesViewModel();
 
   @override
-  void onViewModelReady(AddressesViewModel viewModel) {
-    viewModel.initialize();
-    super.onViewModelReady(viewModel);
+  void onViewModelReady(AddressesViewModel viewModel) => viewModel.load();
+
+  @override
+  Widget builder(
+      BuildContext context, AddressesViewModel model, Widget? child) {
+    final type = SplgType.of(context);
+    final brasa = context.brasa;
+    return LoadScaffold(
+      title: 'Mis direcciones',
+      model: model,
+      builder: (context) {
+        final list = model.addresses;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            Material(
+              color: brasa.primaryStrong.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              child: SplgMenuItem(
+                key: const Key('address-new'),
+                label: 'Nueva dirección',
+                icon: SplgIcons.house,
+                onTap: model.add,
+              ),
+            ),
+            if (model.actionError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(model.actionError!,
+                    key: const Key('address-error'),
+                    style: type.body.copyWith(color: brasa.danger)),
+              ),
+            const SizedBox(height: 12),
+            if (list.isEmpty)
+              SizedBox(
+                height: 360,
+                child: SplgEmptyState(
+                  illustration: SplgIllustration.location,
+                  message: 'Todavía no tenés direcciones guardadas.',
+                ),
+              )
+            else
+              for (final a in list)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _AddressTile(
+                    key: Key('address-${a.addressId}'),
+                    address: a,
+                    busy: model.isBusy,
+                    onEdit: () => model.edit(a),
+                    onDefault: () => model.setDefault(a),
+                    onDelete: () => _confirmDelete(context, model, a),
+                  ),
+                ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDelete(
+      BuildContext context, AddressesViewModel model, Address a) async {
+    final ok = await showSplgDialog(
+      context,
+      title: 'Eliminar dirección',
+      message: '¿Querés eliminar "${a.streetName}"?',
+      primaryLabel: 'Eliminar',
+      secondaryLabel: 'Cancelar',
+      destructive: true,
+    );
+    if (ok) await model.delete(a);
   }
 }
 
-class _AddressCard extends StatelessWidget {
-  const _AddressCard({
+enum _Action { edit, makeDefault, delete }
+
+class _AddressTile extends StatelessWidget {
+  const _AddressTile({
+    super.key,
     required this.address,
-    required this.colorScheme,
-    required this.onSetDefault,
+    required this.busy,
+    required this.onEdit,
+    required this.onDefault,
     required this.onDelete,
   });
 
   final Address address;
-  final ColorScheme colorScheme;
-  final VoidCallback onSetDefault;
+  final bool busy;
+  final VoidCallback onEdit;
+  final VoidCallback onDefault;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final subtitle = [
-      if (address.city != null && address.city!.isNotEmpty) address.city!,
-      if (address.postalCode != null && address.postalCode!.isNotEmpty)
-        address.postalCode!,
+    final brasa = context.brasa;
+    final type = SplgType.of(context);
+    final detail = [
+      if ((address.city ?? '').isNotEmpty) address.city!,
+      if ((address.additionalInstructions ?? '').isNotEmpty)
+        address.additionalInstructions!,
     ].join(' · ');
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh.withAlpha(100),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: address.primary
-              ? colorScheme.primary
-              : colorScheme.onSurface.withAlpha(30),
-          width: address.primary ? 1.5 : 1,
-        ),
+            color: address.primary ? brasa.primaryStrong : brasa.outline,
+            width: address.primary ? 2 : 1),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.location_on_outlined, color: colorScheme.primary),
-          const SizedBox(width: 12),
+          Icon(SplgIcons.location, color: brasa.primaryStrong),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  address.streetName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                        child: Text(address.streetName, style: type.value)),
+                    if (address.primary) ...[
+                      const SizedBox(width: 8),
+                      const SplgStatusBadge(
+                          label: 'Predeterminada', tone: SplgTone.success),
+                    ],
+                  ],
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: theme.textTheme.bodyMedium),
-                ],
-                const SizedBox(height: 8),
-                if (address.primary)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Predeterminada',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-                else
-                  TextButton(
-                    onPressed: onSetDefault,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(0, 0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Marcar como predeterminada'),
-                  ),
+                if (detail.isNotEmpty) Text(detail, style: type.caption),
               ],
             ),
           ),
-          IconButton(
-            onPressed: onDelete,
-            icon: Icon(Icons.delete_outline, color: colorScheme.error),
-            splashRadius: 22,
+          PopupMenuButton<_Action>(
+            tooltip: 'Opciones',
+            enabled: !busy,
+            icon: Icon(SplgIcons.more, color: brasa.primaryStrong),
+            onSelected: (a) => switch (a) {
+              _Action.edit => onEdit(),
+              _Action.makeDefault => onDefault(),
+              _Action.delete => onDelete(),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: _Action.edit, child: Text('Editar')),
+              if (!address.primary)
+                const PopupMenuItem(
+                    value: _Action.makeDefault,
+                    child: Text('Marcar como predeterminada')),
+              const PopupMenuItem(
+                  value: _Action.delete, child: Text('Eliminar')),
+            ],
           ),
         ],
       ),

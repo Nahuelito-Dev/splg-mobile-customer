@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:splg_customer/ui/common/ui_helpers.dart';
-
 import 'rate_driver_sheet_model.dart';
-import 'package:splg_lib/theme/app_colors.dart';
-import 'package:splg_lib/theme/brasa_palette.dart';
 
 /// Hoja para calificar al chofer tras la entrega. `request.data` trae
 /// `{ orderId, driverName }`. Completa con `SheetResponse(confirmed: true)` si
@@ -35,108 +32,60 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
     final subtitle = (driverName != null && driverName.trim().isNotEmpty)
         ? '¿Cómo estuvo la entrega de $driverName?'
         : '¿Cómo estuvo la entrega?';
+    final type = SplgType.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Calificá al chofer',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-            ),
-            verticalSpaceTiny,
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 14, color: context.brasa.muted),
-            ),
-            verticalSpaceMedium,
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                final value = index + 1;
-                return IconButton(
-                  iconSize: 40,
-                  onPressed:
-                      viewModel.isBusy ? null : () => viewModel.setStars(value),
-                  icon: Icon(
-                    value <= viewModel.stars ? Icons.star : Icons.star_border,
-                    color: AppColors.gas400,
-                  ),
-                );
-              }),
-            ),
-            verticalSpaceSmall,
-            TextField(
-              controller: viewModel.commentController,
-              enabled: !viewModel.isBusy,
-              maxLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Comentario (opcional)',
-                border: OutlineInputBorder(),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SplgBottomPanel(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Calificá al repartidor', style: type.heading),
+              const SizedBox(height: 4),
+              Text(subtitle, style: type.caption),
+              const SizedBox(height: 8),
+              SplgRatingInput(
+                value: viewModel.stars,
+                enabled: !viewModel.isBusy,
+                onChanged: viewModel.setStars,
               ),
-            ),
-            if (viewModel.errorMessage != null) ...[
-              verticalSpaceSmall,
-              Text(
-                viewModel.errorMessage!,
-                style: TextStyle(color: context.brasa.danger, fontSize: 13),
+              const SizedBox(height: 8),
+              SplgTextArea(
+                controller: viewModel.commentController,
+                hint: 'Comentario (opcional)',
+                maxLength: 300,
+                minLines: 3,
+                enabled: !viewModel.isBusy,
+              ),
+              if (viewModel.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(viewModel.errorMessage!,
+                      key: const Key('rate-error'),
+                      style: type.body.copyWith(color: context.brasa.danger)),
+                ),
+              const SizedBox(height: 16),
+              SplgButton(
+                title: 'Enviar',
+                loading: viewModel.isBusy,
+                onPressed: () async {
+                  final ok = await viewModel.submit(orderId);
+                  if (ok) completer?.call(SheetResponse(confirmed: true));
+                },
+              ),
+              const SizedBox(height: 8),
+              SplgButton(
+                title: 'Omitir',
+                style: SplgButtonStyle.outlined,
+                onPressed: viewModel.isBusy
+                    ? null
+                    : () => completer?.call(SheetResponse(confirmed: false)),
               ),
             ],
-            verticalSpaceMedium,
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: viewModel.isBusy
-                        ? null
-                        : () =>
-                            completer?.call(SheetResponse(confirmed: false)),
-                    child: const Text('Omitir'),
-                  ),
-                ),
-                horizontalSpaceSmall,
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: viewModel.isBusy
-                        ? null
-                        : () async {
-                            final ok = await viewModel.submit(orderId);
-                            if (ok) {
-                              completer?.call(SheetResponse(confirmed: true));
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: viewModel.isBusy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Enviar'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

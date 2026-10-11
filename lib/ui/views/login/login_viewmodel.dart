@@ -1,101 +1,71 @@
 import 'dart:async';
 
+import 'package:email_validator/email_validator.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
-import 'package:email_validator/email_validator.dart';
 
-import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/ui/views/login/login_view.form.dart';
 
 class LoginViewModel extends FormViewModel {
-  final _dialogService = locator<DialogService>();
   final _customerService = locator<CustomerService>();
   final _navigationService = locator<NavigationService>();
   final _notificationService = locator<NotificationService>();
 
-  String? _emailError;
-  String? get emaileError => _emailError;
+  /// Mensaje de error para mostrar bajo el formulario (null = sin error).
+  String? errorMessage;
 
-  String? _passwordError;
-  String? get passwordError => _passwordError;
+  bool showPassword = false;
 
-  bool _isPasswordVisible = false;
-  bool get isPasswordVisible => _isPasswordVisible;
-
-  Future<void> onLogin() async {
-    setBusy(true);
-    if (!_passValidations()) {
-      setBusy(false);
-      return;
-    }
-    final success = await _customerService.signInWithEmailAndPassword(
-        emailValue!, passwordValue!);
-    if (success) {
-      // Recién ahora hay sesión: registramos el token FCM contra el backend
-      // (antes del login, initialize() en startup no tenía con qué autenticar).
-      unawaited(_notificationService.requestPermissionAndRegister());
-      _navigationService.back();
-    } else {
-      _dialogService.showDialog(
-        title: 'Error',
-        description:
-            'No se pudo iniciar sesión. Por favor, verifique sus credenciales e intente nuevamente.',
-      );
-    }
-
-    setBusy(false);
+  void togglePasswordVisibility() {
+    showPassword = !showPassword;
+    notifyListeners();
   }
 
+  /// Abre la recuperación con el email que ya escribió.
   Future<void> onForgotPassword() async {
-    final email = (emailValue ?? '').trim();
-    if (!EmailValidator.validate(email)) {
-      _emailError = 'Ingresá tu email para recuperar la contraseña';
-      rebuildUi();
-      return;
-    }
-    _emailError = null;
-    setBusy(true);
-    final sent = await _customerService.sendPasswordResetEmail(email);
-    setBusy(false);
-    await _dialogService.showDialog(
-      title: sent ? 'Revisá tu correo' : 'No se pudo enviar',
-      description: sent
-          ? 'Si $email tiene una cuenta, te mandamos un enlace para elegir una nueva contraseña.'
-          : 'No pudimos enviar el correo de recuperación. Probá de nuevo en unos minutos.',
+    if (isBusy) return;
+    final email = emailValue?.trim();
+    await _navigationService.navigateToRecoverPasswordView(
+      email: (email == null || email.isEmpty) ? null : email,
     );
   }
 
-  bool _passValidations() {
-    if (!hasEmail) {
-      _emailError = "Email inválido";
+  Future<void> onSignup() => _navigationService.navigateToSignupView();
+
+  Future<void> onLogin() async {
+    if (isBusy) return;
+    errorMessage = null;
+
+    final email = emailValue?.trim() ?? '';
+    final password = passwordValue ?? '';
+    if (email.isEmpty || password.isEmpty) {
+      errorMessage = 'Ingresá tu email y contraseña.';
+      notifyListeners();
+      return;
+    }
+    if (!EmailValidator.validate(email)) {
+      errorMessage = 'Ingresá un email válido.';
+      notifyListeners();
+      return;
+    }
+
+    setBusy(true);
+    final outcome = await _customerService.signIn(email, password);
+    setBusy(false);
+
+    if (outcome == SignInOutcome.ok) {
+      // Recién ahora hay sesión: registramos el token FCM contra el backend.
+      unawaited(_notificationService.requestPermissionAndRegister());
+      await _navigationService.clearStackAndShow(Routes.homeView);
     } else {
-      EmailValidator.validate(emailValue ?? '')
-          ? _emailError = null
-          : _emailError = "Email inválido";
+      errorMessage = outcome == SignInOutcome.disabled
+          ? 'Tu cuenta está deshabilitada. Contactá a tu distribuidora.'
+          : 'No pudimos iniciar sesión. Revisá tus datos.';
+      notifyListeners();
     }
-
-    if (!hasPassword) {
-      _passwordError = "Contraseña inválida";
-    } else {
-      _passwordError = null;
-    }
-
-    if (_emailError != null || _passwordError != null) {
-      return false;
-    }
-
-    return true;
-  }
-
-  void navigateToSignup() {
-    _navigationService.navigateToSignupView();
-  }
-
-  void togglePasswordVisibility() {
-    _isPasswordVisible = !_isPasswordVisible;
-    rebuildUi();
   }
 }

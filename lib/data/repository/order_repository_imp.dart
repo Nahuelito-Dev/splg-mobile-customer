@@ -6,6 +6,7 @@ import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/orders_page.dart';
 
 class OrderRepositoryImp implements OrderRepository {
   OrderRepositoryImp(this._remoteDatasource);
@@ -77,33 +78,53 @@ class OrderRepositoryImp implements OrderRepository {
     String token, {
     int limit = 20,
     int offset = 0,
-  }) async {
-    try {
-      final (success, data) = await _remoteDatasource.fetchCustomerHistory(
+  }) async =>
+      (await fetchCustomerPage(
         customerId,
         token,
         limit: limit,
         offset: offset,
-      );
-      if (!success || data == null) return [];
+      ))
+          .orders;
 
-      return OrderApiMapper.parseOrders(data);
-    } catch (e) {
-      log('e in fetchCustomerHistory repository: ${e.toString()}');
-    }
+  @override
+  Future<OrdersPage> fetchCustomerPage(
+    String customerId,
+    String token, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final data = await _remoteDatasource.fetchCustomerHistory(
+      customerId,
+      token,
+      limit: limit,
+      offset: offset,
+    );
+    final orders = OrderApiMapper.parseOrders(data);
+    final total = data is Map && data['total'] is num
+        ? (data['total'] as num).toInt()
+        : offset + orders.length;
+    return OrdersPage(orders: orders, total: total, offset: offset);
+  }
 
-    return [];
+  @override
+  Future<Order> fetchOrder(String orderId, String token) async {
+    final data = await _remoteDatasource.fetchOrder(orderId, token);
+    final order = OrderApiMapper.parseOrder(data);
+    if (order == null) throw const FormatException('Pedido ilegible');
+    return order;
   }
 
   @override
   Future<CancelResult> cancelOrder(
     String orderId,
     String token,
-    String idempotencyKey,
-  ) async {
+    String idempotencyKey, {
+    String? reason,
+  }) async {
     try {
-      return await _remoteDatasource.cancelOrder(
-          orderId, token, idempotencyKey);
+      return await _remoteDatasource.cancelOrder(orderId, token, idempotencyKey,
+          reason: reason);
     } catch (e) {
       log('e in cancelOrder repository: ${e.toString()}');
     }

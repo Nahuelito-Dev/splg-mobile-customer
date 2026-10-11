@@ -22,6 +22,7 @@ class RateDriverSheetModel extends BaseViewModel {
 
   /// Envía la calificación del chofer. Devuelve `true` si se registró.
   Future<bool> submit(String orderId) async {
+    if (isBusy) return false;
     if (_stars == 0) {
       errorMessage = 'Elegí una puntuación de 1 a 5.';
       notifyListeners();
@@ -30,18 +31,18 @@ class RateDriverSheetModel extends BaseViewModel {
 
     setBusy(true);
     errorMessage = null;
-    final ok = await _ratingService.rateDriver(
+    final result = await _ratingService.rateDriver(
       orderId: orderId,
       stars: _stars,
       comment: commentController.text,
     );
     setBusy(false);
 
-    if (!ok) {
-      errorMessage = 'No se pudo enviar la calificación. Intentá de nuevo.';
+    if (!result.ok) {
+      errorMessage = result.message;
       notifyListeners();
     }
-    return ok;
+    return result.ok;
   }
 
   @override

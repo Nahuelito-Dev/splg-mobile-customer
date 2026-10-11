@@ -1,7 +1,12 @@
+import 'dart:developer';
+
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
 import 'package:splg_lib/domain/order.dart';
+import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/domain/orders_page.dart';
+import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
@@ -36,6 +41,12 @@ class HistoryService with ListenableServiceMixin {
   final ReactiveValue<bool> _hasPendingOrder = ReactiveValue<bool>(false);
   bool get hasPendingOrder => _hasPendingOrder.value;
 
+  /// Época de la sesión (`reset()` la incrementa) y versión de los cambios
+  /// locales (alta o edición de un pedido). Una consulta que volvió después de
+  /// un cierre de sesión, o que salió antes de crear un pedido, no pisa la lista.
+  int _session = 0;
+  int _localChanges = 0;
+
   final ReactiveList<Order> _history = ReactiveList<Order>();
   List<Order> get history => _history;
 
@@ -52,6 +63,7 @@ class HistoryService with ListenableServiceMixin {
     Order order, {
     String? timeSlotId,
   }) async {
+    final session = _session;
     final token = await _customerService.token;
     if (token == null) {
       return const CreateOrderResult(success: false);
@@ -67,8 +79,12 @@ class HistoryService with ListenableServiceMixin {
       return CreateOrderResult(success: false, paymentUrl: result.paymentUrl);
     }
 
-    _history.removeWhere((historyOrder) => historyOrder.id == createdOrder.id);
-    _history.insert(0, createdOrder);
+    if (session == _session) {
+      _localChanges++;
+      _history
+          .removeWhere((historyOrder) => historyOrder.id == createdOrder.id);
+      _history.insert(0, createdOrder);
+    }
     _hasPendingOrder.value = _history
         .any((historyOrder) => historyOrder.status == OrderStatus.pending);
     notifyListeners();
@@ -84,6 +100,7 @@ class HistoryService with ListenableServiceMixin {
     Order order, {
     String? timeSlotId,
   }) async {
+    final session = _session;
     final token = await _customerService.token;
     if (token == null) {
       return false;
@@ -98,32 +115,36 @@ class HistoryService with ListenableServiceMixin {
       return false;
     }
 
-    _history.removeWhere((historyOrder) => historyOrder.id == updatedOrder.id);
-    _history.insert(0, updatedOrder);
+    if (session == _session) {
+      _localChanges++;
+      _history
+          .removeWhere((historyOrder) => historyOrder.id == updatedOrder.id);
+      _history.insert(0, updatedOrder);
+    }
     _hasPendingOrder.value = _history
         .any((historyOrder) => historyOrder.status == OrderStatus.pending);
     notifyListeners();
     return true;
   }
 
-  Future<CancelResult> cancelOrder(String orderId) async {
+  Future<CancelResult> cancelOrder(String orderId, {String? reason}) async {
     final token = await _customerService.token;
     if (token == null) {
       return const CancelResult.failed();
     }
 
-    final result = await _cancelOrderUseCase(orderId, token);
+    final result = await _cancelOrderUseCase(orderId, token, reason: reason);
     if (!result.success) {
       // Un rechazo de negocio ("ya finalizado", "ya está en camino") indica que
       // el pedido cambió de estado: se refresca para que la pantalla lo refleje.
       if (result.isRejected) {
-        await refreshHistory();
+        await tryRefreshHistory();
         notifyListeners();
       }
       return result;
     }
 
-    await refreshHistory();
+    await tryRefreshHistory();
     notifyListeners();
     return result;
   }
@@ -135,10 +156,11 @@ class HistoryService with ListenableServiceMixin {
     return refreshHistory();
   }
 
-  Future<List<Order>> refreshHistory({
-    int limit = 20,
-    int offset = 0,
-  }) async {
+  /// Trae la primera página y reemplaza el historial local. Si falla lanza y
+  /// **no** toca lo que ya había: un error de red no es "sin pedidos".
+  Future<List<Order>> refreshHistory({int limit = 20, int offset = 0}) async {
+    final session = _session;
+    final changes = _localChanges;
     final token = await _customerService.token;
     if (token == null) {
       _history.clear();
@@ -154,6 +176,9 @@ class HistoryService with ListenableServiceMixin {
       limit: limit,
       offset: offset,
     );
+    // Cerró sesión o se creó/editó un pedido mientras la consulta volaba: la
+    // respuesta es vieja, la próxima la reemplaza.
+    if (session != _session || changes != _localChanges) return _history;
 
     _history.clear();
     _history.addAll(remoteHistory);
@@ -161,6 +186,52 @@ class HistoryService with ListenableServiceMixin {
       (order) => order.status == OrderStatus.pending,
     );
     return _history;
+  }
+
+  /// Como [refreshHistory] pero sin lanzar: devuelve si se pudo. Para quien
+  /// sólo quiere "lo más fresco posible" (banner del inicio, tras cancelar).
+  Future<bool> tryRefreshHistory({int limit = 20}) async {
+    try {
+      await refreshHistory(limit: limit);
+      return true;
+    } catch (e) {
+      log('refreshHistory falló: $e');
+      return false;
+    }
+  }
+
+  /// Una página del historial para "Mis pedidos". No toca la lista del inicio
+  /// ([history]); lanza ante cualquier error.
+  Future<OrdersPage> fetchOrdersPage({int limit = 20, int offset = 0}) async {
+    final session = _session;
+    final token = await _customerService.token;
+    if (token == null) throw const LoadFailure(ApiErrorText.sessionExpired);
+    final page = await _orderRepository.fetchCustomerPage(
+      _customerService.customer.customerId,
+      token,
+      limit: limit,
+      offset: offset,
+    );
+    if (session != _session) {
+      throw const LoadFailure(ApiErrorText.sessionExpired);
+    }
+    return page;
+  }
+
+  /// Un pedido por id; lanza ante cualquier error.
+  Future<Order> fetchOrder(String orderId) async {
+    final token = await _customerService.token;
+    if (token == null) throw const LoadFailure(ApiErrorText.sessionExpired);
+    return _orderRepository.fetchOrder(orderId, token);
+  }
+
+  /// Limpia lo del usuario anterior (cierre de sesión / baja de cuenta).
+  void reset() {
+    _session++;
+    _history.clear();
+    _hasPendingOrder.value = false;
+    _cancelOrderUseCase.clear();
+    notifyListeners();
   }
 
   Map<String, dynamic> _toCreateOrderPayload(

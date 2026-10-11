@@ -2,7 +2,7 @@
 const String loginViewHintEmail = 'Email';
 const String loginViewHintPassword = 'Contraseña';
 const String loginViewButton = 'Continuar';
-const String loginViewNoAccount = '¿No tienes cuenta? ';
+const String loginViewNoAccount = '¿No tenés cuenta? ';
 const String loginViewSignup = 'Registrarse';
 const String loginViewForgotPassword = '¿Olvidaste tu contraseña?';
 // Signup

@@ -1,6 +1,7 @@
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/orders_page.dart';
 
 abstract interface class OrderRepository {
   Future<CreateOrderResult> createOrder(
@@ -21,11 +22,23 @@ abstract interface class OrderRepository {
     int offset = 0,
   });
 
+  /// Una página del historial con el total; lanza ante cualquier error.
+  Future<OrdersPage> fetchCustomerPage(
+    String customerId,
+    String token, {
+    int limit = 20,
+    int offset = 0,
+  });
+
+  /// `GET /orders/:id`; lanza ante cualquier error.
+  Future<Order> fetchOrder(String orderId, String token);
+
   /// [idempotencyKey] identifica la intención de cancelar: se reusa en los
   /// reintentos para que el back no la procese dos veces.
   Future<CancelResult> cancelOrder(
     String orderId,
     String token,
-    String idempotencyKey,
-  );
+    String idempotencyKey, {
+    String? reason,
+  });
 }
