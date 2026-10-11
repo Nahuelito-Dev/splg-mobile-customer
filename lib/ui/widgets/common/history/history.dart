@@ -6,6 +6,7 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/domain/order_item.dart';
 
 import 'history_model.dart';
+import 'package:splg_lib/theme/brasa_palette.dart';
 
 class History extends StackedView<HistoryModel> {
   const History({super.key});
@@ -222,14 +223,16 @@ class _OrderItemTile extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: order.status == OrderStatus.cancelled
-                        ? Theme.of(context).colorScheme.error
-                        : Colors.green,
+                        ? context.brasa.dangerSoft
+                        : context.brasa.successSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     statusText,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
+                          color: order.status == OrderStatus.cancelled
+                              ? context.brasa.danger
+                              : context.brasa.success,
                           fontWeight: FontWeight.bold,
                         ),
                   ),

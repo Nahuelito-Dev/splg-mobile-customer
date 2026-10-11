@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:email_validator/email_validator.dart';
@@ -45,23 +47,25 @@ class SignupViewModel extends FormViewModel {
 
     final formattedPhone = _formatPhoneNumber(phoneValue!);
 
-    final isRegistered = await _customerService.registerCustomer(
+    final outcome = await _customerService.registerCustomer(
       name: nameValue!,
       email: emailValue!,
       password: passwordValue!,
       phoneNumber: formattedPhone,
     );
 
-    if (isRegistered) {
+    if (outcome == RegisterOutcome.created) {
       await _customerService.signInWithEmailAndPassword(
           emailValue!, passwordValue!);
       // Recién ahora hay sesión: registramos el token FCM contra el backend.
-      await _notificationService.registerCurrentToken();
+      unawaited(_notificationService.requestPermissionAndRegister());
       _navigationService.clearStackAndShow(Routes.homeView);
     } else {
       await _dialogService.showDialog(
         title: signupViewErrorDialogTitle,
-        description: signupViewErrorDialogDescription,
+        description: outcome == RegisterOutcome.alreadyExists
+            ? signupViewAlreadyExistsDescription
+            : signupViewErrorDialogDescription,
       );
     }
 

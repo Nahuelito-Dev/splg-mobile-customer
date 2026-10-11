@@ -79,7 +79,8 @@ class LegalView extends StackedView<LegalViewModel> {
       data: viewModel.content!,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-        h1: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        h1: theme.textTheme.headlineSmall
+            ?.copyWith(fontWeight: FontWeight.bold),
         h2: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         p: theme.textTheme.bodyMedium,
       ),

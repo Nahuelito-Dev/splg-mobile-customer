@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:stacked/stacked.dart';
 
 import 'qr_scan_viewmodel.dart';
@@ -31,59 +30,63 @@ class QrScanView extends StackedView<QrScanViewModel> {
           onPressed: viewModel.cancel,
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on),
-            onPressed: viewModel.controller.toggleTorch,
-          ),
+          if (viewModel.cameraGranted)
+            IconButton(
+              icon: const Icon(Icons.flash_on),
+              onPressed: viewModel.controller.toggleTorch,
+            ),
         ],
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          MobileScanner(
-            controller: viewModel.controller,
-            onDetect: viewModel.onDetect,
-            errorBuilder: (context, error) => _ScannerError(
-              error: error,
-              onRetry: viewModel.retryCamera,
-            ),
-          ),
-          const _ScanWindowOverlay(),
-          const SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 40, left: 24, right: 24),
-                child: Text(
-                  'Apunta la camara al codigo QR que te muestra el chofer',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+      body: !viewModel.cameraGranted
+          ? _CameraGate(viewModel: viewModel)
+          : Stack(
+              fit: StackFit.expand,
+              children: [
+                MobileScanner(
+                  controller: viewModel.controller,
+                  onDetect: viewModel.onDetect,
+                  errorBuilder: (context, error) => _ScannerError(
+                    error: error,
+                    onRetry: viewModel.retryCamera,
+                    onSettings: viewModel.openSettings,
                   ),
                 ),
-              ),
-            ),
-          ),
-          if (viewModel.isProcessing)
-            Container(
-              color: Colors.black.withAlpha(180),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 12),
-                    Text(
-                      'Confirmando entrega...',
-                      style: TextStyle(color: Colors.white),
+                const _ScanWindowOverlay(),
+                const SafeArea(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 40, left: 24, right: 24),
+                      child: Text(
+                        'Apunta la camara al codigo QR que te muestra el chofer',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                if (viewModel.isProcessing)
+                  Container(
+                    color: Colors.black.withAlpha(180),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: Colors.white),
+                          SizedBox(height: 12),
+                          Text(
+                            'Confirmando entrega...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
@@ -92,6 +95,63 @@ class QrScanView extends StackedView<QrScanViewModel> {
     BuildContext context,
   ) =>
       QrScanViewModel(orderId: orderId);
+
+  @override
+  void onViewModelReady(QrScanViewModel viewModel) {
+    viewModel.initialize();
+    super.onViewModelReady(viewModel);
+  }
+}
+
+/// Mientras se consulta el permiso de cámara, o si no se concedió: nunca una
+/// pantalla en blanco, siempre el motivo y qué hacer.
+class _CameraGate extends StatelessWidget {
+  const _CameraGate({required this.viewModel});
+
+  final QrScanViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (viewModel.cameraOutcome == null) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.no_photography, color: Colors.white, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                viewModel.cameraNeedsSettings
+                    ? 'La cámara está desactivada para SPLG. Activala desde Ajustes para escanear el QR de la entrega.'
+                    : 'Necesitamos la cámara para escanear el QR de la entrega.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: viewModel.cameraNeedsSettings
+                    ? viewModel.openSettings
+                    : viewModel.retryCamera,
+                child: Text(
+                  viewModel.cameraNeedsSettings
+                      ? 'Abrir Ajustes'
+                      : 'Reintentar',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Marco cuadrado centrado, solo decorativo: indica al usuario donde encuadrar
@@ -117,10 +177,15 @@ class _ScanWindowOverlay extends StatelessWidget {
 }
 
 class _ScannerError extends StatelessWidget {
-  const _ScannerError({required this.error, required this.onRetry});
+  const _ScannerError({
+    required this.error,
+    required this.onRetry,
+    required this.onSettings,
+  });
 
   final MobileScannerException error;
   final VoidCallback onRetry;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -146,8 +211,9 @@ class _ScannerError extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                onPressed: isPermissionDenied ? openAppSettings : onRetry,
-                child: Text(isPermissionDenied ? 'Abrir Ajustes' : 'Reintentar'),
+                onPressed: isPermissionDenied ? onSettings : onRetry,
+                child:
+                    Text(isPermissionDenied ? 'Abrir Ajustes' : 'Reintentar'),
               ),
             ],
           ),

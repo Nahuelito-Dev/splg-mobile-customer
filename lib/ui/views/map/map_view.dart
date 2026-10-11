@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/theme/brasa_palette.dart';
 import 'package:stacked/stacked.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -26,15 +27,24 @@ class MapView extends StackedView<MapViewModel> {
                   ),
                   onMapCreated: viewModel.onMapCreated,
                   onCameraIdle: viewModel.onCameraIdle,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
+                  // Sólo se activa con el permiso concedido: así el SDK del mapa
+                  // no dispara su propio pedido sin explicación.
+                  myLocationEnabled: viewModel.hasLocation,
+                  myLocationButtonEnabled: viewModel.hasLocation,
                 ),
-                const Center(
+                if (viewModel.locationNotice != null)
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: _LocationNotice(viewModel: viewModel),
+                    ),
+                  ),
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: 24.0),
+                    padding: const EdgeInsets.only(bottom: 24.0),
                     child: Icon(
                       Icons.location_on,
-                      color: Colors.red,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 40,
                     ),
                   ),
@@ -125,4 +135,41 @@ class MapView extends StackedView<MapViewModel> {
     BuildContext context,
   ) =>
       MapViewModel();
+}
+
+class _LocationNotice extends StatelessWidget {
+  const _LocationNotice({required this.viewModel});
+
+  final MapViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.brasa;
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: palette.warnSoft,
+        border: Border.all(color: palette.warn),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              viewModel.locationNotice!,
+              style:
+                  TextStyle(color: palette.warn, fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton(
+            onPressed: viewModel.canOpenSettings
+                ? viewModel.openSettings
+                : viewModel.retryLocation,
+            child: Text(viewModel.canOpenSettings ? 'Ajustes' : 'Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
 }

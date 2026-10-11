@@ -3,6 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:stacked/stacked.dart';
 
 import 'order_tracking_viewmodel.dart';
+import 'widgets/arriving_banner.dart';
+import 'package:splg_lib/theme/brasa_palette.dart';
 
 class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
   const OrderTrackingView({
@@ -58,14 +60,29 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          viewModel.orderTitle,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: context.brasa.outline,
+                              ),
+                            ),
+                            child: Text(
+                              viewModel.orderTitle,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       _HeaderIconButton(
@@ -80,23 +97,9 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
                 SafeArea(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 76),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade700,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Text(
-                        'Tu garrafa esta llegando! Por favor sali a recibirla.',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 76),
+                      child: const ArrivingBanner(),
                     ),
                   ),
                 ),
@@ -106,7 +109,7 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
                 child: FloatingActionButton.small(
                   heroTag: 'recenter_map',
                   onPressed: viewModel.recenterMap,
-                  backgroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.surface,
                   foregroundColor: theme.colorScheme.primary,
                   child: const Icon(Icons.my_location),
                 ),
@@ -240,7 +243,9 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton.icon(
-                              onPressed: viewModel.cancelOrder,
+                              onPressed: viewModel.isBusy
+                                  ? null
+                                  : viewModel.cancelOrder,
                               icon: const Icon(Icons.close),
                               label: const Text('Cancelar pedido'),
                               style: TextButton.styleFrom(
@@ -435,8 +440,8 @@ class _DriverCard extends StatelessWidget {
                   icon: const Icon(Icons.phone),
                   label: const Text('Llamar'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    backgroundColor: context.brasa.success,
+                    foregroundColor: theme.colorScheme.surface,
                   ),
                 ),
               ),

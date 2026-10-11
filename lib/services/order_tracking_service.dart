@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:dio/dio.dart';
+import 'package:splg_customer/core/config/app_config.dart';
 import 'package:splg_customer/core/network/api_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:uuid/uuid.dart';
@@ -24,11 +25,6 @@ class DriverLocationUpdate {
 }
 
 class OrderTrackingService {
-  // Namespace 'customers' del backend (CustomersGateway). En el simulador iOS,
-  // localhost apunta al host. Para el emulador Android usar 10.0.2.2.
-  // TODO(config): centralizar esta base junto a la de ApiClient por entorno.
-  static const String _socketBaseUrl = 'http://localhost:3000/customers';
-
   final _apiClient = ApiClient();
   final _uuid = const Uuid();
   io.Socket? _socket;
@@ -122,7 +118,7 @@ class OrderTrackingService {
       builder.setExtraHeaders({'Authorization': 'Bearer $token'});
     }
 
-    _socket = io.io(_socketBaseUrl, builder.build());
+    _socket = io.io(AppConfig.customersNamespace, builder.build());
 
     _socket?.onConnect((_) {
       // Nos unimos a nuestra sala de cliente: el backend emite ahí los eventos
@@ -190,8 +186,8 @@ class OrderTrackingService {
       return;
     }
 
-    final status = (data['status'] ?? data['orderStatus'] ?? data['state'])
-        ?.toString();
+    final status =
+        (data['status'] ?? data['orderStatus'] ?? data['state'])?.toString();
     if (status != null && status.isNotEmpty) {
       _orderStatusController.add(status);
     }

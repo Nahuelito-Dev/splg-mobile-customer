@@ -7,6 +7,11 @@ import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/location_service.dart';
+import 'package:splg_customer/services/notification_service.dart';
+import 'package:splg_customer/services/time_slot_service.dart';
+import 'package:splg_customer/services/app_permissions.dart';
+import 'package:splg_customer/services/order_tracking_service.dart';
+import 'package:splg_lib/permissions/app_permission.dart';
 // @stacked-import
 
 import 'test_helpers.mocks.dart';
@@ -22,10 +27,15 @@ import 'test_helpers.mocks.dart';
     MockSpec<CustomerService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<CartService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<LocationService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<NotificationService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<TimeSlotService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<AppPermissions>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<OrderTrackingService>(onMissingStub: OnMissingStub.returnDefault),
 // @stacked-mock-spec
   ],
 )
 void registerServices() {
+  provideDummy<PermissionOutcome>(PermissionOutcome.granted);
   getAndRegisterNavigationService();
   getAndRegisterBottomSheetService();
   getAndRegisterDialogService();
@@ -34,6 +44,10 @@ void registerServices() {
   getAndRegisterCustomerService();
   getAndRegisterCartService();
   getAndRegisterLocationService();
+  getAndRegisterNotificationService();
+  getAndRegisterTimeSlotService();
+  getAndRegisterAppPermissions();
+  getAndRegisterOrderTrackingService();
 // @stacked-mock-register
 }
 
@@ -131,4 +145,32 @@ void _removeRegistrationIfExists<T extends Object>() {
   if (locator.isRegistered<T>()) {
     locator.unregister<T>();
   }
+}
+
+MockNotificationService getAndRegisterNotificationService() {
+  _removeRegistrationIfExists<NotificationService>();
+  final service = MockNotificationService();
+  locator.registerSingleton<NotificationService>(service);
+  return service;
+}
+
+MockTimeSlotService getAndRegisterTimeSlotService() {
+  _removeRegistrationIfExists<TimeSlotService>();
+  final service = MockTimeSlotService();
+  locator.registerSingleton<TimeSlotService>(service);
+  return service;
+}
+
+MockAppPermissions getAndRegisterAppPermissions() {
+  _removeRegistrationIfExists<AppPermissions>();
+  final service = MockAppPermissions();
+  locator.registerSingleton<AppPermissions>(service);
+  return service;
+}
+
+MockOrderTrackingService getAndRegisterOrderTrackingService() {
+  _removeRegistrationIfExists<OrderTrackingService>();
+  final service = MockOrderTrackingService();
+  locator.registerSingleton<OrderTrackingService>(service);
+  return service;
 }

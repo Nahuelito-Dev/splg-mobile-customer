@@ -223,8 +223,6 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                       ? viewModel.confirmOrder
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -235,7 +233,6 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                     'CONFIRMAR PEDIDO',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onPrimary,
                     ),
                   ),
                 ),

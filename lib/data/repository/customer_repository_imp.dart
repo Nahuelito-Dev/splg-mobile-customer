@@ -18,6 +18,8 @@ class CustomerRepositoryImp implements CustomerRepository {
         log('UserRepositoryImp - createCustomer: $data');
         return Customer.fromJson(data);
       }
+    } on RegistrationConflictException {
+      rethrow;
     } catch (e) {
       log(e.toString());
     }

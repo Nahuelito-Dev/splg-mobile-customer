@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/domain/gas_cylinder_label.dart';
 import 'package:intl/intl.dart';
 import 'package:splg_lib/domain/discount.dart';
 import 'package:splg_lib/domain/order_item.dart';
@@ -49,7 +50,7 @@ class CylinderCheckoutItem extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Garrafa ${item.cylinder.type}',
+                        item.cylinder.label,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),

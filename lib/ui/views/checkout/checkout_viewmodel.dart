@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:splg_customer/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -25,6 +28,7 @@ class CheckoutViewModel extends ReactiveViewModel {
   final _bottomSheetService = locator<BottomSheetService>();
   final _dialogService = locator<DialogService>();
   final _timeSlotService = locator<TimeSlotService>();
+  final _notificationService = locator<NotificationService>();
 
   Order? get order => _cartService.order;
 
@@ -35,7 +39,20 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   void initialize() {
     setBusy(true);
-    addressController.text = _cartService.order?.address?.streetName ?? '';
+    // El carrito se arma antes del login (sin dirección): al llegar acá se
+    // toma la predeterminada (o la primera) de las direcciones guardadas.
+    var address = _cartService.order?.address;
+    if (address == null) {
+      final saved = _customerService.customer.addresses;
+      if (saved.isNotEmpty) {
+        address = saved.firstWhere((a) => a.primary, orElse: () => saved.first);
+        // initialize() corre dentro del build: notificar al carrito ahí
+        // dispara "setState durante build", así que se difiere.
+        final selected = address;
+        Future.microtask(() => _setOrderAddress(selected));
+      }
+    }
+    addressController.text = address?.streetName ?? '';
     _selectedPaymentMethod =
         _cartService.order?.paymentMethod ?? PaymentMethod.cash;
     setBusy(false);
@@ -277,6 +294,9 @@ class CheckoutViewModel extends ReactiveViewModel {
         await _openMercadoPagoCheckout(result.paymentUrl);
       }
 
+      // Con el pedido hecho es cuando tiene sentido el aviso de estados.
+      unawaited(_notificationService.requestPermissionAndRegister());
+
       final trackedOrderId = _historyService.history.isNotEmpty
           ? _historyService.history.first.id
           : updatedOrder.id;
@@ -346,8 +366,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       case null:
         await _dialogService.showDialog(
           title: 'El pago no se completó',
-          description:
-              'El pedido se creó, pero el pago no se confirmó. '
+          description: 'El pedido se creó, pero el pago no se confirmó. '
               'Podés reintentar el pago desde el seguimiento del pedido.',
           buttonTitle: 'Aceptar',
         );

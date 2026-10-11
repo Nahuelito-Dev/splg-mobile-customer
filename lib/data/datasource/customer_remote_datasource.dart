@@ -1,6 +1,13 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
+
 import 'package:splg_customer/core/network/api_client.dart';
+
+/// El back responde 409 cuando el email o el teléfono ya tienen cuenta.
+class RegistrationConflictException implements Exception {
+  const RegistrationConflictException();
+}
 
 class CustomerRemoteDatasource {
   final _apiClient = ApiClient();
@@ -18,6 +25,11 @@ class CustomerRemoteDatasource {
 
       if (response.statusCode == 201) {
         return (true, response.data);
+      }
+    } on DioException catch (e) {
+      log('e in createCustomer: ${e.toString()}');
+      if (e.response?.statusCode == 409) {
+        throw const RegistrationConflictException();
       }
     } catch (e) {
       log('e in createCustomer: ${e.toString()}');

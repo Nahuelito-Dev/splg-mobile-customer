@@ -22,6 +22,7 @@ import 'package:splg_customer/services/time_slot_service.dart';
 import 'package:splg_customer/services/rating_service.dart';
 import 'package:splg_customer/services/claim_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
+import 'package:splg_customer/services/app_permissions.dart';
 import 'package:splg_customer/ui/bottom_sheets/rate_driver/rate_driver_sheet.dart';
 import 'package:splg_customer/ui/bottom_sheets/claim/claim_sheet.dart';
 import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart';
@@ -59,6 +60,7 @@ import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart
     LazySingleton(classType: RatingService),
     LazySingleton(classType: ClaimService),
     LazySingleton(classType: NotificationService),
+    LazySingleton(classType: AppPermissions),
 // @stacked-service
   ],
   bottomsheets: [

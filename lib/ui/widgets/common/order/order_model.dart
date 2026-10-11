@@ -76,7 +76,8 @@ class OrderModel extends ReactiveViewModel {
 
   Future<void> openActiveOrderTracking() async {
     if (!hasActiveOrder) return;
-    await _navigationService.navigateToOrderTrackingView(orderId: activeOrderId);
+    await _navigationService.navigateToOrderTrackingView(
+        orderId: activeOrderId);
   }
 
   int getItemQuantity(String cylinderId) =>

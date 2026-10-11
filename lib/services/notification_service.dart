@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:splg_customer/core/config/app_config.dart';
+import 'package:splg_customer/services/app_permissions.dart';
+import 'package:splg_lib/permissions/app_permission.dart';
 
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/data/datasource/notification_remote_datasource.dart';
@@ -25,21 +28,52 @@ class NotificationService {
   final _datasource = NotificationRemoteDatasource();
   final _customerService = locator<CustomerService>();
 
-  bool _listenersAttached = false;
+  AppPermissions get _permissions => locator<AppPermissions>();
 
-  /// Pide permiso, registra el token FCM actual (si hay sesión) y deja
-  /// enganchados los listeners de refresh de token y mensajes en foreground.
-  /// Idempotente: se puede llamar en cada apertura de la app y en cada login
-  /// sin duplicar listeners.
+  bool _listenersAttached = false;
+  bool _askedThisSession = false;
+
+  /// Arranque de la app: NO pide permiso (eso pasa en [requestPermissionAndRegister],
+  /// cuando el cliente inicia sesión o hace un pedido). Si ya estaba concedido,
+  /// deja enganchados los listeners y registra el token. Idempotente.
   Future<void> initialize() async {
+    if (!AppConfig.pushEnabled) return;
     try {
-      await _requestPermission();
-      await _initLocalNotifications();
-      _attachListenersOnce();
-      await registerCurrentToken();
+      final outcome = await _permissions.ensure(
+        AppPermission.notifications,
+        interactive: false,
+      );
+      if (outcome.isGranted) await _setUp();
     } catch (e) {
       log('NotificationService.initialize error: $e');
     }
+  }
+
+  /// Pide el permiso de notificaciones (con explicación previa) y, si se
+  /// concede, registra el token FCM. Si se niega, la app sigue igual: los
+  /// estados del pedido se ven dentro. No vuelve a preguntar más de una vez por
+  /// sesión. Devuelve si quedó concedido.
+  Future<bool> requestPermissionAndRegister() async {
+    if (!AppConfig.pushEnabled) return false;
+    try {
+      final outcome = await _permissions.ensure(
+        AppPermission.notifications,
+        interactive: !_askedThisSession,
+      );
+      _askedThisSession = true;
+      if (!outcome.isGranted) return false;
+      await _setUp();
+      return true;
+    } catch (e) {
+      log('NotificationService.requestPermissionAndRegister error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _setUp() async {
+    await _initLocalNotifications();
+    _attachListenersOnce();
+    await registerCurrentToken();
   }
 
   /// Obtiene el token FCM actual y lo registra contra el backend si hay
@@ -47,6 +81,7 @@ class NotificationService {
   /// justo después de un login/registro exitoso (antes puede no haber
   /// customer logueado todavía).
   Future<void> registerCurrentToken() async {
+    if (!AppConfig.pushEnabled) return;
     if (!_customerService.isUserLoggedIn) return;
 
     try {
@@ -70,19 +105,10 @@ class NotificationService {
     }
   }
 
-  Future<void> _requestPermission() async {
-    try {
-      await _messaging.requestPermission(alert: true, badge: true, sound: true);
-    } catch (e) {
-      log('NotificationService.requestPermission error: $e');
-    }
-  }
-
   Future<void> _initLocalNotifications() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();
-    const settings =
-        InitializationSettings(android: androidInit, iOS: iosInit);
+    const settings = InitializationSettings(android: androidInit, iOS: iosInit);
     try {
       await _localNotifications.initialize(settings: settings);
     } catch (e) {

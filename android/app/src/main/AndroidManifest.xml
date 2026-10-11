@@ -1,8 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Escaneo del QR de confirmacion de entrega (mobile_scanner). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Ubicación sólo con la app abierta: elegir la dirección de entrega en el mapa. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- Cámara: QR de confirmación de entrega (mobile_scanner) y foto de un reclamo. -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+
+    <!-- Fotos: adjuntar una imagen a un reclamo (Android 13+ / anteriores). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+
+    <!-- Avisos del estado del pedido (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="SPLG Cliente"
         android:name="${applicationName}"

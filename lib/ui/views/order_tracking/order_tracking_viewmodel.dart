@@ -17,6 +17,7 @@ import 'package:splg_lib/domain/order_item.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:splg_lib/theme/app_colors.dart';
 
 enum TrackingStage {
   pending,
@@ -103,7 +104,8 @@ class OrderTrackingViewModel extends BaseViewModel {
   }
 
   String get orderTitle {
-    final suffix = orderId.length > 6 ? orderId.substring(orderId.length - 6) : orderId;
+    final suffix =
+        orderId.length > 6 ? orderId.substring(orderId.length - 6) : orderId;
     return 'Pedido #$suffix';
   }
 
@@ -224,7 +226,7 @@ class OrderTrackingViewModel extends BaseViewModel {
       Polyline(
         polylineId: const PolylineId('driver_route'),
         points: _routePoints,
-        color: Colors.blue,
+        color: AppColors.primary,
         width: 5,
         geodesic: true,
       ),
@@ -240,8 +242,8 @@ class OrderTrackingViewModel extends BaseViewModel {
         circleId: const CircleId('searching_radar'),
         center: _customerLocation!,
         radius: _radarRadius,
-        fillColor: Colors.blue.withAlpha(30),
-        strokeColor: Colors.blue.withAlpha(120),
+        fillColor: AppColors.primary.withAlpha(30),
+        strokeColor: AppColors.primary.withAlpha(120),
         strokeWidth: 1,
       ),
     };
@@ -328,14 +330,16 @@ class OrderTrackingViewModel extends BaseViewModel {
   }
 
   Future<void> cancelOrder() async {
+    // Un segundo toque mientras la cancelación está en curso no hace nada.
+    if (isBusy) return;
     setBusy(true);
-    final success = await _historyService.cancelOrder(orderId);
+    final result = await _historyService.cancelOrder(orderId);
     setBusy(false);
 
-    if (!success) {
+    if (!result.success) {
       await _dialogService.showDialog(
         title: 'No se pudo cancelar',
-        description: 'Intenta nuevamente en unos segundos.',
+        description: result.failureDescription,
       );
       return;
     }
@@ -450,7 +454,8 @@ class OrderTrackingViewModel extends BaseViewModel {
   void _setCustomerLocationFromOrder(Map<String, dynamic> raw) {
     LatLng? location;
 
-    if (_order?.address?.latitude != null && _order?.address?.longitude != null) {
+    if (_order?.address?.latitude != null &&
+        _order?.address?.longitude != null) {
       final lat = double.tryParse(_order!.address!.latitude!);
       final lng = double.tryParse(_order!.address!.longitude!);
       if (lat != null && lng != null) {
@@ -479,7 +484,8 @@ class OrderTrackingViewModel extends BaseViewModel {
         ) ??
         0;
 
-    final driverMap = _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
+    final driverMap =
+        _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
     final latLngString =
         _readString(driverMap, const ['lat_lng', 'latLang', 'location']);
     if (location == null && latLngString != null) {
@@ -493,22 +499,25 @@ class OrderTrackingViewModel extends BaseViewModel {
   }
 
   void _setDriverData(Map<String, dynamic> raw) {
-    final driverMap = _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
+    final driverMap =
+        _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
     final vehicleMap = _readMap(
-      driverMap,
-      const ['vehicle', 'car', 'truck'],
-    ) ??
+          driverMap,
+          const ['vehicle', 'car', 'truck'],
+        ) ??
         _readMap(raw, const ['vehicle']);
 
-    _driverName = _readString(driverMap, const ['name', 'full_name', 'fullName']) ??
-        _readString(raw, const ['delivery_name', 'driver_name']) ??
-        _driverName;
+    _driverName =
+        _readString(driverMap, const ['name', 'full_name', 'fullName']) ??
+            _readString(raw, const ['delivery_name', 'driver_name']) ??
+            _driverName;
 
     _driverRating = _readDouble(
       driverMap?['rating'] ?? driverMap?['score'] ?? raw['driver_rating'],
     );
 
-    final vehicleModel = _readString(vehicleMap, const ['model', 'name', 'type']) ?? '';
+    final vehicleModel =
+        _readString(vehicleMap, const ['model', 'name', 'type']) ?? '';
     final vehicleColor = _readString(vehicleMap, const ['color']) ?? '';
     final formattedVehicle = [vehicleModel, vehicleColor]
         .where((value) => value.trim().isNotEmpty)
@@ -526,10 +535,10 @@ class OrderTrackingViewModel extends BaseViewModel {
         _vehiclePlate;
 
     _driverPhone = _readString(driverMap, const [
-      'phone',
-      'phone_number',
-      'mobile',
-    ]) ??
+          'phone',
+          'phone_number',
+          'mobile',
+        ]) ??
         _readString(raw, const ['delivery_phone', 'driver_phone']);
 
     _driverAvatarUrl = _readString(driverMap, const [
@@ -656,7 +665,6 @@ class OrderTrackingViewModel extends BaseViewModel {
     await _mapController!.animateCamera(
       CameraUpdate.newLatLngBounds(bounds, 90),
     );
-
   }
 
   void _syncRadarState() {

@@ -4,6 +4,7 @@ import 'package:stacked/stacked.dart';
 import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'startup_viewmodel.dart';
+import 'package:splg_lib/widgets/splg_logo.dart';
 
 class StartupView extends StackedView<StartupViewModel> {
   const StartupView({super.key});
@@ -19,10 +20,7 @@ class StartupView extends StackedView<StartupViewModel> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              'assets/logo.png',
-              height: 78,
-            ),
+            const SplgLogo(height: 56),
             verticalSpaceSmall,
             Row(
               mainAxisSize: MainAxisSize.min,

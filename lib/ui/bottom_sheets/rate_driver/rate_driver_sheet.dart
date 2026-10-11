@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:splg_customer/ui/common/app_colors.dart';
 import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'rate_driver_sheet_model.dart';
+import 'package:splg_lib/theme/app_colors.dart';
+import 'package:splg_lib/theme/brasa_palette.dart';
 
 /// Hoja para calificar al chofer tras la entrega. `request.data` trae
 /// `{ orderId, driverName }`. Completa con `SheetResponse(confirmed: true)` si
@@ -44,8 +45,8 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.all(Radius.circular(12)),
         ),
         child: Column(
@@ -59,7 +60,7 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
             verticalSpaceTiny,
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 14, color: kcMediumGrey),
+              style: TextStyle(fontSize: 14, color: context.brasa.muted),
             ),
             verticalSpaceMedium,
             Row(
@@ -68,12 +69,11 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
                 final value = index + 1;
                 return IconButton(
                   iconSize: 40,
-                  onPressed: viewModel.isBusy
-                      ? null
-                      : () => viewModel.setStars(value),
+                  onPressed:
+                      viewModel.isBusy ? null : () => viewModel.setStars(value),
                   icon: Icon(
                     value <= viewModel.stars ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
+                    color: AppColors.gas400,
                   ),
                 );
               }),
@@ -93,7 +93,7 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
               verticalSpaceSmall,
               Text(
                 viewModel.errorMessage!,
-                style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                style: TextStyle(color: context.brasa.danger, fontSize: 13),
               ),
             ],
             verticalSpaceMedium,
@@ -103,7 +103,8 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
                   child: TextButton(
                     onPressed: viewModel.isBusy
                         ? null
-                        : () => completer?.call(SheetResponse(confirmed: false)),
+                        : () =>
+                            completer?.call(SheetResponse(confirmed: false)),
                     child: const Text('Omitir'),
                   ),
                 ),
@@ -119,7 +120,6 @@ class RateDriverSheet extends StackedView<RateDriverSheetModel> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: kcPrimaryColor,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: viewModel.isBusy

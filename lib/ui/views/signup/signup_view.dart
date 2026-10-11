@@ -8,6 +8,7 @@ import 'package:splg_customer/ui/widgets/common/input/text_input.dart';
 import 'package:splg_customer/ui/views/signup/signup_view.form.dart';
 
 import 'signup_viewmodel.dart';
+import 'package:splg_lib/widgets/splg_logo.dart';
 
 @FormView(fields: [
   FormTextField(name: 'name'),
@@ -38,10 +39,7 @@ class SignupView extends StackedView<SignupViewModel> with $SignupView {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/logo.png',
-                          height: 78,
-                        ),
+                        const SplgLogo(height: 56),
                         const SizedBox(height: 46),
                         Card(
                           shape: RoundedRectangleBorder(

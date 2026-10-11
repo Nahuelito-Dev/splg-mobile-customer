@@ -8,8 +8,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:flutter/material.dart' as _i14;
 import 'package:flutter/material.dart';
-import 'package:splg_customer/ui/views/addresses/addresses_view.dart'
-    as _i9;
+import 'package:splg_customer/ui/views/addresses/addresses_view.dart' as _i9;
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart' as _i4;
 import 'package:splg_customer/ui/views/home/home_view.dart' as _i2;
 import 'package:splg_customer/ui/views/legal/legal_view.dart' as _i12;

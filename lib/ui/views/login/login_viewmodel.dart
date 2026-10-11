@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:email_validator/email_validator.dart';
@@ -34,7 +36,7 @@ class LoginViewModel extends FormViewModel {
     if (success) {
       // Recién ahora hay sesión: registramos el token FCM contra el backend
       // (antes del login, initialize() en startup no tenía con qué autenticar).
-      await _notificationService.registerCurrentToken();
+      unawaited(_notificationService.requestPermissionAndRegister());
       _navigationService.back();
     } else {
       _dialogService.showDialog(
@@ -45,6 +47,25 @@ class LoginViewModel extends FormViewModel {
     }
 
     setBusy(false);
+  }
+
+  Future<void> onForgotPassword() async {
+    final email = (emailValue ?? '').trim();
+    if (!EmailValidator.validate(email)) {
+      _emailError = 'Ingresá tu email para recuperar la contraseña';
+      rebuildUi();
+      return;
+    }
+    _emailError = null;
+    setBusy(true);
+    final sent = await _customerService.sendPasswordResetEmail(email);
+    setBusy(false);
+    await _dialogService.showDialog(
+      title: sent ? 'Revisá tu correo' : 'No se pudo enviar',
+      description: sent
+          ? 'Si $email tiene una cuenta, te mandamos un enlace para elegir una nueva contraseña.'
+          : 'No pudimos enviar el correo de recuperación. Probá de nuevo en unos minutos.',
+    );
   }
 
   bool _passValidations() {

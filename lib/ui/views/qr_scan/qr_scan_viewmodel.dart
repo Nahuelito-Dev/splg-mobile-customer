@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -5,6 +7,8 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
+import 'package:splg_customer/services/app_permissions.dart';
+import 'package:splg_lib/permissions/app_permission.dart';
 
 /// Pantalla de escaneo del QR que muestra el chofer al llegar. El QR trae
 /// EXACTAMENTE el `deliveryCode` (string plano, no JSON), asi que lo leido
@@ -19,9 +23,46 @@ class QrScanViewModel extends BaseViewModel {
   final _dialogService = locator<DialogService>();
   final _navigationService = locator<NavigationService>();
 
+  final _permissions = locator<AppPermissions>();
+
+  // No arranca solo: la cámara se enciende recién cuando el permiso está
+  // concedido (si no, el SDK lo pediría sin explicación previa).
   final MobileScannerController controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
+    autoStart: false,
   );
+
+  /// null = todavía consultando/pidiendo el permiso de cámara.
+  PermissionOutcome? _camera;
+  PermissionOutcome? get cameraOutcome => _camera;
+
+  bool get cameraGranted => _camera?.isGranted ?? false;
+  bool get cameraNeedsSettings =>
+      _camera == PermissionOutcome.permanentlyDenied;
+
+  Future<void> initialize() => _requestCamera();
+
+  Future<void> _requestCamera() async {
+    _camera = null;
+    rebuildUi();
+    _camera = await _permissions.ensure(AppPermission.camera);
+    rebuildUi();
+    if (cameraGranted) {
+      await _startCamera();
+    }
+  }
+
+  /// Enciende la cámara; si el plugin falla, el error lo muestra el
+  /// `errorBuilder` del scanner en vez de romper la pantalla.
+  Future<void> _startCamera() async {
+    try {
+      await controller.start();
+    } catch (e) {
+      log('QrScanViewModel: no se pudo abrir la cámara: $e');
+    }
+  }
+
+  Future<void> openSettings() => _permissions.openSettings();
 
   bool _isProcessing = false;
   bool get isProcessing => _isProcessing;
@@ -39,12 +80,11 @@ class QrScanViewModel extends BaseViewModel {
       return;
     }
 
-    final code = capture.barcodes
-        .map((barcode) => barcode.rawValue?.trim())
-        .firstWhere(
-          (value) => value != null && value.isNotEmpty,
-          orElse: () => null,
-        );
+    final code =
+        capture.barcodes.map((barcode) => barcode.rawValue?.trim()).firstWhere(
+              (value) => value != null && value.isNotEmpty,
+              orElse: () => null,
+            );
     if (code == null) {
       return;
     }
@@ -92,8 +132,14 @@ class QrScanViewModel extends BaseViewModel {
     await controller.start();
   }
 
+  /// "Reintentar": si el permiso no está, lo vuelve a pedir; si está, reabre
+  /// la cámara.
   Future<void> retryCamera() async {
-    await controller.start();
+    if (cameraGranted) {
+      await _startCamera();
+    } else {
+      await _requestCamera();
+    }
   }
 
   void cancel() {

@@ -14,6 +14,9 @@ import 'package:splg_customer/domain/usecases/fetch_customer_usecases.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_lib/domain/customer.dart';
 
+/// Resultado del alta: el back responde 409 si el email o teléfono ya existen.
+enum RegisterOutcome { created, alreadyExists, failed }
+
 class CustomerService {
   CustomerService() {
     _customerRepository = CustomerRepositoryImp(_customerDatasource);
@@ -51,7 +54,7 @@ class CustomerService {
     return customer;
   }
 
-  Future<bool> registerCustomer({
+  Future<RegisterOutcome> registerCustomer({
     required String name,
     required String email,
     required String password,
@@ -66,13 +69,17 @@ class CustomerService {
 
     final createCustomerUseCase = CreateCustomerUseCase(_customerRepository);
 
-    final customer = await createCustomerUseCase(body);
-    if (customer != null) {
-      setCustomer(customer);
-      return true;
+    try {
+      final customer = await createCustomerUseCase(body);
+      if (customer != null) {
+        setCustomer(customer);
+        return RegisterOutcome.created;
+      }
+    } on RegistrationConflictException {
+      return RegisterOutcome.alreadyExists;
     }
 
-    return false;
+    return RegisterOutcome.failed;
   }
 
   Future<bool> fetchCustomerByEmail(String email) async {
@@ -106,6 +113,18 @@ class CustomerService {
       return false;
     } on FirebaseAuthException catch (e) {
       log('Error during sign in: $e');
+      return false;
+    }
+  }
+
+  /// Envía el mail de recuperación de contraseña. Devuelve false si Firebase
+  /// rechaza el pedido (email mal formado, demasiados intentos, sin red).
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: email);
+      return true;
+    } on FirebaseAuthException catch (e) {
+      log('Error sending password reset: $e');
       return false;
     }
   }

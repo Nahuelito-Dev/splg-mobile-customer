@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
-import 'package:splg_customer/ui/common/app_colors.dart';
 import 'package:splg_customer/ui/common/ui_helpers.dart';
 
 import 'claim_sheet_model.dart';
+import 'package:splg_lib/theme/brasa_palette.dart';
 
 /// Hoja para abrir un reclamo sobre un pedido. `request.data` trae
 /// `{ orderId }`. Completa con `SheetResponse(confirmed: true)` si se envió.
@@ -39,8 +39,8 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.all(Radius.circular(12)),
         ),
         child: Column(
@@ -52,9 +52,9 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             verticalSpaceTiny,
-            const Text(
+            Text(
               'Contanos qué pasó con este pedido y lo revisamos.',
-              style: TextStyle(fontSize: 14, color: kcMediumGrey),
+              style: TextStyle(fontSize: 14, color: context.brasa.muted),
             ),
             verticalSpaceMedium,
             Wrap(
@@ -68,9 +68,11 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                   onSelected: viewModel.isBusy
                       ? null
                       : (_) => viewModel.setReason(reason),
-                  selectedColor: kcPrimaryColor,
+                  selectedColor: Theme.of(context).colorScheme.primary,
                   labelStyle: TextStyle(
-                    color: selected ? Colors.white : kcMediumGrey,
+                    color: selected
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : context.brasa.muted,
                   ),
                 );
               }).toList(),
@@ -91,7 +93,7 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
               verticalSpaceSmall,
               Text(
                 viewModel.errorMessage!,
-                style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                style: TextStyle(color: context.brasa.danger, fontSize: 13),
               ),
             ],
             verticalSpaceMedium,
@@ -101,7 +103,8 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                   child: TextButton(
                     onPressed: viewModel.isBusy
                         ? null
-                        : () => completer?.call(SheetResponse(confirmed: false)),
+                        : () =>
+                            completer?.call(SheetResponse(confirmed: false)),
                     child: const Text('Cancelar'),
                   ),
                 ),
@@ -117,7 +120,6 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: kcPrimaryColor,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: viewModel.isBusy

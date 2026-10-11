@@ -79,8 +79,9 @@ class ApiClient {
   Future<Response> patch(
     String path,
     Map<String, dynamic> body,
-    String token,
-  ) async {
+    String token, [
+    Map<String, String>? extraHeaders,
+  ]) async {
     try {
       final response = await dio.patch(
         path,
@@ -92,6 +93,7 @@ class ApiClient {
             'X-Client-Source': 'customer-app',
             'X-Distributor': AppConfig.distributorSlug,
             'Authorization': 'Bearer $token',
+            if (extraHeaders != null) ...extraHeaders,
           },
         ),
       );

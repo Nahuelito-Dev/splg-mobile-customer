@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/domain/gas_cylinder_label.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
 
 import 'order_model.dart';
 import 'package:splg_lib/domain/gas_cylinder.dart';
+import 'package:splg_lib/widgets/splg_logo.dart';
 
 class Order extends StackedView<OrderModel> {
   const Order({super.key});
@@ -32,12 +34,7 @@ class Order extends StackedView<OrderModel> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Image.asset(
-                'assets/logo.png',
-                height: 60,
-                cacheWidth: 635,
-                cacheHeight: 180,
-              ),
+              child: const SplgLogo(height: 36),
             ),
             if (viewModel.hasActiveOrder)
               _ActiveOrderCard(
@@ -110,104 +107,107 @@ class _CylinderItemTile extends StatelessWidget {
       onTap: () => _showCylinderDetail(context),
       borderRadius: BorderRadius.circular(16),
       child: Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8, right: 2),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh.withAlpha(100),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: quantity > 0
-              ? colorScheme.secondary.withAlpha(120)
-              : colorScheme.onSurface.withAlpha(20),
-        ),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/cylinder_10.png',
-            height: 60,
-            fit: BoxFit.contain,
-            cacheWidth: 100,
-            cacheHeight: 180,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8, right: 2),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh.withAlpha(100),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: quantity > 0
+                ? colorScheme.secondary.withAlpha(120)
+                : colorScheme.onSurface.withAlpha(20),
           ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Row(
+          children: [
+            Image.asset(
+              'assets/cylinder_10.png',
+              height: 60,
+              fit: BoxFit.contain,
+              cacheWidth: 100,
+              cacheHeight: 180,
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cylinder.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    currencyFormat.format(cylinder.price),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface.withAlpha(180),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (cylinder.discounts != null &&
+                      cylinder.discounts!.isNotEmpty)
+                    ...cylinder.discounts!.map((discount) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '-${discount.percentage.toStringAsFixed(0)}% a partir de ${discount.quantity}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withAlpha(120),
+                            ),
+                          ),
+                        )),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Métodos de pago',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface.withAlpha(150),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.credit_card,
+                          size: 18,
+                          color: colorScheme.onSurface.withAlpha(150)),
+                      SizedBox(width: 8),
+                      Icon(Icons.payments_outlined,
+                          size: 18,
+                          color: colorScheme.onSurface.withAlpha(150)),
+                      SizedBox(width: 8),
+                      Icon(Icons.account_balance_outlined,
+                          size: 18,
+                          color: colorScheme.onSurface.withAlpha(150)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
               children: [
+                IconButton(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_circle_outline),
+                  color: colorScheme.primary,
+                ),
                 Text(
-                  'Garrafa de ${cylinder.type}',
+                  '$quantity',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  currencyFormat.format(cylinder.price),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface.withAlpha(180),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (cylinder.discounts != null &&
-                    cylinder.discounts!.isNotEmpty)
-                  ...cylinder.discounts!.map((discount) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(
-                          '-${discount.percentage.toStringAsFixed(0)}% a partir de ${discount.quantity}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withAlpha(120),
-                          ),
-                        ),
-                      )),
-                const SizedBox(height: 12),
-                Text(
-                  'Métodos de pago',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface.withAlpha(150),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.credit_card,
-                        size: 18, color: colorScheme.onSurface.withAlpha(150)),
-                    SizedBox(width: 8),
-                    Icon(Icons.payments_outlined,
-                        size: 18, color: colorScheme.onSurface.withAlpha(150)),
-                    SizedBox(width: 8),
-                    Icon(Icons.account_balance_outlined,
-                        size: 18, color: colorScheme.onSurface.withAlpha(150)),
-                  ],
+                IconButton(
+                  onPressed: quantity > 0 ? onRemove : null,
+                  icon: const Icon(Icons.remove_circle_outline),
+                  color: quantity > 0 ? colorScheme.error : colorScheme.outline,
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            children: [
-              IconButton(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_circle_outline),
-                color: colorScheme.primary,
-              ),
-              Text(
-                '$quantity',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                onPressed: quantity > 0 ? onRemove : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                color: quantity > 0 ? colorScheme.error : colorScheme.outline,
-              ),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -276,7 +276,7 @@ class _CylinderDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Garrafa de ${cylinder.type}',
+              cylinder.label,
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),

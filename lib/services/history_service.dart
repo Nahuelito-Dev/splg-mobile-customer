@@ -10,16 +10,18 @@ import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/usecases/create_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_orders_usecases.dart';
-import 'package:splg_customer/domain/usecases/update_order_status_usecases.dart';
+import 'package:splg_customer/domain/usecases/cancel_order_usecases.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
+import 'package:splg_customer/domain/cancel_result.dart';
 
 class HistoryService with ListenableServiceMixin {
-  HistoryService() {
-    _orderRepository = OrderRepositoryImp(_orderDatasource);
+  /// [orderRepository] sólo se inyecta en los tests.
+  HistoryService({OrderRepository? orderRepository}) {
+    _orderRepository = orderRepository ?? OrderRepositoryImp(_orderDatasource);
     _createOrderUseCase = CreateOrderUseCase(_orderRepository);
     _fetchCustomerOrdersUseCase = FetchCustomerOrdersUseCase(_orderRepository);
-    _updateOrderStatusUseCase = UpdateOrderStatusUseCase(_orderRepository);
+    _cancelOrderUseCase = CancelOrderUseCase(_orderRepository);
     listenToReactiveValues([_history]);
   }
 
@@ -29,7 +31,7 @@ class HistoryService with ListenableServiceMixin {
   late OrderRepository _orderRepository;
   late CreateOrderUseCase _createOrderUseCase;
   late FetchCustomerOrdersUseCase _fetchCustomerOrdersUseCase;
-  late UpdateOrderStatusUseCase _updateOrderStatusUseCase;
+  late CancelOrderUseCase _cancelOrderUseCase;
 
   final ReactiveValue<bool> _hasPendingOrder = ReactiveValue<bool>(false);
   bool get hasPendingOrder => _hasPendingOrder.value;
@@ -104,21 +106,26 @@ class HistoryService with ListenableServiceMixin {
     return true;
   }
 
-  Future<bool> cancelOrder(String orderId) async {
+  Future<CancelResult> cancelOrder(String orderId) async {
     final token = await _customerService.token;
     if (token == null) {
-      return false;
+      return const CancelResult.failed();
     }
 
-    final success =
-        await _updateOrderStatusUseCase(orderId, 'cancelled', token);
-    if (!success) {
-      return false;
+    final result = await _cancelOrderUseCase(orderId, token);
+    if (!result.success) {
+      // Un rechazo de negocio ("ya finalizado", "ya está en camino") indica que
+      // el pedido cambió de estado: se refresca para que la pantalla lo refleje.
+      if (result.isRejected) {
+        await refreshHistory();
+        notifyListeners();
+      }
+      return result;
     }
 
     await refreshHistory();
     notifyListeners();
-    return true;
+    return result;
   }
 
   Future<List<Order>> getHistory() async {

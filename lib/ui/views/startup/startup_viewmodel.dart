@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:stacked/stacked.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
@@ -48,9 +50,9 @@ class StartupViewModel extends BaseViewModel {
     }
 
     // Pide permiso de notificaciones y registra el token FCM (si hay sesión).
-    // No bloquea el arranque: NotificationService ya maneja sus propios
-    // errores internamente (p.ej. iOS sin APNs key configurada todavía).
-    await _notificationService.initialize();
+    // No bloquea el arranque: el prompt de iOS queda esperando al usuario y
+    // NotificationService maneja sus propios errores internamente.
+    unawaited(_notificationService.initialize());
 
     _navigationService.replaceWithHomeView();
   }

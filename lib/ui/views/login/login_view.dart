@@ -6,6 +6,7 @@ import 'package:splg_customer/ui/common/app_strings.dart';
 import 'package:splg_customer/ui/views/login/login_view.form.dart';
 
 import 'login_viewmodel.dart';
+import 'package:splg_lib/widgets/splg_logo.dart';
 
 @FormView(fields: [
   FormTextField(
@@ -43,10 +44,7 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/logo.png',
-                          height: 78,
-                        ),
+                        const SplgLogo(height: 56),
                         const SizedBox(height: 46),
                         Card(
                           shape: RoundedRectangleBorder(
@@ -128,7 +126,14 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
           obscureText: !viewModel.isPasswordVisible,
           textInputAction: TextInputAction.done,
         ),
-        const SizedBox(height: 42),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: !viewModel.isBusy ? viewModel.onForgotPassword : null,
+            child: const Text(loginViewForgotPassword),
+          ),
+        ),
+        const SizedBox(height: 24),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primary,

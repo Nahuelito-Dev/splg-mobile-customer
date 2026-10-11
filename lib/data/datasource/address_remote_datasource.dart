@@ -78,7 +78,8 @@ class AddressRemoteDataSource {
   /// Elimina una dirección (`DELETE /user-address/:id`).
   Future<bool> deleteAddress(String addressId, String token) async {
     try {
-      final response = await _apiClient.delete('user-address/$addressId', token);
+      final response =
+          await _apiClient.delete('user-address/$addressId', token);
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       log('e in deleteAddress: ${e.toString()}');

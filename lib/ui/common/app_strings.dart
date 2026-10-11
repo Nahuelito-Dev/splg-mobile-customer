@@ -4,6 +4,7 @@ const String loginViewHintPassword = 'Contraseña';
 const String loginViewButton = 'Continuar';
 const String loginViewNoAccount = '¿No tienes cuenta? ';
 const String loginViewSignup = 'Registrarse';
+const String loginViewForgotPassword = '¿Olvidaste tu contraseña?';
 // Signup
 const String signupViewTitle = 'Registrarse';
 const String signupViewName = 'Nombre y apellido';
@@ -36,5 +37,7 @@ const String signupViewDialogOtpDescription =
 const String signupViewDialogOtpConfirm = 'Aceptar';
 const String signupViewDialogOtpCancel = 'Cancelar';
 const String signupViewErrorDialogTitle = 'Ocurrió un error';
+const String signupViewAlreadyExistsDescription =
+    'Ya existe una cuenta con ese email o teléfono. Probá iniciar sesión o recuperar la contraseña.';
 const String signupViewErrorDialogDescription =
     'No se pudo completar el registro. Por favor, intenta nuevamente.';

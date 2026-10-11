@@ -90,12 +90,11 @@ class HistoryModel extends ReactiveViewModel {
 
   Future<void> cancelOrder(Order order) async {
     setBusy(true);
-    final success = await _historyService.cancelOrder(order.id);
-    if (!success) {
+    final result = await _historyService.cancelOrder(order.id);
+    if (!result.success) {
       await _dialogService.showDialog(
-        title: 'Error al cancelar pedido',
-        description:
-            'No se pudo cancelar la orden en este momento. Intentá nuevamente.',
+        title: 'No se pudo cancelar el pedido',
+        description: result.failureDescription,
       );
     }
     setBusy(false);
@@ -106,7 +105,8 @@ class HistoryModel extends ReactiveViewModel {
 
   void _startHistoryPolling() {
     _historyPollingTimer?.cancel();
-    _historyPollingTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _historyPollingTimer =
+        Timer.periodic(const Duration(seconds: 10), (_) async {
       await _historyService.refreshHistory();
       maybeOpenTracking();
     });

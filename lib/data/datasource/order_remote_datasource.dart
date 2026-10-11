@@ -1,6 +1,8 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
 import 'package:splg_customer/core/network/api_client.dart';
+import 'package:splg_customer/domain/cancel_result.dart';
 
 class OrderRemoteDatasource {
   final _apiClient = ApiClient();
@@ -77,23 +79,31 @@ class OrderRemoteDatasource {
     return (false, null);
   }
 
-  Future<bool> updateOrderStatus(
+  /// `PATCH /orders/:id/cancel`: el cliente no puede usar `/status` (sólo
+  /// chofer y admin). Idempotente por `Idempotency-Key`, que llega de afuera
+  /// para que los reintentos de una misma intención lleven la misma clave.
+  Future<CancelResult> cancelOrder(
     String orderId,
-    String status,
     String token,
+    String idempotencyKey,
   ) async {
     try {
       final response = await _apiClient.patch(
-        'orders/$orderId/status',
-        {'status': status},
+        'orders/$orderId/cancel',
+        {},
         token,
+        {'Idempotency-Key': idempotencyKey},
       );
 
-      return response.statusCode == 200;
+      return CancelResult.fromResponse(response.statusCode, response.data);
+    } on DioException catch (e) {
+      log('e in cancelOrder: ${e.toString()}');
+      return CancelResult.fromResponse(
+          e.response?.statusCode, e.response?.data);
     } catch (e) {
-      log('e in updateOrderStatus: ${e.toString()}');
+      log('e in cancelOrder: ${e.toString()}');
     }
 
-    return false;
+    return const CancelResult.failed();
   }
 }

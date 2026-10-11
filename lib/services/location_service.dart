@@ -2,28 +2,39 @@ import 'dart:developer';
 
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:splg_lib/permissions/app_permission.dart';
+
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/services/app_permissions.dart';
+
+/// No se pudo obtener la posición: [outcome] dice si fue por el permiso (y si
+/// se puede volver a pedir o sólo desde Ajustes) o por el GPS apagado.
+class LocationUnavailableException implements Exception {
+  const LocationUnavailableException(this.outcome,
+      {this.serviceDisabled = false});
+
+  final PermissionOutcome outcome;
+  final bool serviceDisabled;
+
+  @override
+  String toString() =>
+      'LocationUnavailableException($outcome, serviceDisabled: $serviceDisabled)';
+}
 
 class LocationService {
+  AppPermissions get _permissions => locator<AppPermissions>();
+
+  /// Posición actual (ubicación "mientras la app está abierta"). Pide el permiso
+  /// en este momento, con explicación previa. Si no se puede, lanza
+  /// [LocationUnavailableException]: quien llama sigue funcionando sin ubicación.
   Future<Position> getCurrentPosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
+    final outcome = await _permissions.ensure(AppPermission.location);
+    if (!outcome.isGranted) {
+      throw LocationUnavailableException(outcome);
     }
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw LocationUnavailableException(outcome, serviceDisabled: true);
     }
 
     return await Geolocator.getCurrentPosition();

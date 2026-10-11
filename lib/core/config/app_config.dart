@@ -3,7 +3,7 @@
 ///
 /// Ejemplos:
 ///   flutter run --dart-define=API_BASE_URL=https://api.splg.app \
-///               --dart-define=DISTRIBUTOR=jeny-gas
+///               --dart-define=DISTRIBUTOR=demo
 class AppConfig {
   AppConfig._();
 
@@ -13,8 +13,18 @@ class AppConfig {
     defaultValue: 'http://localhost:3000',
   );
 
+  /// `--dart-define=PUSH_ENABLED=false` evita pedir permiso de notificaciones
+  /// y registrar el token FCM (recorridos automáticos en simulador, donde el
+  /// prompt del sistema tapa la pantalla).
+  static const bool pushEnabled =
+      bool.fromEnvironment('PUSH_ENABLED', defaultValue: true);
+
   /// URL completa de la API (con el `/api/` que espera el backend).
   static String get apiUrl => '$apiBaseUrl/api/';
+
+  /// Namespace de Socket.IO del gateway de clientes (misma base que la API,
+  /// sin `/api`).
+  static String get customersNamespace => '$apiBaseUrl/customers';
 
   /// Distribuidora (tenant) contra la que opera esta instancia de la app.
   /// Se envía en el header `X-Distributor` (slug o uuid) para que el backend
@@ -22,7 +32,7 @@ class AppConfig {
   /// endpoints públicos (p.ej. franjas horarias).
   static const String distributorSlug = String.fromEnvironment(
     'DISTRIBUTOR',
-    defaultValue: 'jeny-gas',
+    defaultValue: 'demo',
   );
 
   /// Back URLs de Checkout Pro de MercadoPago (deben coincidir con

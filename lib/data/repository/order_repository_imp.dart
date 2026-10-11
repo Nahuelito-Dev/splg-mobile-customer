@@ -5,6 +5,7 @@ import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
+import 'package:splg_customer/domain/cancel_result.dart';
 
 class OrderRepositoryImp implements OrderRepository {
   OrderRepositoryImp(this._remoteDatasource);
@@ -26,8 +27,8 @@ class OrderRepositoryImp implements OrderRepository {
       }
 
       // Fallback for APIs that do not return the full created order payload.
-      final order =
-          OrderApiMapper.parseOrder(data) ?? OrderApiMapper.parseOrder(orderData);
+      final order = OrderApiMapper.parseOrder(data) ??
+          OrderApiMapper.parseOrder(orderData);
       final paymentUrl = OrderApiMapper.extractPaymentUrl(data);
 
       return CreateOrderResult(
@@ -95,17 +96,18 @@ class OrderRepositoryImp implements OrderRepository {
   }
 
   @override
-  Future<bool> updateOrderStatus(
+  Future<CancelResult> cancelOrder(
     String orderId,
-    String status,
     String token,
+    String idempotencyKey,
   ) async {
     try {
-      return await _remoteDatasource.updateOrderStatus(orderId, status, token);
+      return await _remoteDatasource.cancelOrder(
+          orderId, token, idempotencyKey);
     } catch (e) {
-      log('e in updateOrderStatus repository: ${e.toString()}');
+      log('e in cancelOrder repository: ${e.toString()}');
     }
 
-    return false;
+    return const CancelResult.failed();
   }
 }

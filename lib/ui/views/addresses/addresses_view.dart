@@ -184,8 +184,8 @@ class _AddressCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 if (address.primary)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
                       color: colorScheme.primary,
                       borderRadius: BorderRadius.circular(10),
