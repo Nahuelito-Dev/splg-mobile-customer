@@ -377,9 +377,12 @@ class _DriverCard extends StatelessWidget {
                     : null,
                 child: (viewModel.driverAvatarUrl == null ||
                         viewModel.driverAvatarUrl!.isEmpty)
-                    ? Icon(
-                        Icons.person,
-                        color: theme.colorScheme.primary,
+                    ? Text(
+                        viewModel.driverInitials,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       )
                     : null,
               ),

@@ -24,6 +24,27 @@ class DriverLocationUpdate {
   final double heading;
 }
 
+/// Chofer asignado tal como lo manda el back en `order:accepted` y
+/// `order:on-the-way`. `photoUrl` es una URL firmada que vence en minutos.
+class DriverInfo {
+  const DriverInfo({this.name, this.phone, this.photoUrl});
+
+  final String? name;
+  final String? phone;
+  final String? photoUrl;
+}
+
+/// Resultado de `GET /orders/:id/driver-photo?modo=url`.
+/// [url] nulo: el chofer no tiene foto o el back no la da (409/404).
+/// [failed]: no se pudo consultar (red, 5xx); no dice nada sobre la foto.
+class DriverPhotoLookup {
+  const DriverPhotoLookup({this.url, this.expiresAt, this.failed = false});
+
+  final String? url;
+  final DateTime? expiresAt;
+  final bool failed;
+}
+
 class OrderTrackingService {
   final _apiClient = ApiClient();
   final _uuid = const Uuid();
@@ -36,10 +57,45 @@ class OrderTrackingService {
   final _driverLocationController =
       StreamController<DriverLocationUpdate>.broadcast();
   final _orderStatusController = StreamController<String>.broadcast();
+  final _driverController = StreamController<DriverInfo>.broadcast();
 
   Stream<DriverLocationUpdate> get driverLocationUpdates =>
       _driverLocationController.stream;
   Stream<String> get orderStatusUpdates => _orderStatusController.stream;
+  Stream<DriverInfo> get driverUpdates => _driverController.stream;
+
+  /// Renueva la URL firmada de la foto del chofer. 409 (pedido fuera de
+  /// aceptado/en camino) y 404 no son error: significan "sin foto".
+  Future<DriverPhotoLookup> fetchDriverPhoto(
+    String orderId,
+    String token,
+  ) async {
+    try {
+      final response = await _apiClient.get(
+        'orders/$orderId/driver-photo?modo=url',
+        token,
+      );
+      final data = _toMap(response.data);
+      final url = data?['url']?.toString();
+      if (data == null || url == null || url.isEmpty) {
+        return const DriverPhotoLookup();
+      }
+      return DriverPhotoLookup(
+        url: url,
+        expiresAt: DateTime.tryParse(data['expiresAt']?.toString() ?? ''),
+      );
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 409 || code == 404) {
+        return const DriverPhotoLookup();
+      }
+      log('e in fetchDriverPhoto: ${e.type}');
+      return const DriverPhotoLookup(failed: true);
+    } catch (e) {
+      log('e in fetchDriverPhoto: ${e.runtimeType}');
+      return const DriverPhotoLookup(failed: true);
+    }
+  }
 
   Future<Map<String, dynamic>?> fetchOrderById(
     String orderId,
@@ -184,6 +240,20 @@ class OrderTrackingService {
 
     if (!_isForTrackedOrder(data)) {
       return;
+    }
+
+    final driver = _toMap(data['driver']);
+    if (driver != null) {
+      String? text(dynamic v) {
+        final t = v?.toString().trim();
+        return (t == null || t.isEmpty) ? null : t;
+      }
+
+      _driverController.add(DriverInfo(
+        name: text(driver['name']),
+        phone: text(driver['phone']),
+        photoUrl: text(driver['photoUrl']),
+      ));
     }
 
     final status =

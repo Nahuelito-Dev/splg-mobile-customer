@@ -26,10 +26,18 @@ enum TrackingStage {
   arriving,
 }
 
-class OrderTrackingViewModel extends BaseViewModel {
+class OrderTrackingViewModel extends BaseViewModel
+    with WidgetsBindingObserver {
   OrderTrackingViewModel({required this.orderId});
 
   final String orderId;
+
+  /// Cuánto antes de `expiresAt` se renueva la foto firmada del chofer.
+  static const photoRenewMargin = Duration(seconds: 30);
+
+  /// Vida de la URL firmada que llega por socket (el evento no trae `expiresAt`;
+  /// el back la firma por ~5 minutos).
+  static const eventPhotoTtl = Duration(minutes: 5);
 
   final _trackingService = locator<OrderTrackingService>();
   final _customerService = locator<CustomerService>();
@@ -55,6 +63,10 @@ class OrderTrackingViewModel extends BaseViewModel {
   String _vehiclePlate = '--';
   String? _driverPhone;
   String? _driverAvatarUrl;
+  Timer? _photoTimer;
+  bool _refreshingPhoto = false;
+  bool _closed = false;
+  String? _sessionCustomerId;
 
   bool _detailsExpanded = false;
   bool _userMovedMap = false;
@@ -64,6 +76,7 @@ class OrderTrackingViewModel extends BaseViewModel {
   Timer? _radarTimer;
   StreamSubscription<DriverLocationUpdate>? _driverLocationSubscription;
   StreamSubscription<String>? _orderStatusSubscription;
+  StreamSubscription<DriverInfo>? _driverSubscription;
 
   final List<LatLng> _routePoints = [];
   LatLng? _lastRouteOrigin;
@@ -148,6 +161,18 @@ class OrderTrackingViewModel extends BaseViewModel {
   String get vehicleName => _vehicleName;
   String get vehiclePlate => _vehiclePlate;
   String? get driverAvatarUrl => _driverAvatarUrl;
+
+  String get driverInitials {
+    final parts = _driverName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    final first = String.fromCharCode(parts.first.runes.first).toUpperCase();
+    if (parts.length == 1) return first;
+    return first + String.fromCharCode(parts.last.runes.first).toUpperCase();
+  }
 
   bool get showDriverCard => stage != TrackingStage.pending;
   bool get showRadar => stage == TrackingStage.pending;
@@ -251,8 +276,12 @@ class OrderTrackingViewModel extends BaseViewModel {
 
   Future<void> initialize() async {
     setBusy(true);
+    _sessionCustomerId = _customerService.customer.customerId;
+    _customerService.addListener(_onSessionChanged);
+    WidgetsBinding.instance.addObserver(this);
     await _loadTrackingData();
     await _startRealtimeTracking();
+    await refreshDriverPhoto();
     _syncRadarState();
     setBusy(false);
   }
@@ -436,9 +465,17 @@ class OrderTrackingViewModel extends BaseViewModel {
       },
     );
 
+    _driverSubscription?.cancel();
+    _driverSubscription = _trackingService.driverUpdates.listen(_onDriverEvent);
+
     _orderStatusSubscription = _trackingService.orderStatusUpdates.listen(
       (status) {
         _setStatus(status);
+        if (_hasDriverAssigned) {
+          if (_driverAvatarUrl == null) refreshDriverPhoto();
+        } else {
+          _clearDriverPhoto();
+        }
         _syncRadarState();
         rebuildUi();
       },
@@ -541,12 +578,72 @@ class OrderTrackingViewModel extends BaseViewModel {
         ]) ??
         _readString(raw, const ['delivery_phone', 'driver_phone']);
 
-    _driverAvatarUrl = _readString(driverMap, const [
-      'avatar',
-      'photo',
-      'selfie',
-      'image',
-    ]);
+  }
+
+  /// La foto sólo existe con el pedido aceptado o en camino.
+  bool get _hasDriverAssigned =>
+      _status == 'accepted' || _status == 'out_for_delivery';
+
+  void _onDriverEvent(DriverInfo driver) {
+    if (driver.name != null) _driverName = driver.name!;
+    if (driver.phone != null) _driverPhone = driver.phone;
+    if (driver.photoUrl != null) {
+      _setDriverPhoto(driver.photoUrl!, DateTime.now().add(eventPhotoTtl));
+    } else {
+      _clearDriverPhoto();
+      refreshDriverPhoto();
+    }
+    rebuildUi();
+  }
+
+  /// Pide una URL firmada nueva (`GET /orders/:id/driver-photo?modo=url`).
+  /// 409/404 dejan al chofer sin foto, sin mostrar error.
+  Future<void> refreshDriverPhoto() async {
+    if (_closed || _refreshingPhoto || !_hasDriverAssigned) return;
+    final token = await _customerService.token;
+    if (_closed || token == null) return;
+    _refreshingPhoto = true;
+    try {
+      final lookup = await _trackingService.fetchDriverPhoto(orderId, token);
+      if (_closed || !_hasDriverAssigned) return;
+      if (lookup.url != null) {
+        _setDriverPhoto(
+          lookup.url!,
+          lookup.expiresAt ?? DateTime.now().add(eventPhotoTtl),
+        );
+      } else if (!lookup.failed) {
+        _clearDriverPhoto();
+      }
+      rebuildUi();
+    } finally {
+      _refreshingPhoto = false;
+    }
+  }
+
+  void _setDriverPhoto(String url, DateTime expiresAt) {
+    _driverAvatarUrl = url;
+    _photoTimer?.cancel();
+    var wait = expiresAt.subtract(photoRenewMargin).difference(DateTime.now());
+    if (wait < const Duration(seconds: 1)) wait = const Duration(seconds: 1);
+    _photoTimer = Timer(wait, refreshDriverPhoto);
+  }
+
+  void _clearDriverPhoto() {
+    _photoTimer?.cancel();
+    _photoTimer = null;
+    _driverAvatarUrl = null;
+  }
+
+  void _onSessionChanged() {
+    if (_customerService.customer.customerId != _sessionCustomerId) {
+      _clearDriverPhoto();
+      rebuildUi();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) refreshDriverPhoto();
   }
 
   void _setEtaFromPayload(Map<String, dynamic> raw) {
@@ -828,6 +925,11 @@ class OrderTrackingViewModel extends BaseViewModel {
 
   @override
   void dispose() {
+    _closed = true;
+    _clearDriverPhoto();
+    _customerService.removeListener(_onSessionChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _driverSubscription?.cancel();
     _radarTimer?.cancel();
     _driverLocationSubscription?.cancel();
     _orderStatusSubscription?.cancel();
