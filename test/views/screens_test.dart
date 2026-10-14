@@ -14,6 +14,7 @@ import 'package:splg_customer/services/claim_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/ui/views/checkout/checkout_viewmodel.dart';
 import 'package:splg_customer/services/photo_service.dart';
 import 'package:splg_customer/services/profile_photo_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
@@ -292,7 +293,7 @@ void main() {
       await t.tap(find.byTooltip('Agregar uno').first);
       await t.tap(find.byTooltip('Agregar uno').first);
       await t.pumpAndSettle();
-      expect(find.textContaining('Continuar · \$28.310'), findsWidgets);
+      expect(find.textContaining('Continuar · 2 garrafas'), findsWidgets);
       await t.tap(find.textContaining('Continuar ·').last);
       await t.pumpAndSettle();
       verify(nav.navigateToCheckoutView()).called(1);
@@ -835,6 +836,18 @@ void main() {
         address: addr('a1', 'Buenos Aires 4114'),
       ));
       locator.registerSingleton<CartService>(cart);
+      CheckoutViewModel.quoteDebounce = Duration.zero;
+      addTearDown(() =>
+          CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
+      // El precio lo calcula el back: la transferencia suma su recargo.
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+          .thenAnswer((i) async => backQuote(
+              paymentSurcharge:
+                  (i.positionalArguments.first as Order).paymentMethod ==
+                          PaymentMethod.cash
+                      ? 0
+                      : 180));
       final slots = locator<TimeSlotService>() as MockTimeSlotService;
       when(slots.availabilityFor(any)).thenAnswer((_) async => const [
             TimeSlotAvailability(
@@ -883,10 +896,12 @@ void main() {
       await settle(t);
       await t.tap(find.byKey(const Key('checkout-payment')));
       await settle(t);
-      expect(find.text('Transferencia (+10%)'), findsOneWidget);
+      expect(find.text('Transferencia'), findsOneWidget);
       await t.tap(find.byKey(const Key('pay-online')));
       await settle(t);
       expect(find.text('\$1.980'), findsWidgets);
+      expect(
+          find.byKey(const Key('checkout-payment-surcharge')), findsOneWidget);
     });
   });
 }

@@ -1,12 +1,29 @@
 import 'package:intl/intl.dart';
 import 'package:splg_lib/splg_lib.dart';
 
-final money = NumberFormat.currency(
-  locale: 'es_AR',
-  symbol: '\$',
-  decimalDigits: 0,
-  customPattern: '¤#,##0',
-);
+/// Importes en pesos: sin decimales si el monto es entero, con centavos si no
+/// (un total con recargo puede dar 47701,5: mostrarlo redondeado no coincide
+/// con lo que se cobra).
+class Money {
+  const Money();
+
+  static final _whole = NumberFormat.currency(
+    locale: 'es_AR',
+    symbol: '\$',
+    decimalDigits: 0,
+    customPattern: '¤#,##0',
+  );
+  static final _cents = NumberFormat.currency(
+    locale: 'es_AR',
+    symbol: '\$',
+    decimalDigits: 2,
+    customPattern: '¤#,##0.00',
+  );
+
+  String format(num value) => (value % 1 == 0 ? _whole : _cents).format(value);
+}
+
+const money = Money();
 
 String dateTimeLabel(DateTime d) =>
     DateFormat('dd/MM/yyyy · HH:mm', 'es_AR').format(d.toLocal());

@@ -1,6 +1,8 @@
 import 'dart:developer';
 
 import 'package:splg_lib/domain/order.dart';
+import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
@@ -17,15 +19,33 @@ class OrderRepositoryImp implements OrderRepository {
   Future<CreateOrderResult> createOrder(
     Map<String, dynamic> orderData,
     String token,
+    String idempotencyKey,
   ) async {
     try {
-      final (success, data) = await _remoteDatasource.createOrder(
+      final result = await _remoteDatasource.createOrder(
         orderData,
         token,
+        idempotencyKey,
       );
-      if (!success || data == null) {
-        return const CreateOrderResult(success: false);
+      if (!result.ok) {
+        final conflict =
+            result.status == 422 && result.message == kIdempotencyConflictText;
+        return CreateOrderResult(
+          success: false,
+          message: conflict ? kOrderMaybeCreatedText : result.message,
+          // Se reintenta con la misma clave si la primera llamada pudo haber
+          // llegado: sin respuesta, 5xx, 429, el 409 técnico "en curso" o el
+          // 422 de clave ya usada. Un rechazo de negocio (400, 409 de stock)
+          // no: hay que cambiar el pedido.
+          idempotencyConflict: conflict,
+          retryable: result.keepKey ||
+              ApiErrorText.isRetryable(result.status) ||
+              (result.status == 409 &&
+                  result.message == ApiErrorText.inProgress),
+        );
       }
+      final data = result.data;
+      if (data == null) return const CreateOrderResult(success: false);
 
       // Fallback for APIs that do not return the full created order payload.
       final order = OrderApiMapper.parseOrder(data) ??
@@ -38,7 +58,7 @@ class OrderRepositoryImp implements OrderRepository {
         paymentUrl: paymentUrl,
       );
     } catch (e) {
-      log('e in createOrder repository: ${e.toString()}');
+      log('e in createOrder repository: ${e.runtimeType}');
     }
 
     return const CreateOrderResult(success: false);

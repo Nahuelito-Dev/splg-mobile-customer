@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'checkout_viewmodel.dart';
 
@@ -55,19 +54,20 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                                 Expanded(
                                   child: Text(itemLabel(item), style: white),
                                 ),
-                                if (Pricing.applied(
-                                        item.cylinder, item.quantity) !=
-                                    null)
+                                if (_promo(model, item) != null)
                                   Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: Text(
-                                      Pricing.badge(Pricing.applied(
-                                          item.cylinder, item.quantity)!),
+                                      _promo(model, item)!,
                                       style: type.caption.copyWith(
                                           color: context.brasa.accent),
                                     ),
                                   ),
-                                Text(money.format(model.getSubtotal(item)),
+                                Text(
+                                    model.quoteLineFor(item) == null
+                                        ? '—'
+                                        : money.format(
+                                            model.quoteLineFor(item)!.subtotal),
                                     style: type.value
                                         .copyWith(color: Colors.white)),
                               ],
@@ -86,23 +86,61 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                                 Text('Total',
                                     style: type.caption
                                         .copyWith(color: Colors.white70)),
-                                Text(money.format(model.finalTotal),
+                                Text(
+                                    model.quote == null
+                                        ? '—'
+                                        : money.format(model.quote!.total),
                                     key: const Key('checkout-total'),
                                     style: type.amount
                                         .copyWith(color: Colors.white)),
                               ],
                             ),
-                            if (model.transferSurcharge > 0)
-                              Flexible(
-                                child: Text(
-                                    'Incluye recargo de ${money.format(model.transferSurcharge)}',
-                                    textAlign: TextAlign.right,
-                                    style: type.caption
-                                        .copyWith(color: Colors.white70)),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (model.quoting)
+                                    Text('Calculando…',
+                                        key: const Key('checkout-quoting'),
+                                        style: type.caption
+                                            .copyWith(color: Colors.white70)),
+                                  if ((model.quote?.zoneSurcharge ?? 0) > 0)
+                                    Text(
+                                        'Recargo por zona ${money.format(model.quote!.zoneSurcharge)}',
+                                        key: const Key(
+                                            'checkout-zone-surcharge'),
+                                        textAlign: TextAlign.right,
+                                        style: type.caption
+                                            .copyWith(color: Colors.white70)),
+                                  if ((model.quote?.paymentSurcharge ?? 0) > 0)
+                                    Text(
+                                        'Recargo por medio de pago ${money.format(model.quote!.paymentSurcharge)}',
+                                        key: const Key(
+                                            'checkout-payment-surcharge'),
+                                        textAlign: TextAlign.right,
+                                        style: type.caption
+                                            .copyWith(color: Colors.white70)),
+                                ],
                               ),
+                            ),
                           ],
                         ),
                       ),
+                      if (model.quoteError != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                          child: GestureDetector(
+                            key: const Key('checkout-quote-error'),
+                            onTap:
+                                model.canRetryQuote ? model.retryQuote : null,
+                            child: Text(
+                              model.canRetryQuote
+                                  ? '${model.quoteError} Tocá para reintentar.'
+                                  : model.quoteError!,
+                              style: type.caption.copyWith(color: Colors.white),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       divider(),
                       SplgOptionRow(
@@ -119,9 +157,7 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                           SplgRadioRow(
                             key: Key('pay-${m.name}'),
                             onDark: true,
-                            title: m == PaymentMethod.online
-                                ? 'Transferencia (+10%)'
-                                : paymentLabel(m),
+                            title: paymentLabel(m),
                             selected: model.selectedPaymentMethod == m,
                             onTap: () => model.setPaymentMethod(m),
                           ),
@@ -234,4 +270,14 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
     viewModel.initialize();
     super.onViewModelReady(viewModel);
   }
+}
+
+/// Insignia de la promoción por volumen que aplicó el back: el precio unitario
+/// de la cotización contra el de lista de la garrafa.
+String? _promo(CheckoutViewModel model, OrderItem item) {
+  final line = model.quoteLineFor(item);
+  final list = item.cylinder.price;
+  if (line == null || list <= 0 || line.unitPrice >= list) return null;
+  final pct = (1 - line.unitPrice / list) * 100;
+  return '−${pct.toStringAsFixed(0)}% x${item.quantity}';
 }

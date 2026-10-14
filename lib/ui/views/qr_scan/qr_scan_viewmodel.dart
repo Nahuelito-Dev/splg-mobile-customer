@@ -96,20 +96,20 @@ class QrScanViewModel extends BaseViewModel {
     final token = await _customerService.token;
     if (token == null) {
       await _dialogService.showDialog(
-        title: 'Sesion expirada',
-        description: 'Volve a iniciar sesion para confirmar la entrega.',
+        title: 'Tu sesión venció',
+        description: 'Volvé a iniciar sesión para confirmar la entrega.',
       );
       _navigationService.back(result: false);
       return;
     }
 
-    final result = await _trackingService.confirmDelivery(
+    final outcome = await _trackingService.confirmDelivery(
       orderId,
       code,
       token,
     );
 
-    if (result == ConfirmDeliveryResult.success) {
+    if (outcome.isSuccess) {
       await _dialogService.showDialog(
         title: '¡Entrega confirmada!',
         description: 'Gracias por tu compra.',
@@ -118,18 +118,21 @@ class QrScanViewModel extends BaseViewModel {
       return;
     }
 
+    // El 401 ya lo atiende `SessionService.expire` (avisa y lleva al login):
+    // acá no se muestra otro diálogo ni se vuelve atrás.
+    if (outcome.result == ConfirmDeliveryResult.sessionExpired) return;
+
     await _dialogService.showDialog(
-      title: result == ConfirmDeliveryResult.invalidCode
-          ? 'Codigo invalido'
+      title: outcome.result == ConfirmDeliveryResult.invalidCode
+          ? 'Código inválido'
           : 'No se pudo confirmar',
-      description: result == ConfirmDeliveryResult.invalidCode
-          ? 'El codigo escaneado no es valido o el pedido no esta en camino.'
-          : 'Revisa tu conexion e intenta nuevamente.',
+      description:
+          outcome.message ?? 'No pudimos confirmar la entrega. Probá de nuevo.',
     );
 
     _isProcessing = false;
     rebuildUi();
-    await controller.start();
+    await _startCamera();
   }
 
   /// "Reintentar": si el permiso no está, lo vuelve a pedir; si está, reabre

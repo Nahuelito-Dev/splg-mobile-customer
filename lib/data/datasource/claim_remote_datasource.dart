@@ -12,13 +12,21 @@ class ClaimRemoteDatasource {
 
   /// Crea un reclamo (`POST /claims`). Body:
   /// `{ orderId, customerId, reason, description }` (sin `photoUrl`: la foto se
-  /// sube aparte). Devuelve el `claimId`.
+  /// sube aparte). Devuelve el `claimId`. Idempotente por `Idempotency-Key`:
+  /// [idempotencyKey] llega de afuera para que el reintento de un mismo
+  /// reclamo lleve la misma clave y no lo cree dos veces.
   Future<ApiResult<String?>> createClaim(
     Map<String, dynamic> body,
     String token,
+    String idempotencyKey,
   ) async {
     try {
-      final response = await _apiClient.post('claims', body, token);
+      final response = await _apiClient.post(
+        'claims',
+        body,
+        token,
+        {'Idempotency-Key': idempotencyKey},
+      );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return ApiResult.ok(claimIdFrom(response.data));
       }

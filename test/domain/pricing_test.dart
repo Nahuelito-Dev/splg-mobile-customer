@@ -21,13 +21,9 @@ void main() {
     expect(Pricing.applied(c, 9)!.percentage, 30);
   });
 
-  test('subtotal y total', () {
-    final items = [
-      OrderItem(cylinder: c, quantity: 4),
-      OrderItem(cylinder: cylinder(id: 'x', price: 500), quantity: 1),
-    ];
-    expect(Pricing.subtotal(items.first), closeTo(3200, 0.001));
-    expect(Pricing.total(items), closeTo(3700, 0.001));
+  test('subtotal de un renglón', () {
+    expect(Pricing.subtotal(OrderItem(cylinder: c, quantity: 4)),
+        closeTo(3200, 0.001));
   });
 
   test('las promociones se muestran de menor a mayor', () {

@@ -40,12 +40,20 @@ class LoadScaffold extends StatelessWidget {
             ? 'Sin conexión'
             : 'No pudimos cargar',
         message: model.loadError!,
-        action: SplgButton(
-          title: 'Reintentar',
-          style: SplgButtonStyle.outlined,
-          expand: false,
-          onPressed: model.load,
-        ),
+        action: model.canRetry
+            ? SplgButton(
+                title: 'Reintentar',
+                style: SplgButtonStyle.outlined,
+                expand: false,
+                onPressed: model.load,
+              )
+            : SplgButton(
+                key: const Key('load-back'),
+                title: 'Volver',
+                style: SplgButtonStyle.outlined,
+                expand: false,
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
       );
     } else {
       body = builder(context);

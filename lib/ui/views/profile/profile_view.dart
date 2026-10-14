@@ -5,6 +5,7 @@ import 'package:stacked/stacked.dart';
 import 'package:splg_customer/ui/widgets/photo_source_sheet.dart';
 import 'package:splg_customer/ui/widgets/app_header.dart';
 import 'profile_viewmodel.dart';
+import 'package:splg_customer/ui/common/app_icons.dart';
 
 class ProfileView extends StackedView<ProfileViewModel> {
   const ProfileView({super.key});
@@ -117,7 +118,7 @@ class _PhotoActions extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.photo_camera_outlined, size: 18),
+                  : const Icon(AppIcons.camera, size: 18),
               label: Text(model.hasPhoto ? 'Cambiar foto' : 'Agregar foto'),
             ),
             if (model.hasPhoto)

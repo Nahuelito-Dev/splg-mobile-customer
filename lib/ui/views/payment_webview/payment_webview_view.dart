@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -19,12 +20,9 @@ class PaymentWebViewView extends StackedView<PaymentWebViewModel> {
     Widget? child,
   ) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pago con Mercado Pago'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: viewModel.cancel,
-        ),
+      appBar: SplgHeader(
+        title: 'Pago con Mercado Pago',
+        onBack: viewModel.cancel,
       ),
       body: SafeArea(
         child: Stack(

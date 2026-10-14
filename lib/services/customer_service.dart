@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +14,7 @@ import 'package:splg_customer/domain/usecases/create_customer_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_usecases.dart';
 
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/domain/address_draft.dart';
 import 'package:splg_customer/services/address_geocoder.dart';
 import 'package:splg_lib/domain/address.dart';
@@ -90,6 +92,9 @@ class CustomerService with ListenableServiceMixin {
     _customerRepository = CustomerRepositoryImp(_customerDatasource);
     listenToReactiveValues([_addressesRev]);
   }
+
+  /// Claves de idempotencia del alta de direcciones, por dirección.
+  final _addressKeys = IdempotencyKeys();
 
   /// Cambia cada vez que se reemplaza la lista de direcciones: quien depende de
   /// ella (el inicio) se entera sin tener que preguntar.
@@ -231,6 +236,7 @@ class CustomerService with ListenableServiceMixin {
   /// Olvida al usuario actual (cierre de sesión o baja de cuenta).
   void reset() {
     _session++;
+    _addressKeys.clear();
     _customer = _anonymous;
     _addressesRev.value++;
   }
@@ -360,7 +366,7 @@ class CustomerService with ListenableServiceMixin {
     };
 
     final datasource = _addresses;
-    final ApiResult<void> result;
+    ApiResult<void> result;
     var knownIds = <String>{};
     if (editing == null) {
       // "Primera dirección" se decide con lo que tiene el back, no con la lista
@@ -379,11 +385,22 @@ class CustomerService with ListenableServiceMixin {
       } catch (e) {
         return ApiResult.fromError(e);
       }
+      // La clave es de la dirección (sin `isDefault`, que cambia si la primera
+      // llamada llegó): un reintento tras red caída o 5xx no la crea dos veces.
+      final intention = jsonEncode({...body, 'user_id': _customer.customerId});
       result = await datasource.create({
         ...body,
         'user_id': _customer.customerId,
         'isDefault': isFirst,
-      }, token);
+      }, token, _addressKeys.keyFor(intention));
+      // Un 422 de idempotencia significa que el primer envío llegó (el back
+      // sólo guarda respuestas 2xx): la dirección existe. No se reenvía con
+      // otra clave (se duplicaría) ni se conserva la actual (devolvería esa
+      // respuesta guardada aunque la dirección se borre): se relee la lista.
+      final landed = result.status == 422 && result.keepKey;
+      _addressKeys.settle(intention,
+          keep: !result.ok && result.keepKey && !landed);
+      if (landed) result = const ApiResult.ok();
     } else {
       result = await datasource.update(editing.addressId, body, token);
     }

@@ -10,16 +10,21 @@ import 'package:dio/dio.dart';
 abstract class LoadViewModel extends BaseViewModel {
   String? loadError;
 
+  /// "Reintentar" tiene sentido; false cuando lo pedido ya no existe.
+  bool canRetry = true;
+
   /// Trae los datos; si lanza, la pantalla muestra el error y "Reintentar".
   Future<void> fetch();
 
   Future<void> load() async {
     loadError = null;
+    canRetry = true;
     setBusy(true);
     try {
       await fetch();
     } catch (e) {
       loadError = errorText(e);
+      canRetry = !(e is LoadFailure && !e.retryable);
     }
     setBusy(false);
   }

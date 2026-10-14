@@ -8,11 +8,12 @@ import 'package:stacked_services/stacked_services.dart';
 
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/domain/address.dart';
-import 'package:splg_lib/domain/discount.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
-import 'package:splg_customer/domain/pricing.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
+import 'package:splg_customer/domain/order_quote.dart';
+import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
@@ -66,12 +67,16 @@ class CheckoutViewModel extends ReactiveViewModel {
     setBusy(false);
     // Trae las franjas de la fecha por defecto (hoy) para que el cliente elija.
     loadTimeSlots();
+    scheduleQuote();
   }
 
   void setPaymentMethod(PaymentMethod method) {
+    // Mientras confirma, el pedido que sale es el que se cotizó.
+    if (isBusy) return;
     _selectedPaymentMethod = method;
     paymentOpen = false;
     rebuildUi();
+    scheduleQuote();
   }
 
   /// Desplegables de la confirmación.
@@ -92,6 +97,7 @@ class CheckoutViewModel extends ReactiveViewModel {
   String? get selectedSlotLabel => _selectedSlot?.label;
 
   Future<void> showAddressList() async {
+    if (isBusy) return;
     if (_customerService.customer.addresses.isEmpty) {
       await _addAddress();
       return;
@@ -137,7 +143,79 @@ class CheckoutViewModel extends ReactiveViewModel {
     final newOrder = _cartService.order?.copyWith(address: address);
     if (newOrder != null) {
       _cartService.setOrder(newOrder);
+      scheduleQuote();
     }
+  }
+
+  // ─── Cotización (el precio lo calcula el back) ───
+  // Promociones por volumen, recargo de zona y por medio de pago salen de
+  // `POST /orders/quote`; la app muestra lo que devuelve. Se pide con debounce
+  // cada vez que cambia algo que mueve el precio (dirección, medio de pago,
+  // franja) y una respuesta que llega vieja no pisa a la última.
+
+  /// Espera entre el último cambio y el pedido de cotización.
+  @visibleForTesting
+  static Duration quoteDebounce = const Duration(milliseconds: 400);
+
+  OrderQuote? _quote;
+
+  /// La cotización vigente, o null mientras se pide, si falló o si falta la
+  /// dirección.
+  OrderQuote? get quote => _quote;
+
+  bool _quoting = false;
+  bool get quoting => _quoting;
+
+  String? _quoteError;
+  bool _quoteRetryable = false;
+
+  /// Por qué no hay total, con el texto listo para mostrar.
+  String? get quoteError => _quoteError;
+
+  /// Hay un error que pedir de nuevo puede arreglar (red, 429, 5xx).
+  bool get canRetryQuote => _quoteError != null && _quoteRetryable;
+
+  Timer? _quoteTimer;
+  int _quoteVersion = 0;
+  bool _disposed = false;
+
+  void scheduleQuote({bool immediate = false}) {
+    _quoteTimer?.cancel();
+    final version = ++_quoteVersion;
+    _quote = null;
+    _quoteError = null;
+    final current = order;
+    if (current == null || current.items.isEmpty || current.address == null) {
+      _quoting = false;
+      if (!_disposed) notifyListeners();
+      return;
+    }
+    _quoting = true;
+    if (!_disposed) notifyListeners();
+    _quoteTimer = Timer(
+      immediate ? Duration.zero : quoteDebounce,
+      () => _runQuote(version),
+    );
+  }
+
+  void retryQuote() => scheduleQuote(immediate: true);
+
+  Future<void> _runQuote(int version) async {
+    final current = order;
+    if (current == null) return;
+    final outcome = await _historyService.quoteOrder(
+      current.copyWith(
+        requestedDeliveryDate: _selectedDate,
+        paymentMethod: _selectedPaymentMethod,
+      ),
+      timeSlotId: _selectedTimeSlotId,
+    );
+    if (_disposed || version != _quoteVersion) return;
+    _quoting = false;
+    _quote = outcome.quote;
+    _quoteError = outcome.ok ? null : outcome.message;
+    _quoteRetryable = outcome.retryable;
+    notifyListeners();
   }
 
   // ─── Franjas horarias (agendamiento) ───
@@ -164,15 +242,20 @@ class CheckoutViewModel extends ReactiveViewModel {
     final stillValid = _timeSlots.any(
       (slot) => slot.timeSlotId == _selectedTimeSlotId && !slot.isFull,
     );
-    if (!stillValid) _selectedTimeSlotId = null;
+    if (!stillValid && _selectedTimeSlotId != null) {
+      _selectedTimeSlotId = null;
+      scheduleQuote();
+    }
 
     _loadingTimeSlots = false;
     notifyListeners();
   }
 
   void selectTimeSlot(String timeSlotId) {
+    if (isBusy) return;
     _selectedTimeSlotId = timeSlotId;
     notifyListeners();
+    scheduleQuote();
   }
 
   TimeSlotAvailability? get _selectedSlot {
@@ -182,30 +265,16 @@ class CheckoutViewModel extends ReactiveViewModel {
     return null;
   }
 
-  double getSubtotal(OrderItem item) => Pricing.subtotal(item);
-
-  Discount? getAppliedDiscount(OrderItem item) =>
-      Pricing.applied(item.cylinder, item.quantity);
-
-  double get itemsTotal {
-    if (order == null) return 0;
-    return order!.items.fold(0, (sum, item) => sum + getSubtotal(item));
-  }
-
-  double get transferSurcharge {
-    if (_selectedPaymentMethod == PaymentMethod.online) {
-      return itemsTotal * 0.10;
-    }
-    return 0;
-  }
-
-  double get finalTotal => itemsTotal + transferSurcharge;
+  /// Lo que cobra el back por esta garrafa (con la promoción por volumen), o
+  /// null mientras no hay cotización.
+  QuoteLine? quoteLineFor(OrderItem item) => _quote?.lineFor(item.cylinder.id);
 
   bool get canConfirmOrder {
     return order != null &&
         order!.items.isNotEmpty &&
         addressController.text.isNotEmpty &&
-        _selectedTimeSlotId != null;
+        _selectedTimeSlotId != null &&
+        _quote != null;
   }
 
   /// Reloj del checkout; los tests lo fijan para que el golden no dependa del día.
@@ -219,6 +288,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       DateFormat('dd/MM/yyyy', 'es_AR').format(_selectedDate);
 
   Future<void> selectDate(BuildContext context) async {
+    if (isBusy) return;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
@@ -231,6 +301,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       notifyListeners();
       // La disponibilidad de franjas depende del día → recargar.
       await loadTimeSlots();
+      scheduleQuote();
     }
   }
 
@@ -276,7 +347,19 @@ class CheckoutViewModel extends ReactiveViewModel {
       return;
     }
 
+    // Sin la cotización que se le mostró al cliente no se confirma.
+    final quoted = _quote;
+    if (quoted == null) return;
+    final version = _quoteVersion;
+
     setBusy(true);
+
+    // Lo que se confirma es lo que se cotizó: se toma ahora, antes de esperar.
+    final paymentMethod = _selectedPaymentMethod;
+    final selectedDate = _selectedDate;
+    final timeSlotId = _selectedTimeSlotId;
+    final slot = _selectedSlot;
+    final notes = deliveryDetailsController.text;
 
     // La dirección tiene que seguir vigente: pudo borrarse desde otra pantalla.
     if (!await _addressStillValid()) {
@@ -284,16 +367,24 @@ class CheckoutViewModel extends ReactiveViewModel {
       return;
     }
 
+    // Si mientras tanto cambió algo que mueve el precio (la dirección se
+    // corrigió), la cotización mostrada ya no vale: se corta y se vuelve a pedir.
+    if (_disposed) return;
+    if (version != _quoteVersion || !identical(_quote, quoted)) {
+      setBusy(false);
+      scheduleQuote(immediate: true);
+      return;
+    }
+
     // Update order with new fields. La franja seleccionada aporta la ventana
     // horaria para mostrar; su id se manda aparte al backend (timeSlotId).
-    final slot = _selectedSlot;
     final updatedOrder = order!.copyWith(
-      requestedDeliveryDate: _selectedDate,
+      requestedDeliveryDate: selectedDate,
       deliveryWindowStart: slot?.startTime,
       deliveryWindowEnd: slot?.endTime,
-      paymentMethod: _selectedPaymentMethod,
-      customerNotes: deliveryDetailsController.text,
-      total: finalTotal,
+      paymentMethod: paymentMethod,
+      customerNotes: notes,
+      total: quoted.total,
     );
 
     _cartService.setOrder(updatedOrder);
@@ -305,7 +396,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       final success = await _historyService.updateOrder(
         editingOrderId,
         updatedOrder,
-        timeSlotId: _selectedTimeSlotId,
+        timeSlotId: timeSlotId,
       );
 
       if (success) {
@@ -326,14 +417,28 @@ class CheckoutViewModel extends ReactiveViewModel {
 
     final result = await _historyService.createOrder(
       updatedOrder,
-      timeSlotId: _selectedTimeSlotId,
+      timeSlotId: timeSlotId,
     );
 
     if (result.success) {
       _cartService.clearEditingOrder();
       _cartService.clearOrder();
 
-      if (_selectedPaymentMethod == PaymentMethod.mercadoPago) {
+      // El total viaja calculado por el back en el alta (no se manda desde la
+      // app): si difiere del que se mostró, se avisa con el real antes de
+      // seguir al pago.
+      final charged = result.order?.total;
+      if (charged != null && (charged - quoted.total).abs() > 0.009) {
+        await _dialogService.showDialog(
+          title: 'El total cambió',
+          description:
+              'El total final de tu pedido es ${money.format(charged)} '
+              '(te habíamos mostrado ${money.format(quoted.total)}).',
+          buttonTitle: 'Aceptar',
+        );
+      }
+
+      if (paymentMethod == PaymentMethod.mercadoPago) {
         await _openMercadoPagoCheckout(result.paymentUrl);
       }
 
@@ -344,10 +449,18 @@ class CheckoutViewModel extends ReactiveViewModel {
       await _navigationService.replaceWithOrderTrackingView(
         orderId: trackedOrderId,
       );
+    } else if (result.idempotencyConflict) {
+      // El primer envío llegó con otros datos: no se manda otro pedido.
+      await _dialogService.showDialog(
+        title: 'Revisá Mis pedidos',
+        description: result.message ?? kOrderMaybeCreatedText,
+        buttonTitle: 'Aceptar',
+      );
+      await _navigationService.navigateToOrdersView();
     } else {
       await _dialogService.showDialog(
-        title: 'Error al crear pedido',
-        description:
+        title: 'No pudimos crear tu pedido',
+        description: result.message ??
             'No se pudo crear la orden. Verificá tu conexión e intentá nuevamente.',
       );
     }
@@ -417,6 +530,8 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   @override
   void dispose() {
+    _disposed = true;
+    _quoteTimer?.cancel();
     deliveryDetailsController.dispose();
     super.dispose();
   }

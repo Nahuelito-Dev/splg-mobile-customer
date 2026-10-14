@@ -9,8 +9,9 @@ class Pricing {
   Pricing._();
 
   /// Promociones ordenadas de menor a mayor cantidad.
-  static List<Discount> sortedDiscounts(GasCylinder cylinder) =>
-      [...?cylinder.discounts]..sort((a, b) => a.quantity.compareTo(b.quantity));
+  static List<Discount> sortedDiscounts(GasCylinder cylinder) => [
+        ...?cylinder.discounts
+      ]..sort((a, b) => a.quantity.compareTo(b.quantity));
 
   static Discount? applied(GasCylinder cylinder, int quantity) {
     Discount? best;
@@ -25,9 +26,6 @@ class Pricing {
     final d = applied(item.cylinder, item.quantity);
     return d == null ? base : base * (1 - d.percentage / 100);
   }
-
-  static double total(Iterable<OrderItem> items) =>
-      items.fold(0.0, (sum, i) => sum + subtotal(i));
 
   /// "−12% x4" para las insignias del catálogo.
   static String badge(Discount d) =>

@@ -278,6 +278,12 @@ void main() {
       address: addr('a1', 'Buenos Aires 4114'),
     ));
     locator.registerSingleton<CartService>(cart);
+    CheckoutViewModel.quoteDebounce = Duration.zero;
+    addTearDown(() =>
+        CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
+    final history = locator<HistoryService>() as MockHistoryService;
+    when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+        .thenAnswer((_) async => backQuote(unit: 14155));
     final slots = locator<TimeSlotService>() as MockTimeSlotService;
     when(slots.availabilityFor(any)).thenAnswer((_) async => const [
           TimeSlotAvailability(

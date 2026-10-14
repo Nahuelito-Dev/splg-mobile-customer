@@ -4,9 +4,12 @@ import 'package:splg_customer/domain/cancel_result.dart';
 import 'package:splg_customer/domain/orders_page.dart';
 
 abstract interface class OrderRepository {
+  /// [idempotencyKey] identifica la intención de crear el pedido: se reusa en
+  /// los reintentos para que el back no lo cree dos veces.
   Future<CreateOrderResult> createOrder(
     Map<String, dynamic> orderData,
     String token,
+    String idempotencyKey,
   );
 
   Future<Order?> updateOrder(

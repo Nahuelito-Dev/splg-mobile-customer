@@ -13,7 +13,6 @@ import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
-import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
@@ -379,12 +378,15 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     ));
   }
 
-  double get total => Pricing.total(_cartService.order?.items ?? const []);
-
   int get itemCount => (_cartService.order?.items ?? const <OrderItem>[])
       .fold(0, (n, i) => n + i.quantity);
 
-  bool get canPlaceOrder => total > 0;
+  /// Texto del botón que sigue al carrito. No lleva precio: el total (con
+  /// promociones, zona y medio de pago) lo cotiza el back en la confirmación.
+  String get continueLabel =>
+      'Continuar · $itemCount ${itemCount == 1 ? 'garrafa' : 'garrafas'}';
+
+  bool get canPlaceOrder => itemCount > 0;
 
   void placeOrder() {
     if (!canPlaceOrder) return;

@@ -45,15 +45,16 @@ void main() {
     model.addItem(c, 1);
     model.addItem(c, 1);
     expect(model.getItemQuantity(c.id), 2);
-    expect(model.total, 2000);
+    expect(model.itemCount, 2);
+    expect(model.continueLabel, 'Continuar · 2 garrafas');
     model.addItem(c, -1);
-    expect(model.total, 1000);
+    expect(model.continueLabel, 'Continuar · 1 garrafa');
     model.addItem(c, -1);
     expect(model.getItemQuantity(c.id), 0);
     expect(model.canPlaceOrder, isFalse);
   });
 
-  test('la promoción aplica aunque el back mande la lista desordenada', () {
+  test('el botón no lleva precio: lo cotiza el back en la confirmación', () {
     final c = cylinder(price: 1000, discounts: [
       Discount(quantity: 4, percentage: 20),
       Discount(quantity: 2, percentage: 10),
@@ -62,11 +63,8 @@ void main() {
     for (var i = 0; i < 2; i++) {
       model.addItem(c, 1);
     }
-    expect(model.total, closeTo(1800, 0.001)); // 2 x 1000 con -10 %
-    for (var i = 0; i < 2; i++) {
-      model.addItem(c, 1);
-    }
-    expect(model.total, closeTo(3200, 0.001)); // 4 x 1000 con -20 %
+    expect(model.continueLabel, 'Continuar · 2 garrafas');
+    expect(model.continueLabel, isNot(contains('\$')));
   });
 
   test('la dirección de entrega es la predeterminada, o la primera', () {
@@ -136,7 +134,6 @@ void main() {
     final model = HomeViewModel()
       ..addItem(a, 1)
       ..addItem(b, 2);
-    expect(model.total, 2000);
     expect(model.itemCount, 3);
     expect(
         locator<CartService>().order!.items.map((OrderItem i) => i.cylinder.id),

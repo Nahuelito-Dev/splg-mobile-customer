@@ -15,6 +15,7 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import '../helpers/fixtures.dart';
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
 
@@ -35,6 +36,18 @@ GasCylinder _cyl() => GasCylinder(
     price: 1000,
     active: true,
     description: '');
+
+/// Abre el checkout y espera la cotización del back (sin ella no se confirma).
+Future<CheckoutViewModel> _ready(MockHistoryService history) async {
+  CheckoutViewModel.quoteDebounce = Duration.zero;
+  addTearDown(() =>
+      CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
+  when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+      .thenAnswer((_) async => backQuote(unit: 1000, qty: 1));
+  final model = CheckoutViewModel()..initialize();
+  await Future<void>.delayed(const Duration(milliseconds: 20));
+  return model;
+}
 
 Address _addr(String id, String street, {bool primary = false}) =>
     Address(addressId: id, streetName: street, primary: primary);
@@ -193,7 +206,7 @@ void main() {
           .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
       final history = locator<HistoryService>() as MockHistoryService;
 
-      final model = CheckoutViewModel()..initialize();
+      final model = await _ready(history);
       await model.confirmOrder();
 
       verifyNever(history.createOrder(any, timeSlotId: anyNamed('timeSlotId')));
@@ -206,7 +219,7 @@ void main() {
 
     test('tras crear el pedido abre el seguimiento del recién creado',
         () async {
-      final order = withItems(_addr('a', 'Calle 1'));
+      final order = withItems(_addr('a', 'Calle 1', primary: true));
       when(cart.order).thenReturn(order);
       when(customers.isUserLoggedIn).thenReturn(true);
       when(customers.customer)
@@ -220,7 +233,7 @@ void main() {
               success: true, order: _orderWithout(null).copyWith(id: 'nuevo')));
       final nav = locator<NavigationService>() as MockNavigationService;
 
-      final model = CheckoutViewModel()..initialize();
+      final model = await _ready(history);
       await model.confirmOrder();
 
       verify(nav.replaceWith<dynamic>(
@@ -233,6 +246,30 @@ void main() {
         preventDuplicates: anyNamed('preventDuplicates'),
         parameters: anyNamed('parameters'),
         transition: anyNamed('transition'),
+      )).called(1);
+    });
+
+    test('si el back rechaza el pedido, muestra su mensaje (no el de conexión)',
+        () async {
+      final order = withItems(_addr('a', 'Calle 1', primary: true));
+      when(cart.order).thenReturn(order);
+      when(customers.isUserLoggedIn).thenReturn(true);
+      when(customers.customer)
+          .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.createOrder(any, timeSlotId: anyNamed('timeSlotId')))
+          .thenAnswer((_) async => const CreateOrderResult(
+                success: false,
+                message: 'La dirección está fuera de la zona de cobertura',
+                retryable: false,
+              ));
+
+      final model = await _ready(history);
+      await model.confirmOrder();
+
+      verify(locator<DialogService>().showDialog(
+        title: 'No pudimos crear tu pedido',
+        description: 'La dirección está fuera de la zona de cobertura',
       )).called(1);
     });
   });

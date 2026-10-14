@@ -32,16 +32,24 @@ class OrderDetailViewModel extends LoadViewModel {
     try {
       order = await _history.fetchOrder(orderId);
     } catch (e) {
-      // Con el pedido de la lista a mano se muestra eso; sin él, el error.
-      if (order == null) rethrow;
+      // Con el pedido de la lista a mano se muestra eso; sin él, el error. Un
+      // pedido que ya no existe no se muestra con datos viejos.
+      if (order == null || _isGone(e)) rethrow;
     }
   }
+
+  static bool _isGone(Object e) => e is LoadFailure && !e.retryable;
 
   Future<void> _reload() async {
     try {
       order = await _history.fetchOrder(orderId);
-    } catch (_) {
-      // Se queda con lo que ya tenía.
+    } catch (e) {
+      if (_isGone(e)) {
+        order = null;
+        loadError = LoadViewModel.errorText(e);
+        canRetry = false;
+      }
+      // Cualquier otra falla: se queda con lo que ya tenía.
     }
     notifyListeners();
   }

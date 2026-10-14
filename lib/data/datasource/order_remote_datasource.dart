@@ -2,27 +2,59 @@ import 'dart:developer';
 
 import 'package:dio/dio.dart';
 import 'package:splg_customer/core/network/api_client.dart';
+import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
 
 class OrderRemoteDatasource {
   final _apiClient = ApiClient();
 
-  Future<(bool, dynamic)> createOrder(
+  /// `POST /orders`, idempotente por `Idempotency-Key`: [idempotencyKey]
+  /// llega de afuera para que los reintentos de una misma intención lleven la
+  /// misma clave. Un error vuelve como `ApiResult.fail` con el texto listo.
+  Future<ApiResult<dynamic>> createOrder(
+    Map<String, dynamic> orderData,
+    String token,
+    String idempotencyKey,
+  ) async {
+    try {
+      final response = await _apiClient.post(
+        'orders',
+        orderData,
+        token,
+        {'Idempotency-Key': idempotencyKey},
+      );
+      final status = response.statusCode;
+      if (status == 201 || status == 200) {
+        return ApiResult.ok(response.data);
+      }
+      return ApiResult.fromError(DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+      ));
+    } catch (e) {
+      log('e in createOrder: ${e is DioException ? e.type : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
+  /// `POST /orders/quote`: el total que cobraría el alta con este mismo cuerpo
+  /// (no escribe nada). Un error vuelve como `ApiResult.fail` con el texto
+  /// listo (400 de negocio: sin stock, fuera de cobertura).
+  Future<ApiResult<dynamic>> quoteOrder(
     Map<String, dynamic> orderData,
     String token,
   ) async {
     try {
-      final response = await _apiClient.post('orders', orderData, token);
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return (true, response.data);
-      }
+      final response = await _apiClient.post('orders/quote', orderData, token);
+      return ApiResult.ok(response.data);
     } catch (e) {
-      log('e in createOrder: ${e.toString()}');
+      log('e in quoteOrder: ${e is DioException ? e.type : e.runtimeType}');
+      return ApiResult.fromError(e);
     }
-
-    return (false, null);
   }
 
+  /// `PATCH /orders/:id`. El back no tiene `PUT` para pedidos, y hoy el `PATCH`
+  /// sólo lo permite a admin y super admin: con un cliente responde 403.
   Future<(bool, dynamic)> updateOrder(
     String orderId,
     Map<String, dynamic> orderData,
@@ -38,20 +70,7 @@ class OrderRemoteDatasource {
         return (true, response.data);
       }
     } catch (e) {
-      log('e in updateOrder (patch): ${e.toString()}');
-    }
-
-    try {
-      final response = await _apiClient.put(
-        'orders/$orderId',
-        orderData,
-        token,
-      );
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        return (true, response.data);
-      }
-    } catch (e) {
-      log('e in updateOrder (put): ${e.toString()}');
+      log('e in updateOrder: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
     }
 
     return (false, null);

@@ -88,5 +88,66 @@ void main() {
 
       expect(repo.keys, ['key-1', 'key-2']);
     });
+
+    test('reintentar con el mismo motivo reusa la clave', () async {
+      final repo = _FakeRepository([
+        const CancelResult.failed(),
+        const CancelResult.ok(),
+      ]);
+      final useCase = CancelOrderUseCase(repo, newKey: newKey);
+
+      await useCase('o1', 'tok', reason: 'Me equivoqué');
+      await useCase('o1', 'tok', reason: ' Me equivoqué ');
+
+      expect(repo.keys, ['key-1', 'key-1']);
+    });
+
+    test('otro motivo tras un error de red es otra intención: otra clave',
+        () async {
+      final repo = _FakeRepository([
+        const CancelResult.failed(),
+        const CancelResult.ok(),
+      ]);
+      final useCase = CancelOrderUseCase(repo, newKey: newKey);
+
+      await useCase('o1', 'tok', reason: 'Me equivoqué');
+      await useCase('o1', 'tok', reason: 'Ya no lo necesito');
+
+      expect(repo.keys, ['key-1', 'key-2']);
+    });
+
+    test('el 422 por clave reutilizada se explica y conserva la clave',
+        () async {
+      final result = CancelResult.fromResponse(422, {
+        'message':
+            'Esa clave de idempotencia ya se usó con otros datos. Revisá si la operación anterior se registró antes de reintentar.',
+      });
+
+      expect(result.success, isFalse);
+      expect(result.retryable, isTrue);
+      expect(result.failureDescription, contains('otro motivo'));
+
+      // La primera cancelación llegó: una clave nueva podría procesarla dos
+      // veces.
+      final repo = _FakeRepository([result, const CancelResult.ok()]);
+      final useCase = CancelOrderUseCase(repo, newKey: newKey);
+      await useCase('o1', 'tok', reason: 'a');
+      await useCase('o1', 'tok', reason: 'a');
+      expect(repo.keys, ['key-1', 'key-1']);
+    });
+
+    test('un 422 de validación (no de idempotencia) descarta la clave',
+        () async {
+      final result = CancelResult.fromResponse(422, {
+        'message': ['reason must be shorter than 500 characters'],
+      });
+      expect(result.retryable, isFalse);
+
+      final repo = _FakeRepository([result, const CancelResult.ok()]);
+      final useCase = CancelOrderUseCase(repo, newKey: newKey);
+      await useCase('o1', 'tok', reason: 'a');
+      await useCase('o1', 'tok', reason: 'a');
+      expect(repo.keys, ['key-1', 'key-2']);
+    });
   });
 }

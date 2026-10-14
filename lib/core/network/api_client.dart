@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import 'package:splg_customer/core/config/app_config.dart';
@@ -26,6 +27,23 @@ class UnauthorizedInterceptor extends Interceptor {
   }
 }
 
+/// Registro de pedidos para depurar. Sólo en debug (en release no sale nada) y
+/// nunca con las cabeceras: llevan el `Authorization: Bearer ...` del usuario.
+PrettyDioLogger logger({
+  bool debug = kDebugMode,
+  void Function(Object object)? logPrint,
+}) =>
+    PrettyDioLogger(
+      enabled: debug,
+      requestHeader: false,
+      requestBody: debug,
+      responseBody: false,
+      responseHeader: false,
+      error: true,
+      compact: true,
+      logPrint: logPrint ?? print,
+    );
+
 class ApiClient {
   static final instance = ApiClient._();
 
@@ -42,14 +60,7 @@ class ApiClient {
       receiveTimeout: const Duration(seconds: 10),
     ),
   )
-    ..interceptors.add(PrettyDioLogger(
-      requestHeader: true,
-      requestBody: true,
-      responseBody: false,
-      responseHeader: false,
-      error: true,
-      compact: true,
-    ))
+    ..interceptors.add(logger())
     ..interceptors.add(UnauthorizedInterceptor(() => onUnauthorized?.call()));
 
   /// Qué hacer cuando el back responde 401 a un pedido con token (se asigna al

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
 import 'order_tracking_viewmodel.dart';
 import 'widgets/arriving_banner.dart';
-import 'package:splg_lib/theme/brasa_palette.dart';
 
+/// Seguimiento del pedido con la distribución de la referencia de diseño: mapa
+/// a pantalla completa con el estado arriba y, abajo, la hoja con el
+/// repartidor, la llegada estimada y las acciones.
 class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
   const OrderTrackingView({
     super.key,
@@ -14,254 +17,70 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
 
   final String orderId;
 
+  /// Sólo para tests: reemplaza el mapa de Google por un placeholder.
+  @visibleForTesting
+  static Widget Function(BuildContext, OrderTrackingViewModel)? debugMapBuilder;
+
+  /// Sólo para tests: fabrica el ViewModel.
+  @visibleForTesting
+  static OrderTrackingViewModel Function(String)? debugViewModelFactory;
+
   @override
   Widget builder(
     BuildContext context,
     OrderTrackingViewModel viewModel,
     Widget? child,
   ) {
-    final theme = Theme.of(context);
-
-    if (viewModel.isBusy && !viewModel.hasOrderLoaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    if (!viewModel.hasOrderLoaded) {
+      return Scaffold(
+        body: viewModel.isBusy
+            ? const SplgLoader()
+            : _LoadError(model: viewModel),
       );
     }
 
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final sheetHeight = constraints.maxHeight * 0.40;
-
-          return Stack(
-            children: [
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: viewModel.fallbackCenter,
-                  zoom: 14,
-                ),
-                onMapCreated: viewModel.onMapCreated,
-                onCameraMoveStarted: viewModel.onMapMovedByUser,
-                markers: viewModel.markers,
-                polylines: viewModel.polylines,
-                circles: viewModel.circles,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                mapToolbarEnabled: false,
-              ),
-              SafeArea(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: OrderTrackingView.debugMapBuilder?.call(
+                  context,
+                  viewModel,
+                ) ??
+                _TrackingMap(model: viewModel),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: _StatusCard(model: viewModel),
+            ),
+          ),
+          if (viewModel.showArrivingBanner)
+            const SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Row(
-                    children: [
-                      _HeaderIconButton(
-                        icon: Icons.arrow_back,
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: context.brasa.outline,
-                              ),
-                            ),
-                            child: Text(
-                              viewModel.orderTitle,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                      _HeaderIconButton(
-                        icon: Icons.help_outline,
-                        onTap: viewModel.showHelp,
-                      ),
-                    ],
-                  ),
+                  padding: EdgeInsets.only(top: 132),
+                  child: ArrivingBanner(),
                 ),
               ),
-              if (viewModel.showArrivingBanner)
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 76),
-                      child: const ArrivingBanner(),
-                    ),
-                  ),
-                ),
-              Positioned(
-                right: 16,
-                bottom: sheetHeight + 20,
-                child: FloatingActionButton.small(
-                  heroTag: 'recenter_map',
-                  onPressed: viewModel.recenterMap,
-                  backgroundColor: theme.colorScheme.surface,
-                  foregroundColor: theme.colorScheme.primary,
-                  child: const Icon(Icons.my_location),
-                ),
+            ),
+          if (!viewModel.isFinished)
+            Positioned(
+              left: 8,
+              bottom: context.sp(210),
+              child: SplgFloatingButton(
+                key: const Key('tracking-locate'),
+                tooltip: 'Recentrar',
+                icon: SplgIcons.locate,
+                onPressed: viewModel.recenterMap,
               ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  height: sheetHeight,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(25),
-                        blurRadius: 14,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 42,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.outlineVariant,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        _TrackingStepper(
-                          activeStep: viewModel.currentStepIndex,
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          viewModel.statusTitle,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          viewModel.etaTitle,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          viewModel.etaSubtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(170),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        if (viewModel.showDriverCard)
-                          _DriverCard(viewModel: viewModel),
-                        if (!viewModel.showDriverCard)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withAlpha(20),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              'Buscando al repartidor mas cercano...',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        if (viewModel.canConfirmDelivery) ...[
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: viewModel.confirmDeliveryByScan,
-                              icon: const Icon(Icons.qr_code_scanner),
-                              label: const Text(
-                                'Confirmar entrega (escanear QR)',
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 14),
-                        Text(
-                          viewModel.compactOrderDetail,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        TextButton(
-                          onPressed: viewModel.toggleOrderDetails,
-                          child: Text(
-                            viewModel.detailsExpanded
-                                ? 'Ocultar detalle'
-                                : 'Ver detalle',
-                          ),
-                        ),
-                        if (viewModel.detailsExpanded)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest
-                                  .withAlpha(90),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: viewModel.expandedOrderDetail
-                                  .map(
-                                    (line) => Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 6.0),
-                                      child: Text(line),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                        if (viewModel.canCancelOrder) ...[
-                          const SizedBox(height: 10),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: viewModel.isBusy
-                                  ? null
-                                  : viewModel.cancelOrder,
-                              icon: const Icon(Icons.close),
-                              label: const Text('Cancelar pedido'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: theme.colorScheme.error,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+            ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: _TrackingSheet(model: viewModel),
+          ),
+        ],
       ),
     );
   }
@@ -276,7 +95,268 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
   OrderTrackingViewModel viewModelBuilder(
     BuildContext context,
   ) =>
+      debugViewModelFactory?.call(orderId) ??
       OrderTrackingViewModel(orderId: orderId);
+}
+
+/// Mapa con la dirección de entrega, la ruta y la camioneta del repartidor.
+class _TrackingMap extends StatelessWidget {
+  const _TrackingMap({required this.model});
+
+  final OrderTrackingViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget map(Set<Marker> markers) => GoogleMap(
+          mapType: MapType.terrain,
+          initialCameraPosition: CameraPosition(
+            target: model.fallbackCenter,
+            zoom: 14,
+          ),
+          onMapCreated: model.onMapCreated,
+          onCameraMoveStarted: model.onMapMovedByUser,
+          markers: markers,
+          polylines: model.polylines,
+          circles: model.circles,
+          // Deja libre el centro: la dirección y la ruta no quedan tapadas
+          // por la tarjeta de arriba ni por la hoja de abajo.
+          padding: const EdgeInsets.only(top: 140, bottom: 320),
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          compassEnabled: false,
+          mapToolbarEnabled: false,
+        );
+
+    final position = model.driverPosition;
+    if (position == null || model.isFinished) return map(model.markers);
+    return SplgAnimatedVehicle(
+      position: position,
+      heading: model.driverHeading,
+      icon: model.vehicleIcon,
+      builder: (_, vehicle) => map({...model.markers, vehicle}),
+    );
+  }
+}
+
+/// Tarjeta superior: volver, número de pedido, ayuda y la píldora de estado.
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({required this.model});
+
+  final OrderTrackingViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = SplgType.of(context);
+    final (icon, text) = switch (model.stage) {
+      TrackingStage.pending => (SplgIcons.clock, 'Buscando repartidor'),
+      TrackingStage.assigned => (SplgIcons.ok, 'Pedido asignado'),
+      TrackingStage.inProgress => (SplgIcons.truck, 'En camino'),
+      TrackingStage.arriving => (SplgIcons.house, 'Llegando'),
+      TrackingStage.delivered => (SplgIcons.ok, 'Entregado'),
+      TrackingStage.cancelled => (SplgIcons.close, 'Cancelado'),
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SplgIconButton(
+          key: const Key('tracking-back'),
+          tooltip: 'Volver',
+          icon: SplgIcons.back,
+          size: 44,
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SplgDarkCard(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  model.orderTitle,
+                  key: const Key('tracking-title'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.subtitle.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  key: const Key('tracking-status-pill'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: type.body.copyWith(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SplgIconButton(
+          key: const Key('tracking-help'),
+          tooltip: 'Ayuda',
+          icon: SplgIcons.help,
+          size: 44,
+          onPressed: model.showHelp,
+        ),
+      ],
+    );
+  }
+}
+
+class _TrackingSheet extends StatelessWidget {
+  const _TrackingSheet({required this.model});
+
+  final OrderTrackingViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.6;
+    return SplgBottomPanel(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          child: model.isFinished
+              ? _FinishedContent(model: model)
+              : _ActiveContent(model: model),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pedido en curso: avance, llegada estimada, repartidor y acciones.
+class _ActiveContent extends StatelessWidget {
+  const _ActiveContent({required this.model});
+
+  final OrderTrackingViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = SplgType.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _TrackingStepper(activeStep: model.currentStepIndex),
+        const SizedBox(height: 12),
+        Text(
+          model.statusTitle,
+          key: const Key('tracking-status-title'),
+          style: type.subtitle,
+        ),
+        if (model.showDriverCard || model.stage == TrackingStage.pending) ...[
+          const SizedBox(height: 4),
+          Text(model.etaTitle,
+              key: const Key('tracking-eta'), style: type.heading),
+          Text(model.etaSubtitle, style: type.caption),
+        ],
+        if (model.showDriverCard) ...[
+          const SizedBox(height: 12),
+          _DriverCard(model: model),
+        ],
+        if (model.canConfirmDelivery) ...[
+          const SizedBox(height: 12),
+          SplgButton(
+            key: const Key('tracking-confirm-qr'),
+            title: 'Confirmar entrega (escanear QR)',
+            onPressed: model.confirmDeliveryByScan,
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(model.compactOrderDetail, style: type.body),
+        if (model.expandedOrderDetail.isNotEmpty)
+          SplgAccordion(
+            entries: [
+              SplgAccordionEntry(
+                title: 'Ver detalle',
+                body: model.expandedOrderDetail.join('\n'),
+              ),
+            ],
+          ),
+        if (model.canCancelOrder) ...[
+          const SizedBox(height: 6),
+          SplgButton(
+            key: const Key('tracking-cancel'),
+            title: 'Cancelar pedido',
+            style: SplgButtonStyle.danger,
+            onPressed: model.isBusy ? null : model.cancelOrder,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Pedido entregado o cancelado: ya no hay nada que seguir.
+class _FinishedContent extends StatelessWidget {
+  const _FinishedContent({required this.model});
+
+  final OrderTrackingViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = SplgType.of(context);
+    final brasa = context.brasa;
+    final delivered = model.isDelivered;
+    final detail = model.finishedDetail;
+    return Column(
+      children: [
+        Icon(
+          delivered ? SplgIcons.ok : SplgIcons.error,
+          size: 44,
+          color: delivered ? brasa.success : brasa.danger,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          model.statusTitle,
+          key: const Key('tracking-finished-title'),
+          textAlign: TextAlign.center,
+          style: type.heading,
+        ),
+        if (detail != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            detail,
+            key: const Key('tracking-finished-detail'),
+            textAlign: TextAlign.center,
+            style: type.body,
+          ),
+        ],
+        const SizedBox(height: 16),
+        if (delivered) ...[
+          SplgButton(
+            key: const Key('tracking-rate'),
+            title: 'Calificar al repartidor',
+            onPressed: model.rateDriver,
+          ),
+          const SizedBox(height: 10),
+        ],
+        SplgButton(
+          key: const Key('tracking-close'),
+          title: 'Volver',
+          style: SplgButtonStyle.outlined,
+          onPressed: model.close,
+        ),
+      ],
+    );
+  }
 }
 
 class _TrackingStepper extends StatelessWidget {
@@ -286,12 +366,13 @@ class _TrackingStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final type = SplgType.of(context);
+    final brasa = context.brasa;
     const steps = [
-      (icon: Icons.schedule, label: 'Pendiente'),
-      (icon: Icons.check_circle, label: 'Asignado'),
-      (icon: Icons.local_shipping, label: 'En camino'),
-      (icon: Icons.home, label: 'Llegando'),
+      (icon: SplgIcons.clock, label: 'Pendiente'),
+      (icon: SplgIcons.ok, label: 'Asignado'),
+      (icon: SplgIcons.truck, label: 'En camino'),
+      (icon: SplgIcons.house, label: 'Llegando'),
     ];
 
     return Column(
@@ -304,9 +385,7 @@ class _TrackingStepper extends StatelessWidget {
               return Expanded(
                 child: Container(
                   height: 2,
-                  color: active
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outlineVariant,
+                  color: active ? brasa.primaryStrong : brasa.outline,
                 ),
               );
             }
@@ -314,35 +393,28 @@ class _TrackingStepper extends StatelessWidget {
             final stepIndex = index ~/ 2;
             final active = stepIndex <= activeStep;
             return Container(
-              width: 26,
-              height: 26,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: active
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant,
+                color: active ? brasa.primaryStrong : brasa.outline,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                steps[stepIndex].icon,
-                size: 15,
-                color: Colors.white,
-              ),
+              child: Icon(steps[stepIndex].icon, size: 16, color: Colors.white),
             );
           }),
         ),
         const SizedBox(height: 6),
         Row(
-          children: steps
-              .map(
-                (step) => Expanded(
-                  child: Text(
-                    step.label,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.labelSmall,
-                  ),
+          children: [
+            for (final step in steps)
+              Expanded(
+                child: Text(
+                  step.label,
+                  textAlign: TextAlign.center,
+                  style: type.caption,
                 ),
-              )
-              .toList(),
+              ),
+          ],
         ),
       ],
     );
@@ -350,142 +422,140 @@ class _TrackingStepper extends StatelessWidget {
 }
 
 class _DriverCard extends StatelessWidget {
-  const _DriverCard({required this.viewModel});
+  const _DriverCard({required this.model});
 
-  final OrderTrackingViewModel viewModel;
+  final OrderTrackingViewModel model;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHigh.withAlpha(90),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: theme.colorScheme.primary.withAlpha(30),
-                backgroundImage: (viewModel.driverAvatarUrl != null &&
-                        viewModel.driverAvatarUrl!.isNotEmpty)
-                    ? NetworkImage(viewModel.driverAvatarUrl!)
-                    : null,
-                child: (viewModel.driverAvatarUrl == null ||
-                        viewModel.driverAvatarUrl!.isEmpty)
-                    ? Text(
-                        viewModel.driverInitials,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      viewModel.driverName,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+    final type = SplgType.of(context);
+    final brasa = context.brasa;
+    final rating = model.driverRating;
+    final plate = model.vehiclePlate;
+    return Column(
+      children: [
+        Row(
+          children: [
+            SplgAvatar(
+              imageUrl: model.driverAvatarUrl,
+              initials: model.driverInitials,
+              radius: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    model.driverName,
+                    key: const Key('tracking-driver-name'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: type.subtitle,
+                  ),
+                  Row(
+                    children: [
+                      Icon(
+                        rating == null ? SplgIcons.starEmpty : SplgIcons.star,
+                        size: 13,
+                        color: brasa.accent,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '⭐ ${viewModel.driverRatingText}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating == null
+                            ? 'Sin calificaciones'
+                            : rating.toStringAsFixed(1),
+                        key: const Key('tracking-driver-rating'),
+                        style: type.caption,
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
+            if (plate != null)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
+                key: const Key('tracking-plate'),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withAlpha(25),
+                  color: brasa.primarySoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  viewModel.vehiclePlate,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                child: Text(plate, style: type.value),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  viewModel.vehicleName,
-                  style: theme.textTheme.bodyMedium,
-                ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SplgRouteRow(
+          icon: SplgIcons.truck,
+          text: model.vehicleName ?? 'Vehículo sin datos',
+          color: brasa.primaryStrong,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: SplgButton(
+                key: const Key('tracking-call'),
+                title: 'Llamar',
+                style: SplgButtonStyle.outlined,
+                onPressed: model.hasDriverPhone ? model.callDriver : null,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: viewModel.callDriver,
-                  icon: const Icon(Icons.phone),
-                  label: const Text('Llamar'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: context.brasa.success,
-                    foregroundColor: theme.colorScheme.surface,
-                  ),
-                ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SplgButton(
+                key: const Key('tracking-message'),
+                title: 'Escribirle',
+                style: SplgButtonStyle.outlined,
+                onPressed: model.hasDriverPhone ? model.messageDriver : null,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: viewModel.messageDriver,
-                  icon: const Icon(Icons.chat_bubble_outline),
-                  label: const Text('Mensaje'),
-                ),
-              ),
-            ],
+            ),
+          ],
+        ),
+        if (model.contactHint != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            model.contactHint!,
+            key: const Key('tracking-contact-hint'),
+            textAlign: TextAlign.center,
+            style: type.caption,
           ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({
-    required this.icon,
-    required this.onTap,
-  });
+/// El pedido no se pudo cargar: texto claro y "Reintentar".
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.model});
 
-  final IconData icon;
-  final VoidCallback onTap;
+  final OrderTrackingViewModel model;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withAlpha(100),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(icon, color: Colors.white),
-        ),
+    return SafeArea(
+      child: SplgEmptyState(
+        illustration: SplgIllustration.error,
+        title: 'No pudimos cargar',
+        message: model.loadError ?? 'No pudimos cargar tu pedido.',
+        action: model.canRetryLoad
+            ? SplgButton(
+                key: const Key('tracking-retry'),
+                title: 'Reintentar',
+                style: SplgButtonStyle.outlined,
+                expand: false,
+                onPressed: model.retry,
+              )
+            : SplgButton(
+                key: const Key('tracking-back'),
+                title: 'Volver',
+                style: SplgButtonStyle.outlined,
+                expand: false,
+                onPressed: model.close,
+              ),
       ),
     );
   }

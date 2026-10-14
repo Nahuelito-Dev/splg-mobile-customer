@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/common/app_icons.dart';
 import 'qr_scan_viewmodel.dart';
 
 class QrScanView extends StackedView<QrScanViewModel> {
@@ -20,19 +22,15 @@ class QrScanView extends StackedView<QrScanViewModel> {
   ) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Escanear QR de entrega'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: viewModel.cancel,
-        ),
+      appBar: SplgHeader(
+        title: 'Escanear QR de entrega',
+        onGradient: true,
+        onBack: viewModel.cancel,
         actions: [
           if (viewModel.cameraGranted)
             IconButton(
-              icon: const Icon(Icons.flash_on),
+              tooltip: 'Linterna',
+              icon: const Icon(SplgIcons.online, color: Colors.white),
               onPressed: viewModel.controller.toggleTorch,
             ),
         ],
@@ -52,18 +50,18 @@ class QrScanView extends StackedView<QrScanViewModel> {
                   ),
                 ),
                 const _ScanWindowOverlay(),
-                const SafeArea(
+                SafeArea(
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
-                      padding: EdgeInsets.only(bottom: 40, left: 24, right: 24),
+                      padding: const EdgeInsets.only(
+                          bottom: 40, left: 24, right: 24),
                       child: Text(
-                        'Apunta la camara al codigo QR que te muestra el chofer',
+                        'Apuntá la cámara al código QR que te muestra el repartidor',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: SplgType.of(context)
+                            .subtitle
+                            .copyWith(color: Colors.white),
                       ),
                     ),
                   ),
@@ -71,15 +69,17 @@ class QrScanView extends StackedView<QrScanViewModel> {
                 if (viewModel.isProcessing)
                   Container(
                     color: Colors.black.withAlpha(180),
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircularProgressIndicator(color: Colors.white),
-                          SizedBox(height: 12),
+                          const SplgLoader(onDark: true),
+                          const SizedBox(height: 12),
                           Text(
-                            'Confirmando entrega...',
-                            style: TextStyle(color: Colors.white),
+                            'Confirmando la entrega...',
+                            style: SplgType.of(context)
+                                .body
+                                .copyWith(color: Colors.white),
                           ),
                         ],
                       ),
@@ -115,7 +115,7 @@ class _CameraGate extends StatelessWidget {
     if (viewModel.cameraOutcome == null) {
       return const ColoredBox(
         color: Colors.black,
-        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+        child: SplgLoader(onDark: true),
       );
     }
     return ColoredBox(
@@ -126,25 +126,25 @@ class _CameraGate extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.no_photography, color: Colors.white, size: 48),
+              const Icon(AppIcons.cameraSlash, color: Colors.white, size: 48),
               const SizedBox(height: 16),
               Text(
                 viewModel.cameraNeedsSettings
                     ? 'La cámara está desactivada para SPLG. Activala desde Ajustes para escanear el QR de la entrega.'
                     : 'Necesitamos la cámara para escanear el QR de la entrega.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
+                style: SplgType.of(context).body.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 20),
-              FilledButton(
+              SplgButton(
+                title: viewModel.cameraNeedsSettings
+                    ? 'Abrir Ajustes'
+                    : 'Reintentar',
+                style: SplgButtonStyle.white,
+                expand: false,
                 onPressed: viewModel.cameraNeedsSettings
                     ? viewModel.openSettings
                     : viewModel.retryCamera,
-                child: Text(
-                  viewModel.cameraNeedsSettings
-                      ? 'Abrir Ajustes'
-                      : 'Reintentar',
-                ),
               ),
             ],
           ),
@@ -200,20 +200,21 @@ class _ScannerError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.no_photography, color: Colors.white, size: 48),
+              const Icon(AppIcons.cameraSlash, color: Colors.white, size: 48),
               const SizedBox(height: 16),
               Text(
                 isPermissionDenied
-                    ? 'No tenes permiso de camara. Activalo desde Ajustes para poder escanear el QR.'
-                    : 'No se pudo abrir la camara. Intenta de nuevo.',
+                    ? 'No tenés permiso para usar la cámara. Activalo desde Ajustes para poder escanear el QR.'
+                    : 'No se pudo abrir la cámara. Probá de nuevo.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
+                style: SplgType.of(context).body.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 20),
-              FilledButton(
+              SplgButton(
+                title: isPermissionDenied ? 'Abrir Ajustes' : 'Reintentar',
+                style: SplgButtonStyle.white,
+                expand: false,
                 onPressed: isPermissionDenied ? onSettings : onRetry,
-                child:
-                    Text(isPermissionDenied ? 'Abrir Ajustes' : 'Reintentar'),
               ),
             ],
           ),

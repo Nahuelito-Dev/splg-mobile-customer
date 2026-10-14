@@ -45,7 +45,7 @@ class _CatalogSheet extends StatelessWidget {
             const SizedBox(height: 12),
             SplgButton(
               title: model.canPlaceOrder
-                  ? 'Continuar · ${money.format(model.total)}'
+                  ? model.continueLabel
                   : 'Elegí tus garrafas',
               onPressed: model.canPlaceOrder
                   ? () {
@@ -90,7 +90,8 @@ class _CatalogSheet extends StatelessWidget {
           image: SignedImage(
             key: Key('cylinder-photo-${c.id}'),
             url: model.cylinderPhoto(c.id),
-            fallback: Image.asset('assets/cylinder_10.png', fit: BoxFit.contain),
+            fallback:
+                Image.asset('assets/cylinder_10.png', fit: BoxFit.contain),
           ),
           title: c.label,
           price: money.format(c.price),

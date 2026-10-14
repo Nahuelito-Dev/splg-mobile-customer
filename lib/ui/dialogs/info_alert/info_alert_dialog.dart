@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/icons/splg_icons.dart';
 import 'package:splg_customer/ui/common/ui_helpers.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -70,7 +71,8 @@ class InfoAlertDialog extends StackedView<InfoAlertDialogModel> {
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('⭐️', style: TextStyle(fontSize: 30)),
+                  child: Icon(SplgIcons.star,
+                      size: 30, color: context.brasa.accent),
                 ),
               ],
             ),

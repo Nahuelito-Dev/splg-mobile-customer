@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
-import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/widgets/app_drawer/app_drawer.dart';
 import 'home_viewmodel.dart';
 import 'widgets/catalog_sheet.dart';
@@ -138,7 +137,7 @@ class HomeView extends StackedView<HomeViewModel> {
                       if (model.canPlaceOrder) ...[
                         const SizedBox(height: 12),
                         SplgButton(
-                          title: 'Continuar · ${money.format(model.total)}',
+                          title: model.continueLabel,
                           onPressed: model.placeOrder,
                         ),
                       ],

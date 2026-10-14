@@ -7,7 +7,7 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SPLG necesita acceder a tus fotos para que puedas adjuntar una imagen a un reclamo.</string>
+	<string>SPLG necesita acceder a tus fotos para que puedas elegir la imagen de tu perfil o adjuntar una a un reclamo.</string>
 	<key>GMSApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

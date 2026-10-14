@@ -54,8 +54,8 @@ class _SlowRepository implements OrderRepository {
       history!.future;
 
   @override
-  Future<CreateOrderResult> createOrder(
-          Map<String, dynamic> orderData, String token) =>
+  Future<CreateOrderResult> createOrder(Map<String, dynamic> orderData,
+          String token, String idempotencyKey) =>
       create!.future;
 
   @override

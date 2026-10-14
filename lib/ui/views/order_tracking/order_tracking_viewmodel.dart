@@ -1,19 +1,28 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:developer';
+import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
+import 'package:splg_customer/core/network/api_result.dart' show LoadFailure;
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
+import 'package:splg_customer/ui/common/formatters.dart';
+import 'package:splg_customer/domain/signed_url.dart';
+import 'package:splg_customer/ui/views/order_tracking/order_driver_reader.dart';
+import 'package:splg_lib/network/api_error_text.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
+import 'package:splg_customer/services/tracking_routes.dart';
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/domain/order_item.dart';
+import 'package:splg_lib/maps/geo.dart';
+import 'package:splg_lib/maps/route_tracker.dart';
+import 'package:splg_lib/maps/vehicle_marker.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,19 +33,33 @@ enum TrackingStage {
   assigned,
   inProgress,
   arriving,
+  delivered,
+  cancelled,
 }
 
-class OrderTrackingViewModel extends BaseViewModel
-    with WidgetsBindingObserver {
-  OrderTrackingViewModel({required this.orderId});
+/// Cada cuánto se consulta el pedido por si el socket se cayó o dejó de
+/// avisar.
+const trackingPollInterval = Duration(seconds: 20);
+
+class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
+  OrderTrackingViewModel({
+    required this.orderId,
+    this.pollInterval = trackingPollInterval,
+    RouteTrackerFactory? routeTracker,
+    Future<BitmapDescriptor?> Function()? iconLoader,
+  })  : _customTracker = routeTracker,
+        _iconLoader = iconLoader;
 
   final String orderId;
+  final Duration pollInterval;
+  final RouteTrackerFactory? _customTracker;
+  final Future<BitmapDescriptor?> Function()? _iconLoader;
 
   /// Cuánto antes de `expiresAt` se renueva la foto firmada del chofer.
   static const photoRenewMargin = Duration(seconds: 30);
 
-  /// Vida de la URL firmada que llega por socket (el evento no trae `expiresAt`;
-  /// el back la firma por ~5 minutos).
+  /// Vida que se supone a la URL firmada de la foto cuando no trae sus datos
+  /// de vencimiento (`X-Amz-Date` + `X-Amz-Expires`).
   static const eventPhotoTtl = Duration(minutes: 5);
 
   final _trackingService = locator<OrderTrackingService>();
@@ -46,21 +69,49 @@ class OrderTrackingViewModel extends BaseViewModel
   final _bottomSheetService = locator<BottomSheetService>();
   final _navigationService = locator<NavigationService>();
 
+  /// La ruta por calles la da el back y sólo con el pedido en camino.
+  RouteTracker _newTracker(LatLng destination) =>
+      _customTracker?.call(destination) ??
+      TrackingRoutes.trackerTo(
+        destination,
+        orderId: orderId,
+        tokenProvider: () => _customerService.token,
+        canRequest: () => _status == 'out_for_delivery',
+      );
+
   GoogleMapController? _mapController;
   Order? _order;
 
   LatLng? _customerLocation;
   LatLng? _driverLocation;
   double _driverHeading = 0;
+  BitmapDescriptor? _vehicleIcon;
 
   String _status = 'pending';
+
+  /// Se suma con cada aviso del socket: una consulta que salió antes de un
+  /// aviso trae un estado viejo y no lo pisa.
+  int _eventVersion = 0;
+  bool _suspended = false;
+  bool _finishedHandled = false;
+  bool _arrived = false;
+  String? _driverId;
+  bool _cancelling = false;
+  String? _cancellationReason;
+
+  /// Quién canceló, según el pedido o el aviso del socket.
+  String? _cancelledBy;
+  String? _loadError;
+  bool _gone = false;
+  DateTime? _driverLocationAt;
+  bool _loadRetryable = true;
   int? _etaMinutes;
   DateTime? _etaDateTime;
 
   String _driverName = 'Repartidor';
   double? _driverRating;
-  String _vehicleName = 'Vehiculo sin datos';
-  String _vehiclePlate = '--';
+  String? _vehicleName;
+  String? _vehiclePlate;
   String? _driverPhone;
   String? _driverAvatarUrl;
   Timer? _photoTimer;
@@ -68,36 +119,52 @@ class OrderTrackingViewModel extends BaseViewModel
   bool _closed = false;
   String? _sessionCustomerId;
 
-  bool _detailsExpanded = false;
   bool _userMovedMap = false;
-  bool _arrivingNotified = false;
   double _radarRadius = 60;
 
   Timer? _radarTimer;
+  Timer? _pollTimer;
+  bool _polling = false;
   StreamSubscription<DriverLocationUpdate>? _driverLocationSubscription;
   StreamSubscription<String>? _orderStatusSubscription;
   StreamSubscription<DriverInfo>? _driverSubscription;
+  StreamSubscription<String>? _cancellationSubscription;
+  StreamSubscription<String>? _cancelledBySubscription;
+  StreamSubscription<void>? _arrivedSubscription;
 
-  final List<LatLng> _routePoints = [];
-  LatLng? _lastRouteOrigin;
+  RouteTracker? _tracker;
+  Set<Polyline> _polylines = const {};
 
-  bool get hasOrderLoaded => _order != null;
-  bool get detailsExpanded => _detailsExpanded;
-  LatLng get fallbackCenter => const LatLng(-34.6037, -58.3816);
+  /// El pedido llegó del back (aunque no se haya podido armar el detalle).
+  bool _loaded = false;
+  bool get hasOrderLoaded => _loaded;
+  String? get loadError => _loadError;
+
+  /// "Reintentar" sólo tiene sentido si no es la sesión la que venció.
+  bool get canRetryLoad => _loadRetryable;
+  LatLng get fallbackCenter => const LatLng(-27.3671, -55.8961);
+
+  LatLng? get driverPosition => _driverLocation;
+  double get driverHeading => _driverHeading;
+  BitmapDescriptor? get vehicleIcon => _vehicleIcon;
+
+  bool get isDelivered => _status == 'delivered';
+  bool get isCancelled => _status == 'cancelled';
+  bool get isFinished => isDelivered || isCancelled;
 
   TrackingStage get stage {
-    final distance = _distanceToCustomer;
-    if (distance != null && distance < 200) {
-      return TrackingStage.arriving;
-    }
-
     switch (_status) {
+      case 'delivered':
+        return TrackingStage.delivered;
+      case 'cancelled':
+        return TrackingStage.cancelled;
       case 'accepted':
         return TrackingStage.assigned;
       case 'out_for_delivery':
-        return TrackingStage.inProgress;
-      case 'arriving':
-        return TrackingStage.arriving;
+        final distance = _distanceToCustomer;
+        return _arrived || (distance != null && distance < 200)
+            ? TrackingStage.arriving
+            : TrackingStage.inProgress;
       default:
         return TrackingStage.pending;
     }
@@ -112,6 +179,8 @@ class OrderTrackingViewModel extends BaseViewModel
       case TrackingStage.inProgress:
         return 2;
       case TrackingStage.arriving:
+      case TrackingStage.delivered:
+      case TrackingStage.cancelled:
         return 3;
     }
   }
@@ -125,19 +194,23 @@ class OrderTrackingViewModel extends BaseViewModel
   String get statusTitle {
     switch (stage) {
       case TrackingStage.pending:
-        return 'Buscando al repartidor mas cercano...';
+        return 'Buscando al repartidor más cercano...';
       case TrackingStage.assigned:
-        return '${_driverFirstName()} fue asignado';
+        return '${_driverFirstName()} fue asignado a tu pedido';
       case TrackingStage.inProgress:
-        return '${_driverFirstName()} esta en camino';
+        return '${_driverFirstName()} está en camino';
       case TrackingStage.arriving:
-        return 'Tu garrafa esta llegando';
+        return 'Tu garrafa está llegando';
+      case TrackingStage.delivered:
+        return 'Entregamos tu pedido';
+      case TrackingStage.cancelled:
+        return 'Pedido cancelado';
     }
   }
 
   String get etaTitle {
     if (stage == TrackingStage.arriving) {
-      return 'Esta afuera!';
+      return '¡Ya está afuera!';
     }
     if (_etaMinutes != null) {
       return 'Llega en $_etaMinutes min';
@@ -147,7 +220,7 @@ class OrderTrackingViewModel extends BaseViewModel
 
   String get etaSubtitle {
     if (stage == TrackingStage.arriving) {
-      return 'Por favor sali a recibirla';
+      return 'Salí a recibirla';
     }
     if (_etaDateTime == null) {
       return 'Hora estimada: --:--';
@@ -155,12 +228,42 @@ class OrderTrackingViewModel extends BaseViewModel
     return 'Hora estimada: ${DateFormat('HH:mm').format(_etaDateTime!)}';
   }
 
+  /// Texto de la tarjeta de pedido finalizado ("Entregamos..." / motivo de la
+  /// cancelación que informa el back).
+  String? get finishedDetail {
+    if (isDelivered) return 'Gracias por tu compra.';
+    if (isCancelled) {
+      final who = switch (_cancelledBy) {
+        'customer' => 'Lo cancelaste vos.',
+        'admin' => 'Lo canceló la distribuidora.',
+        'driver' => 'Lo canceló el repartidor.',
+        'system' => 'Se canceló automáticamente.',
+        _ => null,
+      };
+      final reason = _cancellationReason;
+      // Sin motivo propio el back escribe "Cancelado por <rol>", que repite lo
+      // que ya dice [who].
+      final reasonText =
+          reason == null || (who != null && reason.startsWith('Cancelado por '))
+              ? null
+              : 'Motivo: $reason';
+      final text = [who, reasonText].whereType<String>().join(' ');
+      return text.isEmpty ? null : text;
+    }
+    return null;
+  }
+
   String get driverName => _driverName;
-  String get driverRatingText =>
-      _driverRating == null ? '--' : _driverRating!.toStringAsFixed(1);
-  String get vehicleName => _vehicleName;
-  String get vehiclePlate => _vehiclePlate;
+  double? get driverRating => _driverRating;
+  String? get vehicleName => _vehicleName;
+  String? get vehiclePlate => _vehiclePlate;
   String? get driverAvatarUrl => _driverAvatarUrl;
+  bool get hasDriverPhone => _driverPhone?.trim().isNotEmpty ?? false;
+
+  /// Por qué "Llamar" y "Escribirle" no se pueden usar todavía.
+  String? get contactHint => hasDriverPhone
+      ? null
+      : 'Todavía no tenemos el teléfono de tu repartidor.';
 
   String get driverInitials {
     final parts = _driverName
@@ -174,9 +277,14 @@ class OrderTrackingViewModel extends BaseViewModel
     return first + String.fromCharCode(parts.last.runes.first).toUpperCase();
   }
 
-  bool get showDriverCard => stage != TrackingStage.pending;
+  bool get showDriverCard =>
+      stage == TrackingStage.assigned ||
+      stage == TrackingStage.inProgress ||
+      stage == TrackingStage.arriving;
   bool get showRadar => stage == TrackingStage.pending;
-  bool get canCancelOrder => stage == TrackingStage.pending;
+
+  /// Sólo un pedido que todavía no tiene repartidor se cancela desde acá.
+  bool get canCancelOrder => _status == 'pending';
   bool get showArrivingBanner => stage == TrackingStage.arriving;
 
   /// El chofer solo genera el QR de entrega una vez que el pedido esta
@@ -192,12 +300,7 @@ class OrderTrackingViewModel extends BaseViewModel
     final itemsSummary = _order!.items
         .map((item) => '${item.quantity}x ${_itemTitle(item)}')
         .join(' - ');
-    final total = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-      customPattern: '\u00A4#,##0',
-    ).format(_order!.total);
+    final total = money.format(_order!.total);
     return '$itemsSummary - Total: $total';
   }
 
@@ -210,53 +313,25 @@ class OrderTrackingViewModel extends BaseViewModel
         .toList();
   }
 
+  /// Marcadores fijos (la dirección); el repartidor lo dibuja
+  /// `SplgAnimatedVehicle` con su ícono de camioneta.
   Set<Marker> get markers {
-    final markers = <Marker>{};
-    if (_customerLocation != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('customer_home'),
-          position: _customerLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
-          infoWindow: const InfoWindow(title: 'Tu casa'),
-        ),
-      );
-    }
-
-    if (_driverLocation != null && stage != TrackingStage.pending) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('driver'),
-          position: _driverLocation!,
-          rotation: _driverHeading,
-          flat: true,
-          anchor: const Offset(0.5, 0.5),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-          infoWindow: InfoWindow(title: _driverName),
-        ),
-      );
-    }
-    return markers;
-  }
-
-  Set<Polyline> get polylines {
-    if (_routePoints.length < 2 || stage == TrackingStage.pending) {
-      return const {};
-    }
+    if (_customerLocation == null) return const {};
     return {
-      Polyline(
-        polylineId: const PolylineId('driver_route'),
-        points: _routePoints,
-        color: AppColors.primary,
-        width: 5,
-        geodesic: true,
+      Marker(
+        markerId: const MarkerId('customer_home'),
+        position: _customerLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          BitmapDescriptor.hueOrange,
+        ),
+        infoWindow: const InfoWindow(title: 'Tu dirección'),
       ),
     };
   }
+
+  /// Ruta que le falta recorrer al repartidor, punteada si no hay ruta por
+  /// calles.
+  Set<Polyline> get polylines => _polylines;
 
   Set<Circle> get circles {
     if (!showRadar || _customerLocation == null) {
@@ -280,10 +355,34 @@ class OrderTrackingViewModel extends BaseViewModel
     _customerService.addListener(_onSessionChanged);
     WidgetsBinding.instance.addObserver(this);
     await _loadTrackingData();
+    if (_closed) return;
+    if (_gone) {
+      setBusy(false);
+      return;
+    }
+    if (isFinished) _finish();
     await _startRealtimeTracking();
+    if (_closed) return;
+    unawaited(_loadVehicleIcon());
     await refreshDriverPhoto();
+    if (_closed) return;
     _syncRadarState();
+    _startPolling();
     setBusy(false);
+  }
+
+  /// Vuelve a pedir el pedido cuando la primera carga falló, y retoma lo que
+  /// la carga fallida dejó sin hacer (foto, cierre, sondeo).
+  Future<void> retry() async {
+    setBusy(true);
+    final ok = await _loadTrackingData();
+    if (_closed) return;
+    if (ok) {
+      _afterStatusChange(photo: false);
+      await refreshDriverPhoto();
+      _startPolling();
+    }
+    if (!_closed) setBusy(false);
   }
 
   void onMapCreated(GoogleMapController controller) {
@@ -300,16 +399,11 @@ class OrderTrackingViewModel extends BaseViewModel
     await _fitMapToMarkers(force: true);
   }
 
-  void toggleOrderDetails() {
-    _detailsExpanded = !_detailsExpanded;
-    rebuildUi();
-  }
-
   Future<void> callDriver() async {
-    if (_driverPhone == null || _driverPhone!.trim().isEmpty) {
+    if (!hasDriverPhone) {
       await _dialogService.showDialog(
-        title: 'Telefono no disponible',
-        description: 'No hay un numero de contacto para este chofer.',
+        title: 'Teléfono no disponible',
+        description: 'Todavía no tenemos un número de contacto del repartidor.',
       );
       return;
     }
@@ -319,16 +413,17 @@ class OrderTrackingViewModel extends BaseViewModel
     if (!launched) {
       await _dialogService.showDialog(
         title: 'No se pudo llamar',
-        description: 'No fue posible abrir el marcador del telefono.',
+        description: 'No pudimos abrir el marcador del teléfono.',
       );
     }
   }
 
   Future<void> messageDriver() async {
-    if (_driverPhone == null || _driverPhone!.trim().isEmpty) {
+    if (!hasDriverPhone) {
       await _dialogService.showDialog(
         title: 'Contacto no disponible',
-        description: 'No hay un numero para enviar mensaje al chofer.',
+        description:
+            'Todavía no tenemos un número para escribirle al repartidor.',
       );
       return;
     }
@@ -337,7 +432,7 @@ class OrderTrackingViewModel extends BaseViewModel
     if (normalizedPhone.isEmpty) {
       await _dialogService.showDialog(
         title: 'Contacto no disponible',
-        description: 'El numero del chofer no es valido.',
+        description: 'El número del repartidor no es válido.',
       );
       return;
     }
@@ -353,28 +448,25 @@ class OrderTrackingViewModel extends BaseViewModel
     if (!launched) {
       await _dialogService.showDialog(
         title: 'No se pudo abrir WhatsApp',
-        description: 'Intenta llamar al chofer para coordinar la entrega.',
+        description: 'Probá llamarlo para coordinar la entrega.',
       );
     }
   }
 
+  /// Cancelar desde el seguimiento usa el mismo flujo que el detalle del
+  /// pedido: pantalla con motivo y confirmación.
   Future<void> cancelOrder() async {
-    // Un segundo toque mientras la cancelación está en curso no hace nada.
-    if (isBusy) return;
-    setBusy(true);
-    final result = await _historyService.cancelOrder(orderId);
-    setBusy(false);
-
-    if (!result.success) {
-      await _dialogService.showDialog(
-        title: 'No se pudo cancelar',
-        description: result.failureDescription,
-      );
-      return;
+    if (_cancelling || !canCancelOrder) return;
+    _cancelling = true;
+    try {
+      final cancelled =
+          await _navigationService.navigateToCancelOrderView(orderId: orderId);
+      if (cancelled != true || _closed) return;
+      _trackingService.disconnect();
+      _navigationService.back();
+    } finally {
+      _cancelling = false;
     }
-
-    _trackingService.disconnect();
-    _navigationService.back();
   }
 
   /// Abre la camara para escanear el QR que muestra el chofer al llegar. La
@@ -396,14 +488,14 @@ class OrderTrackingViewModel extends BaseViewModel
 
     // Momento de mayor señal para calificar al chofer (CU-025). El cliente
     // puede omitir; el sheet maneja el envío y sus errores internamente.
-    await _promptDriverRating();
+    await rateDriver();
 
     _navigationService.back();
   }
 
   /// Ofrece calificar al chofer tras la entrega. `POST /ratings` requiere que
-  /// el pedido esté `delivered` (ya lo está en este punto).
-  Future<void> _promptDriverRating() async {
+  /// el pedido esté `delivered`.
+  Future<void> rateDriver() async {
     await _bottomSheetService.showCustomSheet(
       variant: BottomSheetType.rateDriver,
       isScrollControlled: true,
@@ -412,53 +504,151 @@ class OrderTrackingViewModel extends BaseViewModel
     );
   }
 
+  /// Cierra el seguimiento de un pedido que ya terminó.
+  void close() {
+    _trackingService.disconnect();
+    _navigationService.back();
+  }
+
   Future<void> showHelp() async {
     await _dialogService.showDialog(
       title: 'Ayuda',
       description:
-          'Esta pantalla muestra el estado de tu pedido, la ubicacion del chofer y el tiempo estimado de llegada.',
+          'Acá ves el estado de tu pedido, dónde está tu repartidor y cuánto falta para que llegue.',
     );
   }
 
-  Future<void> _loadTrackingData() async {
+  /// Carga el pedido; devuelve false (y deja [loadError]) si no se pudo.
+  Future<bool> _loadTrackingData() async {
+    final version = _eventVersion;
     final token = await _customerService.token;
     if (token == null) {
-      return;
+      _loadError = ApiErrorText.sessionExpired;
+      _loadRetryable = false;
+      return false;
     }
 
-    final raw = await _trackingService.fetchOrderById(orderId, token);
-    if (raw == null) {
-      return;
+    Map<String, dynamic>? raw;
+    try {
+      raw = await _trackingService.fetchOrderById(orderId, token);
+    } on LoadFailure catch (e) {
+      if (!_closed) _onOrderGone(e.message);
+      return false;
+    }
+    if (raw == null || _closed) {
+      _loadError ??= 'No pudimos cargar tu pedido. Revisá tu conexión.';
+      _loadRetryable = true;
+      return false;
     }
 
+    _loadError = null;
+    _loaded = true;
+    _applyOrder(raw, fresh: version == _eventVersion);
+    _updateEta();
+    return true;
+  }
+
+  /// El back dice que el pedido no existe o ya no es del cliente (404/410):
+  /// se corta todo lo que lo seguía (sondeo, socket, radar) y se avisa. Si la
+  /// pantalla ya mostraba el pedido, se explica y se vuelve; si no, queda el
+  /// mensaje con "Volver".
+  void _onOrderGone(String message) {
+    if (_gone) return;
+    _gone = true;
+    _loadError = message;
+    _loadRetryable = false;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _radarTimer?.cancel();
+    _radarTimer = null;
+    _clearDriverPhoto();
+    _trackingService.disconnect();
+    if (_loaded) unawaited(_leaveGoneOrder(message));
+  }
+
+  Future<void> _leaveGoneOrder(String message) async {
+    await _dialogService.showDialog(
+      title: 'Pedido no disponible',
+      description: message,
+      buttonTitle: 'Aceptar',
+    );
+    if (!_closed) _navigationService.back();
+  }
+
+  /// [fresh] es false si mientras se pedía llegó un aviso por el socket: el
+  /// estado y el repartidor de esta respuesta ya pueden estar viejos.
+  void _applyOrder(Map<String, dynamic> raw, {bool fresh = true}) {
     _order = OrderApiMapper.parseOrder(raw);
+    _cancellationReason =
+        _readString(raw, const ['cancellation_reason']) ?? _cancellationReason;
+    _cancelledBy = _readString(raw, const ['cancelledBy']) ?? _cancelledBy;
+    if (isFinished || !fresh) return;
 
     final statusFromOrder = _order?.status == OrderStatus.outForDelivery
         ? 'out_for_delivery'
         : _order?.status.name;
-    _setStatus(
-      _readString(raw, const ['status', 'order_status']) ?? statusFromOrder,
-    );
+    _setStatus(_readString(raw, const ['status']) ?? statusFromOrder);
     _setDriverData(raw);
     _setCustomerLocationFromOrder(raw);
-    _setDriverLocationFromPayload(raw);
-    _setEtaFromPayload(raw);
-    _updateEtaFromDistance();
-    _updateRoute(force: true);
+    _updateEta();
+    _rebuildPolylines();
+    unawaited(_updateRoute());
+  }
+
+  // --- Sondeo de respaldo -------------------------------------------------
+
+  void _startPolling() {
+    // `cancel()` no pone el campo en null: sin esto un sondeo cancelado antes
+    // (p. ej. tras "Reintentar") impedía crear el nuevo.
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (_closed || _suspended || _gone || isFinished) return;
+    _pollTimer = Timer.periodic(pollInterval, (_) => poll());
+  }
+
+  /// Consulta el pedido por si el socket se cayó o no avisó un cambio. Si el
+  /// estado cambió, hace lo mismo que si hubiera llegado por el socket.
+  Future<void> poll() async {
+    if (_closed || _suspended || _gone || _polling || isFinished) return;
+    _polling = true;
+    try {
+      final before = _status;
+      final hadError = _loadError != null;
+      final ok = await _loadTrackingData();
+      if (_closed) return;
+      if (ok && (_status != before || hadError)) {
+        _afterStatusChange();
+      }
+    } catch (e) {
+      log('e in poll tracking: ${e.runtimeType}');
+    } finally {
+      _polling = false;
+    }
   }
 
   Future<void> _startRealtimeTracking() async {
-    final token = await _customerService.token;
-
+    if (_closed || _gone || isFinished) return;
     _driverLocationSubscription?.cancel();
     _orderStatusSubscription?.cancel();
+    _cancellationSubscription?.cancel();
+    _cancelledBySubscription?.cancel();
+    _arrivedSubscription?.cancel();
 
     _driverLocationSubscription = _trackingService.driverLocationUpdates.listen(
       (update) {
-        _driverHeading = update.heading;
-        _driverLocation = LatLng(update.lat, update.lng);
-        _updateEtaFromDistance();
-        _updateRoute();
+        final position = LatLng(update.lat, update.lng);
+        _driverHeading = resolveHeading(
+          gpsHeading: update.heading != 0 ? update.heading : null,
+          speedMps: update.heading != 0 ? 1.0 : null,
+          previous: _driverLocation,
+          current: position,
+          fallback: _driverHeading,
+        );
+        _driverLocation = position;
+        _driverLocationAt = update.at ?? DateTime.now();
+        _updateEta();
+        _rebuildPolylines();
+        unawaited(_updateRoute());
         _syncRadarState();
         _fitMapToMarkers();
         rebuildUi();
@@ -468,24 +658,72 @@ class OrderTrackingViewModel extends BaseViewModel
     _driverSubscription?.cancel();
     _driverSubscription = _trackingService.driverUpdates.listen(_onDriverEvent);
 
+    _cancellationSubscription =
+        _trackingService.cancellationReasons.listen((reason) {
+      _cancellationReason = reason;
+    });
+
+    _cancelledBySubscription =
+        _trackingService.cancelledBys.listen((who) => _cancelledBy = who);
+
+    _arrivedSubscription = _trackingService.arrivedUpdates.listen((_) {
+      if (_status != 'out_for_delivery') return;
+      _arrived = true;
+      rebuildUi();
+    });
+
     _orderStatusSubscription = _trackingService.orderStatusUpdates.listen(
       (status) {
+        _eventVersion++;
         _setStatus(status);
-        if (_hasDriverAssigned) {
-          if (_driverAvatarUrl == null) refreshDriverPhoto();
-        } else {
-          _clearDriverPhoto();
-        }
-        _syncRadarState();
-        rebuildUi();
+        _afterStatusChange();
       },
     );
 
+    // El token se pide en cada (re)conexión: el de Firebase vence en una hora.
     _trackingService.subscribeToOrder(
       orderId: orderId,
       customerId: _customerService.customer.customerId,
-      token: token,
+      tokenProvider: () => _customerService.token,
     );
+  }
+
+  /// Lo que hay que hacer cuando el estado pudo haber cambiado (por socket o
+  /// por el sondeo).
+  void _afterStatusChange({bool photo = true}) {
+    if (_closed) return;
+    if (_status != 'out_for_delivery') _arrived = false;
+    // Sin repartidor (se buscaba o lo liberó): no quedan sus datos.
+    if (_status == 'pending' || _status == 'reserved') _clearDriver();
+    if (_hasDriverAssigned) {
+      if (photo && _driverAvatarUrl == null) refreshDriverPhoto();
+    } else {
+      _clearDriverPhoto();
+    }
+    if (isFinished) {
+      if (!_finishedHandled) _finish();
+    } else {
+      unawaited(_updateRoute());
+    }
+    _syncRadarState();
+    rebuildUi();
+  }
+
+  /// El pedido terminó (entregado o cancelado): no hay nada más que seguir.
+  void _finish() {
+    _finishedHandled = true;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _tracker = null;
+    _polylines = const {};
+    _trackingService.disconnect();
+    // El aviso por socket de una cancelación no siempre trae el motivo; se lee
+    // del pedido.
+    if (isCancelled && (_cancellationReason == null || _cancelledBy == null)) {
+      unawaited(_loadTrackingData().then((_) {
+        if (!_closed) rebuildUi();
+      }));
+    }
   }
 
   void _setCustomerLocationFromOrder(Map<String, dynamic> raw) {
@@ -501,83 +739,60 @@ class OrderTrackingViewModel extends BaseViewModel
     }
 
     location ??= _readLatLng(
-      _readMap(raw, const ['delivery_address', 'deliveryAddress', 'address']),
+      _readMap(raw, const ['delivery_address']),
     );
 
     _customerLocation = location;
   }
 
-  void _setDriverLocationFromPayload(Map<String, dynamic> raw) {
-    final directLocation = _readMap(raw, const [
-      'driver_location',
-      'driverLocation',
-      'delivery_location',
-      'location',
-    ]);
-
-    LatLng? location = _readLatLng(directLocation);
-    double heading = _readDouble(
-          directLocation?['heading'] ?? directLocation?['bearing'],
-        ) ??
-        0;
-
-    final driverMap =
-        _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
-    final latLngString =
-        _readString(driverMap, const ['lat_lng', 'latLang', 'location']);
-    if (location == null && latLngString != null) {
-      location = _parseLatLngPair(latLngString);
+  void _setDriverData(Map<String, dynamic> raw) {
+    final driver = OrderDriverReader.read(raw);
+    // Otro repartidor (reasignación): no quedan el teléfono ni la
+    // calificación del anterior.
+    if (driver.id != null && _driverId != null && driver.id != _driverId) {
+      _clearDriver();
     }
-
-    if (location != null) {
-      _driverLocation = location;
-      _driverHeading = heading;
+    _driverId = driver.id ?? _driverId;
+    _driverName = driver.name ?? _driverName;
+    // El bloque `driver` del pedido es la fuente: el back lo manda sólo con el
+    // pedido aceptado o en camino. Sin él no hay teléfono ni calificación (ni
+    // se inventan), y el estado se muestra sin chofer.
+    _driverPhone = driver.phone;
+    _driverRating = driver.rating;
+    if (!driver.hasBlock && !_hasDriverAssigned) _clearDriver();
+    // El vehículo lo informa siempre el back con el pedido: lo que no trae,
+    // no hay.
+    _vehicleName = driver.vehicleName;
+    _vehiclePlate = driver.vehiclePlate;
+    // La ubicación llega sólo en camino y reciente; null es "sin posición
+    // reciente", no un error, y no pisa una posición más nueva del socket.
+    final last = driver.lastLocation, at = driver.lastLocationAt;
+    final known = _driverLocationAt;
+    // Sin hora (`at: null`) no se puede comparar: sirve sólo si todavía no hay
+    // otra posición con hora.
+    if (last != null && (known == null || (at != null && at.isAfter(known)))) {
+      _driverLocation = last;
+      _driverLocationAt = at ?? _driverLocationAt;
     }
   }
 
-  void _setDriverData(Map<String, dynamic> raw) {
-    final driverMap =
-        _readMap(raw, const ['driver', 'delivery', 'assignedDriver']);
-    final vehicleMap = _readMap(
-          driverMap,
-          const ['vehicle', 'car', 'truck'],
-        ) ??
-        _readMap(raw, const ['vehicle']);
-
-    _driverName =
-        _readString(driverMap, const ['name', 'full_name', 'fullName']) ??
-            _readString(raw, const ['delivery_name', 'driver_name']) ??
-            _driverName;
-
-    _driverRating = _readDouble(
-      driverMap?['rating'] ?? driverMap?['score'] ?? raw['driver_rating'],
-    );
-
-    final vehicleModel =
-        _readString(vehicleMap, const ['model', 'name', 'type']) ?? '';
-    final vehicleColor = _readString(vehicleMap, const ['color']) ?? '';
-    final formattedVehicle = [vehicleModel, vehicleColor]
-        .where((value) => value.trim().isNotEmpty)
-        .join(' ');
-    _vehicleName = formattedVehicle.isEmpty
-        ? (_readString(raw, const ['vehicle_name']) ?? _vehicleName)
-        : formattedVehicle;
-
-    _vehiclePlate = _readString(vehicleMap, const [
-          'plate',
-          'license_plate',
-          'licensePlate',
-        ]) ??
-        _readString(raw, const ['vehicle_plate', 'plate']) ??
-        _vehiclePlate;
-
-    _driverPhone = _readString(driverMap, const [
-          'phone',
-          'phone_number',
-          'mobile',
-        ]) ??
-        _readString(raw, const ['delivery_phone', 'driver_phone']);
-
+  /// Olvida todo lo del repartidor (se liberó el pedido o lo tomó otro).
+  void _clearDriver() {
+    _driverName = 'Repartidor';
+    _driverId = null;
+    _driverPhone = null;
+    _driverRating = null;
+    _vehicleName = null;
+    _vehiclePlate = null;
+    _driverLocation = null;
+    _driverLocationAt = null;
+    _driverHeading = 0;
+    _etaMinutes = null;
+    _etaDateTime = null;
+    _tracker = null;
+    _polylines = const {};
+    _arrived = false;
+    _clearDriverPhoto();
   }
 
   /// La foto sólo existe con el pedido aceptado o en camino.
@@ -585,16 +800,29 @@ class OrderTrackingViewModel extends BaseViewModel
       _status == 'accepted' || _status == 'out_for_delivery';
 
   void _onDriverEvent(DriverInfo driver) {
-    if (driver.name != null) _driverName = driver.name!;
+    if (driver.name != null && driver.name != _driverName) {
+      // Otro repartidor: no quedan los datos del anterior.
+      _driverPhone = null;
+      _driverRating = null;
+      _driverId = null;
+      _vehicleName = null;
+      _vehiclePlate = null;
+      _driverName = driver.name!;
+    }
     if (driver.phone != null) _driverPhone = driver.phone;
     if (driver.photoUrl != null) {
-      _setDriverPhoto(driver.photoUrl!, DateTime.now().add(eventPhotoTtl));
+      _setDriverPhoto(driver.photoUrl!, _expiryOf(driver.photoUrl!));
     } else {
       _clearDriverPhoto();
       refreshDriverPhoto();
     }
     rebuildUi();
   }
+
+  /// Cuándo vence una URL firmada: lo dice ella misma (`X-Amz-Date` +
+  /// `X-Amz-Expires`); sólo si no lo trae se supone [eventPhotoTtl].
+  DateTime _expiryOf(String url) =>
+      SignedUrl.fromAwsQuery(url) ?? DateTime.now().add(eventPhotoTtl);
 
   /// Pide una URL firmada nueva (`GET /orders/:id/driver-photo?modo=url`).
   /// 409/404 dejan al chofer sin foto, sin mostrar error.
@@ -608,9 +836,7 @@ class OrderTrackingViewModel extends BaseViewModel
       if (_closed || !_hasDriverAssigned) return;
       if (lookup.url != null) {
         _setDriverPhoto(
-          lookup.url!,
-          lookup.expiresAt ?? DateTime.now().add(eventPhotoTtl),
-        );
+            lookup.url!, lookup.expiresAt ?? _expiryOf(lookup.url!));
       } else if (!lookup.failed) {
         _clearDriverPhoto();
       }
@@ -634,6 +860,19 @@ class OrderTrackingViewModel extends BaseViewModel
     _driverAvatarUrl = null;
   }
 
+  Future<void> _loadVehicleIcon() async {
+    try {
+      final loader = _iconLoader ??
+          () => SplgVehicleIcon.descriptor(body: AppColors.llama600);
+      final icon = await loader();
+      if (_closed || icon == null) return;
+      _vehicleIcon = icon;
+      rebuildUi();
+    } catch (e) {
+      log('No se pudo dibujar el ícono del vehículo: ${e.runtimeType}');
+    }
+  }
+
   void _onSessionChanged() {
     if (_customerService.customer.customerId != _sessionCustomerId) {
       _clearDriverPhoto();
@@ -643,25 +882,39 @@ class OrderTrackingViewModel extends BaseViewModel
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) refreshDriverPhoto();
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_resume());
+    } else {
+      _suspend();
+    }
   }
 
-  void _setEtaFromPayload(Map<String, dynamic> raw) {
-    _etaMinutes = _readInt(raw['eta_minutes'] ?? raw['etaMinutes']);
+  /// En segundo plano no hay nada que mirar: se cortan el sondeo, el radar, el
+  /// renovado de la foto y el socket.
+  void _suspend() {
+    if (_closed || _suspended) return;
+    _suspended = true;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _radarTimer?.cancel();
+    _radarTimer = null;
+    _photoTimer?.cancel();
+    _photoTimer = null;
+    _trackingService.disconnect();
+  }
 
-    final etaString = _readString(raw, const [
-      'estimated_arrival',
-      'estimatedArrival',
-      'eta_time',
-      'etaTime',
-    ]);
-    if (etaString != null) {
-      _etaDateTime = DateTime.tryParse(etaString);
-    }
-
-    if (_etaDateTime == null && _etaMinutes != null) {
-      _etaDateTime = DateTime.now().add(Duration(minutes: _etaMinutes!));
-    }
+  /// De vuelta en primer plano: relee el pedido (pudo cambiar) y retoma todo.
+  Future<void> _resume() async {
+    if (_closed || !_suspended) return;
+    _suspended = false;
+    if (isFinished) return;
+    final ok = await _loadTrackingData();
+    if (_closed || _suspended) return;
+    await _startRealtimeTracking();
+    if (ok) _afterStatusChange();
+    unawaited(refreshDriverPhoto());
+    _syncRadarState();
+    _startPolling();
   }
 
   void _setStatus(String? status) {
@@ -672,51 +925,65 @@ class OrderTrackingViewModel extends BaseViewModel
     _status = _normalizeStatus(status);
   }
 
-  void _updateEtaFromDistance() {
+  /// Llegada estimada: por la ruta si se conoce su duración; si no, por la
+  /// distancia en línea recta a ~18 km/h.
+  void _updateEta() {
+    final position = _driverLocation;
     final distance = _distanceToCustomer;
-    if (distance == null) {
+    if (position == null || distance == null) {
       return;
     }
 
     if (distance < 200) {
       _etaMinutes = 0;
       _etaDateTime = DateTime.now();
-      if (!_arrivingNotified) {
-        _arrivingNotified = true;
-      }
       return;
     }
 
-    final minutes = max(1, ((distance / 1000) / 18 * 60).round());
+    final seconds = _tracker?.remainingSeconds(position);
+    final minutes = seconds != null
+        ? max(1, (seconds / 60).round())
+        : max(1, ((distance / 1000) / 18 * 60).round());
     _etaMinutes = minutes;
     _etaDateTime = DateTime.now().add(Duration(minutes: minutes));
   }
 
-  void _updateRoute({bool force = false}) {
-    if (_customerLocation == null || _driverLocation == null) {
+  bool get _routeVisible =>
+      stage == TrackingStage.assigned ||
+      stage == TrackingStage.inProgress ||
+      stage == TrackingStage.arriving;
+
+  void _rebuildPolylines() {
+    final position = _driverLocation, tracker = _tracker;
+    if (position == null || tracker == null || !_routeVisible) {
+      _polylines = const {};
       return;
     }
+    _polylines = {
+      splgRoutePolyline(
+        tracker.remainingPoints(position),
+        color: AppColors.llama600,
+        dashed: tracker.route?.isFallback ?? true,
+      ),
+    };
+  }
 
-    if (_routePoints.isEmpty || force || _lastRouteOrigin == null) {
-      _routePoints
-        ..clear()
-        ..addAll([_driverLocation!, _customerLocation!]);
-      _lastRouteOrigin = _driverLocation;
+  Future<void> _updateRoute() async {
+    final destination = _customerLocation, position = _driverLocation;
+    if (destination == null || position == null || _closed || !_routeVisible) {
       return;
     }
-
-    final movedDistance = Geolocator.distanceBetween(
-      _lastRouteOrigin!.latitude,
-      _lastRouteOrigin!.longitude,
-      _driverLocation!.latitude,
-      _driverLocation!.longitude,
-    );
-
-    if (movedDistance > 250) {
-      _routePoints
-        ..clear()
-        ..addAll([_driverLocation!, _customerLocation!]);
-      _lastRouteOrigin = _driverLocation;
+    final tracker = _tracker ??= _newTracker(destination);
+    try {
+      final changed = await tracker.update(position);
+      if (_closed || !identical(tracker, _tracker)) return;
+      if (changed) {
+        _rebuildPolylines();
+        _updateEta();
+        rebuildUi();
+      }
+    } catch (e) {
+      log('No se pudo actualizar la ruta: ${e.runtimeType}');
     }
   }
 
@@ -765,7 +1032,7 @@ class OrderTrackingViewModel extends BaseViewModel
   }
 
   void _syncRadarState() {
-    if (!showRadar) {
+    if (_closed || _suspended || !showRadar) {
       _radarTimer?.cancel();
       _radarTimer = null;
       _radarRadius = 60;
@@ -785,28 +1052,16 @@ class OrderTrackingViewModel extends BaseViewModel
     });
   }
 
+  /// El back manda `on_the_way` por socket y `out_for_delivery` en el pedido.
   String _normalizeStatus(String rawStatus) {
-    switch (rawStatus.trim().toLowerCase()) {
-      case 'assigned':
-        return 'accepted';
-      case 'in_progress':
-      case 'in-progress':
-      case 'on_the_way':
-      case 'in_route':
-      case 'out_for_delivery':
-      case 'outfordelivery':
-        return 'out_for_delivery';
-      case 'arriving':
-        return 'arriving';
-      default:
-        return rawStatus.trim().toLowerCase();
-    }
+    final status = rawStatus.trim().toLowerCase();
+    return status == 'on_the_way' ? 'out_for_delivery' : status;
   }
 
   String _driverFirstName() {
     final trimmed = _driverName.trim();
     if (trimmed.isEmpty) {
-      return 'El chofer';
+      return 'El repartidor';
     }
     return trimmed.split(' ').first;
   }
@@ -827,38 +1082,14 @@ class OrderTrackingViewModel extends BaseViewModel
     if (_driverLocation == null || _customerLocation == null) {
       return null;
     }
-    return Geolocator.distanceBetween(
-      _driverLocation!.latitude,
-      _driverLocation!.longitude,
-      _customerLocation!.latitude,
-      _customerLocation!.longitude,
-    );
+    return Geo.distanceMeters(_driverLocation!, _customerLocation!);
   }
 
   LatLng? _readLatLng(Map<String, dynamic>? map) {
-    if (map == null) {
-      return null;
-    }
-
-    final lat = _readDouble(map['lat'] ?? map['latitude']);
-    final lng = _readDouble(map['lng'] ?? map['longitude']);
-    if (lat == null || lng == null) {
-      return null;
-    }
-    return LatLng(lat, lng);
-  }
-
-  LatLng? _parseLatLngPair(String raw) {
-    final parts = raw.split(',');
-    if (parts.length != 2) {
-      return null;
-    }
-    final lat = double.tryParse(parts[0].trim());
-    final lng = double.tryParse(parts[1].trim());
-    if (lat == null || lng == null) {
-      return null;
-    }
-    return LatLng(lat, lng);
+    if (map == null) return null;
+    final lat = _readDouble(map['latitude']);
+    final lng = _readDouble(map['longitude']);
+    return lat == null || lng == null ? null : LatLng(lat, lng);
   }
 
   Map<String, dynamic>? _readMap(
@@ -910,19 +1141,6 @@ class OrderTrackingViewModel extends BaseViewModel
     return null;
   }
 
-  int? _readInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-    if (value is num) {
-      return value.toInt();
-    }
-    if (value is String) {
-      return int.tryParse(value);
-    }
-    return null;
-  }
-
   @override
   void dispose() {
     _closed = true;
@@ -931,8 +1149,12 @@ class OrderTrackingViewModel extends BaseViewModel
     WidgetsBinding.instance.removeObserver(this);
     _driverSubscription?.cancel();
     _radarTimer?.cancel();
+    _pollTimer?.cancel();
     _driverLocationSubscription?.cancel();
     _orderStatusSubscription?.cancel();
+    _cancellationSubscription?.cancel();
+    _cancelledBySubscription?.cancel();
+    _arrivedSubscription?.cancel();
     _trackingService.disconnect();
     super.dispose();
   }

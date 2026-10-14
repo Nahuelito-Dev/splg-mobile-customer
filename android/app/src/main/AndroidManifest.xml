@@ -10,8 +10,8 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
-    <!-- Fotos: adjuntar una imagen a un reclamo (Android 13+ / anteriores). -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Fotos de perfil y de reclamos: se eligen con el selector del sistema, que
+         da acceso sólo a la imagen elegida (Android 13+ no necesita permiso). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
 
     <!-- Avisos del estado del pedido (Android 13+). -->

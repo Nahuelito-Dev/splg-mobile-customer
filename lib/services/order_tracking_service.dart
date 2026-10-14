@@ -2,26 +2,53 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:splg_customer/core/config/app_config.dart';
 import 'package:splg_customer/core/network/api_client.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
+import 'package:splg_customer/core/network/order_gone.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import 'package:uuid/uuid.dart';
+import 'package:splg_lib/network/api_error_text.dart';
 
-/// Resultado de intentar confirmar la entrega con el codigo leido del QR del
-/// chofer. `invalidCode` cubre tanto codigo incorrecto como pedido que ya no
-/// esta `on_the_way` (el backend devuelve 400 en ambos casos).
-enum ConfirmDeliveryResult { success, invalidCode, networkError }
+/// Cómo terminó el intento de confirmar la entrega con el código del QR.
+/// - `invalidCode`: el back lo rechazó con un 400 de negocio (código que no
+///   coincide o pedido que ya no está en camino).
+/// - `sessionExpired`: 401, la sesión dejó de valer.
+/// - `networkError`: no hubo respuesta (sin conexión, timeout).
+/// - `failed`: cualquier otro rechazo (403, 404, 5xx...).
+enum ConfirmDeliveryResult {
+  success,
+  invalidCode,
+  sessionExpired,
+  networkError,
+  failed,
+}
+
+/// Resultado de confirmar la entrega más el texto listo para mostrar (el
+/// mensaje del back cuando es de negocio y está en castellano).
+class ConfirmDeliveryOutcome {
+  const ConfirmDeliveryOutcome(this.result, [this.message]);
+
+  final ConfirmDeliveryResult result;
+  final String? message;
+
+  bool get isSuccess => result == ConfirmDeliveryResult.success;
+}
 
 class DriverLocationUpdate {
   const DriverLocationUpdate({
     required this.lat,
     required this.lng,
     required this.heading,
+    this.at,
   });
 
   final double lat;
   final double lng;
   final double heading;
+
+  /// Hora de la posición según el servidor (`at` de `order:driver-location`).
+  final DateTime? at;
 }
 
 /// Chofer asignado tal como lo manda el back en `order:accepted` y
@@ -47,7 +74,6 @@ class DriverPhotoLookup {
 
 class OrderTrackingService {
   final _apiClient = ApiClient();
-  final _uuid = const Uuid();
   io.Socket? _socket;
 
   /// Pedido que estamos siguiendo: filtramos los eventos que llegan al room del
@@ -58,11 +84,25 @@ class OrderTrackingService {
       StreamController<DriverLocationUpdate>.broadcast();
   final _orderStatusController = StreamController<String>.broadcast();
   final _driverController = StreamController<DriverInfo>.broadcast();
+  final _cancellationController = StreamController<String>.broadcast();
+  final _cancelledByController = StreamController<String>.broadcast();
+  final _arrivedController = StreamController<void>.broadcast();
 
   Stream<DriverLocationUpdate> get driverLocationUpdates =>
       _driverLocationController.stream;
   Stream<String> get orderStatusUpdates => _orderStatusController.stream;
   Stream<DriverInfo> get driverUpdates => _driverController.stream;
+
+  /// Motivo de una cancelación (`reason` de `order:cancelled`); sale antes que
+  /// el cambio de estado.
+  Stream<String> get cancellationReasons => _cancellationController.stream;
+
+  /// Quién canceló (`cancelledBy` de `order:cancelled`: customer, admin,
+  /// driver o system).
+  Stream<String> get cancelledBys => _cancelledByController.stream;
+
+  /// El repartidor avisó que llegó (`order:arrived`).
+  Stream<void> get arrivedUpdates => _arrivedController.stream;
 
   /// Renueva la URL firmada de la foto del chofer. 409 (pedido fuera de
   /// aceptado/en camino) y 404 no son error: significan "sin foto".
@@ -97,6 +137,9 @@ class OrderTrackingService {
     }
   }
 
+  /// `GET /orders/:id`. Null ante red o 5xx (se puede reintentar); lanza
+  /// [orderGoneFailure] ante 404/410: el pedido ya no existe para este usuario
+  /// y volver a pedirlo no cambia nada.
   Future<Map<String, dynamic>?> fetchOrderById(
     String orderId,
     String token,
@@ -114,48 +157,112 @@ class OrderTrackingService {
 
       return _extractOrderMap(data) ?? data;
     } catch (e) {
+      if (isOrderGone(e)) throw orderGoneFailure;
       log('e in fetchOrderById: ${e.toString()}');
       return null;
     }
   }
 
+  /// Claves de idempotencia de la confirmación, por pedido y código leído.
+  final _deliveryKeys = IdempotencyKeys();
+
   /// POST /orders/:orderId/confirm-delivery con el codigo leido del QR del
-  /// chofer. Idempotente via header `Idempotency-Key` (un uuid v4 por
-  /// intento del usuario, asi un reintento de red no reprocesa la entrega).
-  Future<ConfirmDeliveryResult> confirmDelivery(
+  /// chofer. Idempotente via header `Idempotency-Key`: el mismo pedido y
+  /// código reusan la clave mientras no haya respuesta definitiva (sin
+  /// respuesta, 5xx, 429, 409 "en curso" o 422), asi el reintento no
+  /// reprocesa la entrega. Con exito o un rechazo de negocio la clave se
+  /// descarta. El back responde 201 al confirmar: cualquier 2xx es exito.
+  Future<ConfirmDeliveryOutcome> confirmDelivery(
     String orderId,
     String code,
     String token,
   ) async {
+    final intention = '$orderId|$code';
     try {
       final response = await _apiClient.post(
         'orders/$orderId/confirm-delivery',
         {'code': code},
         token,
-        {'Idempotency-Key': _uuid.v4()},
+        {'Idempotency-Key': _deliveryKeys.keyFor(intention)},
       );
-
-      if (response.statusCode == 200) {
-        return ConfirmDeliveryResult.success;
+      final status = response.statusCode ?? 0;
+      if (status >= 200 && status < 300) {
+        _deliveryKeys.settle(intention, keep: false);
+        return const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success);
       }
-
-      return ConfirmDeliveryResult.invalidCode;
+      _deliveryKeys.settle(intention,
+          keep: keepIdempotencyKey(status, response.data));
+      return ConfirmDeliveryOutcome(
+        ConfirmDeliveryResult.failed,
+        ApiErrorText.of(status, response.data),
+      );
     } on DioException catch (e) {
-      if (e.response?.statusCode == 400) {
-        return ConfirmDeliveryResult.invalidCode;
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      log('e in confirmDelivery: ${e.type} $status');
+      _deliveryKeys.settle(intention, keep: keepIdempotencyKey(status, data));
+      if (status == null) {
+        return const ConfirmDeliveryOutcome(
+          ConfirmDeliveryResult.networkError,
+          ApiErrorText.offline,
+        );
       }
-      log('e in confirmDelivery: ${e.toString()}');
-      return ConfirmDeliveryResult.networkError;
+      if (status == 400) {
+        return ConfirmDeliveryOutcome(
+          ConfirmDeliveryResult.invalidCode,
+          ApiErrorText.businessMessage(status, data) ?? _invalidCodeText,
+        );
+      }
+      if (isIdempotencyConflict(status, data)) {
+        return const ConfirmDeliveryOutcome(
+          ConfirmDeliveryResult.failed,
+          'Ya recibimos tu confirmación. Revisá el estado del pedido.',
+        );
+      }
+      return ConfirmDeliveryOutcome(
+        status == 401
+            ? ConfirmDeliveryResult.sessionExpired
+            : ConfirmDeliveryResult.failed,
+        ApiErrorText.of(status, data),
+      );
     } catch (e) {
-      log('e in confirmDelivery: ${e.toString()}');
-      return ConfirmDeliveryResult.networkError;
+      log('e in confirmDelivery: ${e.runtimeType}');
+      _deliveryKeys.settle(intention, keep: true);
+      return const ConfirmDeliveryOutcome(
+        ConfirmDeliveryResult.failed,
+        ApiErrorText.generic,
+      );
     }
+  }
+
+  static const _invalidCodeText =
+      'El código no es válido o el pedido ya no está en camino.';
+
+  /// Auth del handshake de Socket.IO: una función que pide el token en cada
+  /// conexión (también en las reconexiones). El token de Firebase vence en una
+  /// hora; uno tomado una sola vez al abrir el seguimiento deja de valer y el
+  /// back rechaza la reconexión.
+  @visibleForTesting
+  static void Function(void Function(Map<String, dynamic>) done) authFor(
+    Future<String?> Function() tokenProvider,
+  ) {
+    return (done) async {
+      String? token;
+      try {
+        token = await tokenProvider();
+      } catch (e) {
+        log('socket order tracking: no se pudo leer el token: ${e.runtimeType}');
+      }
+      done(token == null || token.isEmpty
+          ? <String, dynamic>{}
+          : {'token': token});
+    };
   }
 
   void subscribeToOrder({
     required String orderId,
     required String customerId,
-    String? token,
+    Future<String?> Function()? tokenProvider,
   }) {
     disconnect();
     _trackedOrderId = orderId;
@@ -167,14 +274,13 @@ class OrderTrackingService {
         .setReconnectionAttempts(8)
         .setReconnectionDelay(1000);
 
-    // El CustomersGateway valida el token de Firebase en el handshake (auth.token
-    // o header Authorization). Mandamos ambos por compatibilidad.
-    if (token != null && token.isNotEmpty) {
-      builder.setAuth({'token': token});
-      builder.setExtraHeaders({'Authorization': 'Bearer $token'});
-    }
-
     _socket = io.io(AppConfig.customersNamespace, builder.build());
+
+    // El CustomersGateway valida el token de Firebase en el handshake
+    // (`auth.token`); se pide fresco en cada conexión.
+    if (tokenProvider != null) {
+      _socket?.auth = authFor(tokenProvider);
+    }
 
     _socket?.onConnect((_) {
       // Nos unimos a nuestra sala de cliente: el backend emite ahí los eventos
@@ -183,14 +289,18 @@ class OrderTrackingService {
     });
 
     // Ubicación del chofer en vivo (mientras el pedido está en camino).
-    _socket?.on('order:driver-location', _onDriverLocationUpdate);
+    _socket?.on('order:driver-location', onDriverLocationUpdate);
 
     // Cambios de estado del pedido → alertas al cliente.
-    _socket?.on('order:accepted', _onOrderStatusUpdate);
-    _socket?.on('order:on-the-way', _onOrderStatusUpdate);
-    _socket?.on('order:delivered', _onOrderStatusUpdate);
-    _socket?.on('order:cancelled', _onOrderStatusUpdate);
+    _socket?.on('order:accepted', onOrderStatusUpdate);
+    _socket?.on('order:on-the-way', onOrderStatusUpdate);
+    _socket?.on('order:delivered', onOrderStatusUpdate);
+    _socket?.on('order:cancelled', onOrderStatusUpdate);
+    // El chofer liberó el pedido: vuelve a buscarse repartidor (`pending`).
+    _socket?.on('order:searching-driver', onOrderStatusUpdate);
+    _socket?.on('order:arrived', onArrived);
 
+    _socket?.onConnectError((e) => log('socket order tracking connect error'));
     _socket?.onError((e) => log('socket order tracking error: $e'));
     _socket?.onDisconnect((_) => log('socket order tracking disconnected'));
 
@@ -203,13 +313,16 @@ class OrderTrackingService {
     _socket?.off('order:on-the-way');
     _socket?.off('order:delivered');
     _socket?.off('order:cancelled');
+    _socket?.off('order:searching-driver');
+    _socket?.off('order:arrived');
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
     _trackedOrderId = null;
   }
 
-  void _onDriverLocationUpdate(dynamic payload) {
+  @visibleForTesting
+  void onDriverLocationUpdate(dynamic payload) {
     final data = _toMap(payload);
     if (data == null) {
       return;
@@ -220,19 +333,32 @@ class OrderTrackingService {
       return;
     }
 
-    final lat = _toDouble(data['lat'] ?? data['latitude']);
-    final lng = _toDouble(data['lng'] ?? data['longitude']);
+    final lat = _toDouble(data['lat']);
+    final lng = _toDouble(data['lng']);
     if (lat == null || lng == null) {
       return;
     }
 
-    final heading = _toDouble(data['heading'] ?? data['bearing']) ?? 0;
+    final heading = _toDouble(data['heading']) ?? 0;
     _driverLocationController.add(
-      DriverLocationUpdate(lat: lat, lng: lng, heading: heading),
+      DriverLocationUpdate(
+        lat: lat,
+        lng: lng,
+        heading: heading,
+        at: DateTime.tryParse(data['at']?.toString() ?? ''),
+      ),
     );
   }
 
-  void _onOrderStatusUpdate(dynamic payload) {
+  @visibleForTesting
+  void onArrived(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    _arrivedController.add(null);
+  }
+
+  @visibleForTesting
+  void onOrderStatusUpdate(dynamic payload) {
     final data = _toMap(payload);
     if (data == null) {
       return;
@@ -256,8 +382,17 @@ class OrderTrackingService {
       ));
     }
 
-    final status =
-        (data['status'] ?? data['orderStatus'] ?? data['state'])?.toString();
+    final reason = data['reason']?.toString().trim();
+    if (reason != null && reason.isNotEmpty) {
+      _cancellationController.add(reason);
+    }
+
+    final cancelledBy = data['cancelledBy']?.toString().trim();
+    if (cancelledBy != null && cancelledBy.isNotEmpty) {
+      _cancelledByController.add(cancelledBy);
+    }
+
+    final status = data['status']?.toString();
     if (status != null && status.isNotEmpty) {
       _orderStatusController.add(status);
     }
@@ -266,7 +401,7 @@ class OrderTrackingService {
   /// True si el evento es del pedido que seguimos (o si no trae orderId, para no
   /// perder eventos legacy). El backend manda `orderId` en todos sus payloads.
   bool _isForTrackedOrder(Map<String, dynamic> data) {
-    final incoming = (data['orderId'] ?? data['order_id'])?.toString();
+    final incoming = data['orderId']?.toString();
     if (incoming == null || _trackedOrderId == null) {
       return true;
     }

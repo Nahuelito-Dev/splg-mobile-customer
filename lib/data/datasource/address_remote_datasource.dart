@@ -48,9 +48,19 @@ class AddressRemoteDataSource {
 
   /// Alta de una dirección ya geocodificada (`POST /user-address`). El body
   /// lleva los nombres del DTO del back (camelCase) y `latitude`/`longitude`
-  /// obligatorios.
-  Future<ApiResult<void>> create(Map<String, dynamic> body, String token) =>
-      _send(() => _apiClient.post('user-address', body, token));
+  /// obligatorios. Idempotente por `Idempotency-Key` ([idempotencyKey]): el
+  /// reintento de una misma dirección lleva la misma clave.
+  Future<ApiResult<void>> create(
+    Map<String, dynamic> body,
+    String token,
+    String idempotencyKey,
+  ) =>
+      _send(() => _apiClient.post(
+            'user-address',
+            body,
+            token,
+            {'Idempotency-Key': idempotencyKey},
+          ));
 
   /// Actualiza una dirección (`PATCH /user-address/:id`).
   Future<ApiResult<void>> update(

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/core/network/order_gone.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_viewmodel.dart';
@@ -62,6 +63,33 @@ void main() {
     final m = OrderDetailViewModel(orderId: 'zzz');
     await m.load();
     expect(m.loadError, isNotNull);
+    expect(m.order, isNull);
+  });
+
+  test(
+      'pedido que ya no existe (404/410): mensaje y sin Reintentar, aun con '
+      'el de la lista a mano', () async {
+    when(history.fetchOrder('o1'))
+        .thenAnswer((_) async => throw orderGoneFailure);
+    final m = OrderDetailViewModel(
+        orderId: 'o1', initial: order(status: OrderStatus.pending));
+
+    await m.load();
+
+    expect(m.loadError, kOrderGoneText);
+    expect(m.canRetry, isFalse);
+  });
+
+  test('si desaparece al volver del seguimiento, se muestra el mensaje',
+      () async {
+    final m = await loaded(OrderStatus.accepted);
+    when(history.fetchOrder('o1'))
+        .thenAnswer((_) async => throw orderGoneFailure);
+
+    await m.track();
+
+    expect(m.loadError, kOrderGoneText);
+    expect(m.canRetry, isFalse);
     expect(m.order, isNull);
   });
 

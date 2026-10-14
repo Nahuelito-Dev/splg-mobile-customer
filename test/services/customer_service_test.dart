@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/data/datasource/address_remote_datasource.dart';
 import 'package:splg_customer/domain/address_draft.dart';
 import 'package:splg_customer/services/address_geocoder.dart';
@@ -23,6 +24,7 @@ class _Geocoder implements AddressGeocoder {
 /// Registra qué se mandó a la API de direcciones.
 class _Addresses extends AddressRemoteDataSource {
   final calls = <String>[];
+  final keys = <String>[];
   Map<String, dynamic>? lastBody;
   ApiResult<void> result = const ApiResult.ok();
 
@@ -31,9 +33,10 @@ class _Addresses extends AddressRemoteDataSource {
 
   @override
   Future<ApiResult<void>> create(
-      Map<String, dynamic> body, String token) async {
+      Map<String, dynamic> body, String token, String idempotencyKey) async {
     calls.add('create');
     lastBody = body;
+    keys.add(idempotencyKey);
     onCreate?.call();
     return result;
   }
@@ -269,5 +272,69 @@ void main() {
     expect(PasswordChangeResult.fromCode('too-many-requests'),
         PasswordChangeResult.tooManyRequests);
     expect(PasswordChangeResult.fromCode('algo'), PasswordChangeResult.other);
+  });
+
+  group('Idempotency-Key del alta de dirección', () {
+    test('el reintento tras un error de red lleva la misma clave', () async {
+      final a = _Addresses()
+        ..result = const ApiResult.fail('Sin conexión. Revisá tu internet.',
+            keepKey: true);
+      final s = service(_Geocoder(const GeoPoint(1, 1)), a);
+
+      await s.saveAddress(draft);
+      a.result = const ApiResult.ok();
+      await s.saveAddress(draft);
+
+      expect(a.keys, hasLength(2));
+      expect(a.keys[0], a.keys[1]);
+    });
+
+    test('la clave se conserva aunque cambie isDefault entre intentos',
+        () async {
+      final a = _Addresses()
+        ..result = const ApiResult.fail('Sin conexión. Revisá tu internet.',
+            keepKey: true);
+      final s = service(_Geocoder(const GeoPoint(1, 1)), a);
+
+      await s.saveAddress(draft);
+      a.existing = [
+        {'address_id': 'x', 'street': 'Mitre 100'}
+      ];
+      a.result = const ApiResult.ok();
+      await s.saveAddress(draft);
+
+      expect(a.keys[0], a.keys[1]);
+    });
+
+    test('tras crearla o un rechazo de negocio, la próxima lleva otra clave',
+        () async {
+      final a = _Addresses();
+      final s = service(_Geocoder(const GeoPoint(1, 1)), a);
+
+      await s.saveAddress(draft);
+      a.result = const ApiResult.fail('Dirección inválida', status: 400);
+      await s.saveAddress(draft);
+      await s.saveAddress(draft);
+
+      expect(a.keys.toSet(), hasLength(3));
+    });
+
+    test(
+        'un 422 de clave ya usada es que la dirección ya está creada: relee '
+        'la lista, no reenvía ni conserva la clave', () async {
+      final a = _Addresses()
+        ..result = const ApiResult.fail(kIdempotencyConflictText,
+            status: 422, keepKey: true);
+      final s = service(_Geocoder(const GeoPoint(1, 1)), a);
+
+      final r = await s.saveAddress(draft);
+      a.result = const ApiResult.ok();
+      await s.saveAddress(draft);
+
+      expect(r.ok, isTrue);
+      expect(a.calls.first, 'fetch-check');
+      expect(a.calls, contains('fetch'));
+      expect(a.keys[0], isNot(a.keys[1]));
+    });
   });
 }

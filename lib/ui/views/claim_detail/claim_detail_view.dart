@@ -9,6 +9,7 @@ import 'package:splg_customer/ui/widgets/app_header.dart';
 import 'package:splg_customer/ui/widgets/photo_source_sheet.dart';
 import 'package:splg_customer/ui/widgets/signed_image.dart';
 import 'claim_detail_viewmodel.dart';
+import 'package:splg_customer/ui/common/app_icons.dart';
 
 /// Detalle de un reclamo propio: motivo, descripción, estado y la nota con la
 /// que se resolvió.
@@ -89,8 +90,7 @@ class ClaimDetailView extends StackedView<ClaimDetailViewModel> {
                                   height: 16,
                                   child:
                                       CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.photo_camera_outlined,
-                                  size: 18),
+                              : const Icon(AppIcons.camera, size: 18),
                           label: Text(
                               model.hasPhoto ? 'Cambiar foto' : 'Agregar foto'),
                         ),
@@ -113,7 +113,7 @@ class ClaimDetailView extends StackedView<ClaimDetailViewModel> {
                         if (claim.orderTotal != null)
                           SplgInfoRow(
                               title: 'Total:',
-                              value: money.format(claim.orderTotal)),
+                              value: money.format(claim.orderTotal!)),
                       ],
                     ),
                     if ((claim.resolutionNote ?? '').isNotEmpty)

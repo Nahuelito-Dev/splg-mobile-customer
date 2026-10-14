@@ -7,11 +7,13 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/network/api_error_text.dart';
 import 'package:splg_customer/domain/orders_page.dart';
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/core/network/order_gone.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/data/repository/order_repository_imp.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/usecases/create_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_orders_usecases.dart';
@@ -66,7 +68,11 @@ class HistoryService with ListenableServiceMixin {
     final session = _session;
     final token = await _customerService.token;
     if (token == null) {
-      return const CreateOrderResult(success: false);
+      return const CreateOrderResult(
+        success: false,
+        message: ApiErrorText.sessionExpired,
+        retryable: false,
+      );
     }
 
     final notificationToken = await _notificationService.currentToken;
@@ -76,7 +82,13 @@ class HistoryService with ListenableServiceMixin {
     );
     final createdOrder = result.order;
     if (!result.success || createdOrder == null) {
-      return CreateOrderResult(success: false, paymentUrl: result.paymentUrl);
+      return CreateOrderResult(
+        success: false,
+        paymentUrl: result.paymentUrl,
+        message: result.message,
+        retryable: result.retryable,
+        idempotencyConflict: result.idempotencyConflict,
+      );
     }
 
     if (session == _session) {
@@ -93,6 +105,29 @@ class HistoryService with ListenableServiceMixin {
       order: createdOrder,
       paymentUrl: result.paymentUrl,
     );
+  }
+
+  /// Cotiza el pedido en el back (`POST /orders/quote`): promociones por
+  /// volumen, recargo de zona y por medio de pago los calcula el servidor.
+  Future<QuoteOutcome> quoteOrder(Order order, {String? timeSlotId}) async {
+    final token = await _customerService.token;
+    if (token == null) {
+      return const QuoteOutcome.failed(ApiErrorText.sessionExpired,
+          retryable: false);
+    }
+    final result = await _orderDatasource.quoteOrder(
+      _toQuotePayload(order, timeSlotId),
+      token,
+    );
+    if (!result.ok) {
+      return QuoteOutcome.failed(
+        result.message ?? ApiErrorText.generic,
+        retryable: ApiErrorText.isRetryable(result.status),
+      );
+    }
+    final quote = OrderQuote.fromJson(result.data);
+    if (quote == null) return const QuoteOutcome.failed(ApiErrorText.generic);
+    return QuoteOutcome.ok(quote);
   }
 
   Future<bool> updateOrder(
@@ -222,7 +257,12 @@ class HistoryService with ListenableServiceMixin {
   Future<Order> fetchOrder(String orderId) async {
     final token = await _customerService.token;
     if (token == null) throw const LoadFailure(ApiErrorText.sessionExpired);
-    return _orderRepository.fetchOrder(orderId, token);
+    try {
+      return await _orderRepository.fetchOrder(orderId, token);
+    } catch (e) {
+      if (isOrderGone(e)) throw orderGoneFailure;
+      rethrow;
+    }
   }
 
   /// Limpia lo del usuario anterior (cierre de sesión / baja de cuenta).
@@ -231,6 +271,7 @@ class HistoryService with ListenableServiceMixin {
     _history.clear();
     _hasPendingOrder.value = false;
     _cancelOrderUseCase.clear();
+    _createOrderUseCase.clear();
     notifyListeners();
   }
 
@@ -265,6 +306,10 @@ class HistoryService with ListenableServiceMixin {
         'notificationToken': notificationToken,
     };
   }
+
+  /// Mismo cuerpo que el alta, sin el token de notificaciones.
+  Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId) =>
+      _toCreateOrderPayload(order, timeSlotId);
 
   Map<String, dynamic> _toUpdateOrderPayload(Order order, String? timeSlotId) {
     final items = order.items

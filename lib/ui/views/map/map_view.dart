@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_lib/icons/splg_icons.dart';
 import 'package:splg_lib/theme/brasa_palette.dart';
 import 'package:stacked/stacked.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -43,7 +44,7 @@ class MapView extends StackedView<MapViewModel> {
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 24.0),
                     child: Icon(
-                      Icons.location_on,
+                      SplgIcons.location,
                       color: Theme.of(context).colorScheme.primary,
                       size: 40,
                     ),

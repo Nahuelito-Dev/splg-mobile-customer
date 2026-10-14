@@ -11,9 +11,25 @@ class CreateOrderResult {
     required this.success,
     this.order,
     this.paymentUrl,
+    this.message,
+    this.retryable = true,
+    this.idempotencyConflict = false,
   });
 
   final bool success;
+
+  /// Texto para el usuario cuando falló: el mensaje del back si es una regla
+  /// de negocio (fuera de zona, sin stock), o uno propio por tipo de error.
+  final String? message;
+
+  /// Volver a intentar con la misma intención tiene sentido (red caída, 429,
+  /// 5xx). Un rechazo de negocio (400/409) no: hay que cambiar el pedido.
+  final bool retryable;
+
+  /// 422: la misma `Idempotency-Key` ya se usó con otro cuerpo, es decir que el
+  /// primer envío llegó y el pedido probablemente existe.
+  final bool idempotencyConflict;
+
   final Order? order;
   final String? paymentUrl;
 }

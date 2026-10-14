@@ -1,3 +1,4 @@
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:splg_lib/domain/discount.dart';
@@ -48,3 +49,30 @@ Order order({
 
 /// Carrito de verdad: el mock de CartService no guarda nada.
 class FakeCart extends CartService {}
+
+/// Cotización como la devolvería `POST /orders/quote` por [qty] garrafas de
+/// [unit] cada una (promoción por volumen ya aplicada) más los recargos.
+QuoteOutcome backQuote({
+  String id = 'g1',
+  int qty = 2,
+  double unit = 900,
+  double paymentSurcharge = 0,
+  double zoneSurcharge = 0,
+  String? zoneName,
+}) {
+  final subtotal = unit * qty;
+  final total = subtotal + zoneSurcharge + paymentSurcharge;
+  return QuoteOutcome.ok(OrderQuote(
+    lines: [
+      QuoteLine(
+          gasCylinderId: id, quantity: qty, unitPrice: unit, subtotal: subtotal)
+    ],
+    subtotal: subtotal,
+    zoneSurcharge: zoneSurcharge,
+    zoneName: zoneName,
+    paymentSurcharge: paymentSurcharge,
+    deposit: 0,
+    total: total,
+    balance: total,
+  ));
+}

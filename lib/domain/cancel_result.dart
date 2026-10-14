@@ -1,4 +1,5 @@
 import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
 
 /// Resultado de cancelar un pedido. El mensaje del back sólo se muestra si es
 /// un 400/409 de negocio en castellano ("El pedido ya está en camino. Contacte
@@ -48,6 +49,15 @@ class CancelResult {
     if (ApiErrorText.isInProgress(statusCode, data)) {
       return const CancelResult.failed(
           message: ApiErrorText.inProgress, retryable: true);
+    }
+    // La clave ya se usó con otro cuerpo: el primer intento llegó. Se explica
+    // y se conserva la clave (una nueva podría procesar la cancelación dos
+    // veces).
+    if (isIdempotencyConflict(statusCode, data)) {
+      return const CancelResult.failed(
+        message: 'Ya habías intentado cancelar este pedido con otro motivo. '
+            'Revisá el estado del pedido y volvé a intentarlo.',
+      );
     }
     final business = ApiErrorText.businessMessage(statusCode, data);
     if (business != null) return CancelResult.rejected(business);
