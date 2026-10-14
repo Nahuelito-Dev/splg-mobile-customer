@@ -5,6 +5,7 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
@@ -27,10 +28,14 @@ class OrderDetailViewModel extends LoadViewModel {
 
   Order? order;
 
+  /// Desglose del total y estado del cobro (`GET /orders/:id`); null hasta que
+  /// se lee.
+  OrderBreakdown? breakdown;
+
   @override
   Future<void> fetch() async {
     try {
-      order = await _history.fetchOrder(orderId);
+      _apply(await _history.fetchOrderDetail(orderId));
     } catch (e) {
       // Con el pedido de la lista a mano se muestra eso; sin él, el error. Un
       // pedido que ya no existe no se muestra con datos viejos.
@@ -38,11 +43,16 @@ class OrderDetailViewModel extends LoadViewModel {
     }
   }
 
+  void _apply(OrderDetail detail) {
+    order = detail.order;
+    breakdown = detail.breakdown;
+  }
+
   static bool _isGone(Object e) => e is LoadFailure && !e.retryable;
 
   Future<void> _reload() async {
     try {
-      order = await _history.fetchOrder(orderId);
+      _apply(await _history.fetchOrderDetail(orderId));
     } catch (e) {
       if (_isGone(e)) {
         order = null;
@@ -60,7 +70,7 @@ class OrderDetailViewModel extends LoadViewModel {
       order?.status == OrderStatus.accepted ||
       order?.status == OrderStatus.outForDelivery;
   bool get canCancel => order?.status == OrderStatus.pending;
-  bool get canModify => order?.status == OrderStatus.pending;
+  bool get canModify => order != null && canEditOrder(order!, breakdown);
   bool get canRate => order?.status == OrderStatus.delivered;
   bool get canClaim => order?.status == OrderStatus.delivered;
   bool get canRepeat => order != null && !_active;
@@ -75,19 +85,19 @@ class OrderDetailViewModel extends LoadViewModel {
     if (cancelled == true) await _reload();
   }
 
-  void modify() {
+  /// Abre la edición del pedido y, al volver, lo relee: haya guardado o no, el
+  /// pedido pudo cambiar (o ya no ser editable porque lo tomó un repartidor).
+  Future<void> modify() async {
     final o = order;
     if (o == null) return;
-    _cart.setOrder(o);
-    _cart.startEditingOrder(o.id);
-    _nav.navigateToCheckoutView();
+    await _nav.navigateToEditOrderView(order: o, breakdown: breakdown);
+    await _reload();
   }
 
   void repeat() {
     final o = order;
     if (o == null) return;
     _cart.setOrder(o);
-    _cart.clearEditingOrder();
     _nav.navigateToCheckoutView();
   }
 

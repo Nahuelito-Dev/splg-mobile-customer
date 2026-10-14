@@ -6,6 +6,7 @@ import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/time_slot_availability.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/claim_service.dart';
@@ -20,6 +21,8 @@ import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
 import 'package:splg_customer/ui/views/addresses/addresses_view.dart';
 import 'package:splg_customer/ui/views/cancel_order/cancel_order_view.dart';
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
+import 'package:splg_customer/ui/views/edit_order/edit_order_view.dart';
+import 'package:splg_customer/ui/views/edit_order/edit_order_viewmodel.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
 import 'package:splg_customer/ui/views/help/help_view.dart';
 import 'package:splg_customer/ui/views/home/home_view.dart';
@@ -199,8 +202,13 @@ void main() {
 
   testGoldens('Detalle del pedido', (t) async {
     await loadAppFonts();
-    when(history.fetchOrder('o1'))
-        .thenAnswer((_) async => order(status: OrderStatus.pending));
+    when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+        order(status: OrderStatus.pending, total: 1230),
+        const OrderBreakdown(
+            total: 1230,
+            itemsSubtotal: 1000,
+            zoneSurcharge: 50,
+            zoneName: 'Centro')));
     await pumpScreen(t, const OrderDetailView(orderId: 'o1'));
     await check(t, 'order_detail');
   });
@@ -303,5 +311,55 @@ void main() {
     await t.tap(find.byKey(const Key('slot-s1')));
     await t.pumpAndSettle();
     await check(t, 'checkout');
+  });
+  testGoldens('Modificar pedido', (t) async {
+    await loadAppFonts();
+    EditOrderViewModel.now = () => DateTime(2026, 10, 12);
+    EditOrderViewModel.quoteDebounce = Duration.zero;
+    addTearDown(() {
+      EditOrderViewModel.now = DateTime.now;
+      EditOrderViewModel.quoteDebounce = const Duration(milliseconds: 400);
+    });
+    final history = locator<HistoryService>() as MockHistoryService;
+    when(history.quoteOrder(any,
+            timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+        .thenAnswer((_) async =>
+            backQuote(unit: 14155, zoneSurcharge: 900, zoneName: 'Centro'));
+    final customersMock = locator<CustomerService>() as MockCustomerService;
+    when(customersMock.customer).thenReturn(
+        customerWith([addr('a1', 'Buenos Aires 4114', primary: true)]));
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [
+          cylinder(price: 14900, discounts: [
+            Discount(quantity: 2, percentage: 5),
+          ]),
+          cylinder(id: 'g2', type: 'Garrafa 15kg', price: 8500),
+        ]);
+    final slots = locator<TimeSlotService>() as MockTimeSlotService;
+    when(slots.availabilityFor(any)).thenAnswer((_) async => const [
+          TimeSlotAvailability(
+              timeSlotId: 's1',
+              name: 'Mañana',
+              startTime: '08:00:00',
+              endTime: '12:00:00',
+              remaining: 60),
+          TimeSlotAvailability(
+              timeSlotId: 's2',
+              name: 'Tarde',
+              startTime: '16:00:00',
+              endTime: '20:00:00',
+              remaining: 0),
+        ]);
+    final editable = order(
+      items: [OrderItem(cylinder: cylinder(price: 14900), quantity: 2)],
+      address: addr('a1', 'Buenos Aires 4114'),
+    ).copyWith(deliveryWindowStart: '08:00:00', deliveryWindowEnd: '12:00:00');
+    await pumpScreen(
+        t,
+        EditOrderView(
+            order: editable,
+            breakdown: const OrderBreakdown(
+                total: 1000, scheduledDate: '2026-10-12')));
+    await check(t, 'edit_order');
   });
 }

@@ -3,12 +3,15 @@ import 'dart:developer';
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/network/api_error_text.dart';
 import 'package:splg_customer/core/network/idempotency.dart';
+import 'package:splg_customer/core/network/order_gone.dart';
 import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/orders_page.dart';
+import 'package:splg_customer/domain/update_order_result.dart';
 
 class OrderRepositoryImp implements OrderRepository {
   OrderRepositoryImp(this._remoteDatasource);
@@ -65,31 +68,46 @@ class OrderRepositoryImp implements OrderRepository {
   }
 
   @override
-  Future<Order?> updateOrder(
+  Future<UpdateOrderResult> updateOrder(
     String orderId,
     Map<String, dynamic> orderData,
     String token,
+    String idempotencyKey,
   ) async {
     try {
-      final (success, data) = await _remoteDatasource.updateOrder(
+      final result = await _remoteDatasource.updateOrder(
         orderId,
         orderData,
         token,
+        idempotencyKey,
       );
-      if (!success || data == null) return null;
-
-      final order = OrderApiMapper.parseOrder(data);
-      if (order != null) return order;
-
-      return OrderApiMapper.parseOrder({
-        ...orderData,
-        'order_id': orderId,
-      });
+      if (!result.ok) {
+        final conflict =
+            result.status == 422 && result.message == kIdempotencyConflictText;
+        return UpdateOrderResult(
+          success: false,
+          message: conflict ? kOrderMaybeEditedText : result.message,
+          idempotencyConflict: conflict,
+          // Se reintenta con la misma clave si la primera llamada pudo haber
+          // llegado (sin respuesta, 5xx, 429, 409 "en curso"). Un 400/409 de
+          // negocio no: hay que cambiar la edición o el pedido ya cambió.
+          retryable: result.keepKey && !conflict,
+          // 409 de negocio, o el pedido ya no existe (404): el estado cambió.
+          rejected: (result.status == 409 &&
+                  result.message != ApiErrorText.inProgress) ||
+              (result.status == 404 && result.message == kOrderGoneText),
+        );
+      }
+      // Aplicó el cambio aunque la respuesta no se pueda leer: sin pedido, quien
+      // llama lo relee.
+      return UpdateOrderResult(
+          success: true, order: OrderApiMapper.parseOrder(result.data));
     } catch (e) {
-      log('e in updateOrder repository: ${e.toString()}');
+      log('e in updateOrder repository: ${e.runtimeType}');
     }
 
-    return null;
+    return const UpdateOrderResult(
+        success: false, message: ApiErrorText.generic);
   }
 
   @override
@@ -133,6 +151,14 @@ class OrderRepositoryImp implements OrderRepository {
     final order = OrderApiMapper.parseOrder(data);
     if (order == null) throw const FormatException('Pedido ilegible');
     return order;
+  }
+
+  @override
+  Future<OrderDetail> fetchOrderDetail(String orderId, String token) async {
+    final data = await _remoteDatasource.fetchOrder(orderId, token);
+    final order = OrderApiMapper.parseOrder(data);
+    if (order == null) throw const FormatException('Pedido ilegible');
+    return OrderDetail(order, OrderBreakdown.fromJson(data));
   }
 
   @override

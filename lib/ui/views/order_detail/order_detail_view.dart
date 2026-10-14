@@ -87,6 +87,16 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                           SplgInfoRow(
                               title: itemLabel(i),
                               value: money.format(Pricing.subtotal(i))),
+                        if ((model.breakdown?.zoneSurcharge ?? 0) > 0)
+                          SplgInfoRow(
+                              title: 'Recargo por zona',
+                              value:
+                                  money.format(model.breakdown!.zoneSurcharge)),
+                        if ((model.breakdown?.paymentSurcharge ?? 0) > 0)
+                          SplgInfoRow(
+                              title: 'Recargo por medio de pago',
+                              value: money
+                                  .format(model.breakdown!.paymentSurcharge)),
                       ],
                     ),
                     SplgInfoSection(

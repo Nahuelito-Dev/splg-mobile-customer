@@ -3,6 +3,7 @@ import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/core/network/order_gone.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_viewmodel.dart';
@@ -17,8 +18,10 @@ void main() {
   late MockHistoryService history;
   late MockNavigationService nav;
   late MockCartService cart;
+  OrderBreakdown? breakdown;
 
   setUp(() {
+    breakdown = null;
     registerServices();
     history = locator<HistoryService>() as MockHistoryService;
     nav = locator<NavigationService>() as MockNavigationService;
@@ -27,8 +30,8 @@ void main() {
   tearDown(() => locator.reset());
 
   Future<OrderDetailViewModel> loaded(OrderStatus status) async {
-    when(history.fetchOrder('o1'))
-        .thenAnswer((_) async => order(status: status));
+    when(history.fetchOrderDetail('o1'))
+        .thenAnswer((_) async => OrderDetail(order(status: status), breakdown));
     final m = OrderDetailViewModel(orderId: 'o1');
     await m.load();
     return m;
@@ -59,7 +62,7 @@ void main() {
   });
 
   test('trae el pedido por id; si falla y no hay pedido, error', () async {
-    when(history.fetchOrder('zzz')).thenThrow(Exception('404'));
+    when(history.fetchOrderDetail('zzz')).thenThrow(Exception('404'));
     final m = OrderDetailViewModel(orderId: 'zzz');
     await m.load();
     expect(m.loadError, isNotNull);
@@ -69,7 +72,7 @@ void main() {
   test(
       'pedido que ya no existe (404/410): mensaje y sin Reintentar, aun con '
       'el de la lista a mano', () async {
-    when(history.fetchOrder('o1'))
+    when(history.fetchOrderDetail('o1'))
         .thenAnswer((_) async => throw orderGoneFailure);
     final m = OrderDetailViewModel(
         orderId: 'o1', initial: order(status: OrderStatus.pending));
@@ -83,7 +86,7 @@ void main() {
   test('si desaparece al volver del seguimiento, se muestra el mensaje',
       () async {
     final m = await loaded(OrderStatus.accepted);
-    when(history.fetchOrder('o1'))
+    when(history.fetchOrderDetail('o1'))
         .thenAnswer((_) async => throw orderGoneFailure);
 
     await m.track();
@@ -95,7 +98,7 @@ void main() {
 
   test('con el pedido de la lista a mano, un fallo de red no lo borra',
       () async {
-    when(history.fetchOrder('o1')).thenThrow(Exception('sin red'));
+    when(history.fetchOrderDetail('o1')).thenThrow(Exception('sin red'));
     final m = OrderDetailViewModel(
         orderId: 'o1', initial: order(status: OrderStatus.pending));
     await m.load();
@@ -107,15 +110,70 @@ void main() {
     final m = await loaded(OrderStatus.delivered);
     m.repeat();
     verify(cart.setOrder(any)).called(1);
-    verify(cart.clearEditingOrder()).called(1);
     verify(nav.navigateToCheckoutView()).called(1);
   });
 
-  test('modificar marca el pedido como en edición', () async {
-    final m = await loaded(OrderStatus.pending);
-    m.modify();
-    verify(cart.startEditingOrder('o1')).called(1);
-    verify(nav.navigateToCheckoutView()).called(1);
+  group('modificar', () {
+    test('abre la edición con el pedido y el desglose, y lo relee al volver',
+        () async {
+      breakdown = const OrderBreakdown(total: 1000, zoneSurcharge: 0);
+      final m = await loaded(OrderStatus.pending);
+
+      await m.modify();
+
+      final args = verify(nav.navigateTo<dynamic>(Routes.editOrderView,
+              arguments: captureAnyNamed('arguments'),
+              id: anyNamed('id'),
+              preventDuplicates: anyNamed('preventDuplicates'),
+              parameters: anyNamed('parameters'),
+              transition: anyNamed('transition')))
+          .captured
+          .single as EditOrderViewArguments;
+      expect(args.order.id, 'o1');
+      expect(args.breakdown, same(breakdown));
+      verifyNever(nav.navigateToCheckoutView());
+      verify(history.fetchOrderDetail('o1')).called(2); // la carga y la relectura
+    });
+
+    test('si al volver lo tomó un repartidor, ya no se ofrece modificar',
+        () async {
+      final m = await loaded(OrderStatus.pending);
+      expect(m.canModify, isTrue);
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async =>
+          OrderDetail(order(status: OrderStatus.accepted), breakdown));
+
+      await m.modify();
+
+      expect(m.canModify, isFalse);
+      expect(m.canTrack, isTrue);
+    });
+
+    test('con repartidor asignado no se puede modificar aunque siga pendiente',
+        () async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order().copyWith(deliveryId: 'd1'), null));
+      final m = OrderDetailViewModel(orderId: 'o1');
+      await m.load();
+
+      expect(m.canModify, isFalse);
+      expect(m.canCancel, isTrue);
+    });
+
+    test('Mercado Pago no se puede modificar', () async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order().copyWith(paymentMethod: PaymentMethod.mercadoPago), null));
+      final m = OrderDetailViewModel(orderId: 'o1');
+      await m.load();
+
+      expect(m.canModify, isFalse);
+    });
+
+    test('con el cobro ya pagado no se puede modificar', () async {
+      breakdown = const OrderBreakdown(total: 1000, paymentStatus: 'paid');
+      final m = await loaded(OrderStatus.pending);
+
+      expect(m.canModify, isFalse);
+    });
   });
 
   test('cancelar abre la pantalla de motivo y refresca si se canceló',
@@ -131,6 +189,6 @@ void main() {
 
     await m.cancel();
 
-    verify(history.fetchOrder('o1')).called(2); // la carga y el refresco
+    verify(history.fetchOrderDetail('o1')).called(2); // la carga y el refresco
   });
 }

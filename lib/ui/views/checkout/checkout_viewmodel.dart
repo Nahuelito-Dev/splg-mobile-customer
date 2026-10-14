@@ -388,40 +388,12 @@ class CheckoutViewModel extends ReactiveViewModel {
     );
 
     _cartService.setOrder(updatedOrder);
-    final editingOrderId = _cartService.editingOrderId;
-    final isEditingCurrentOrder =
-        editingOrderId != null && updatedOrder.id == editingOrderId;
-
-    if (isEditingCurrentOrder) {
-      final success = await _historyService.updateOrder(
-        editingOrderId,
-        updatedOrder,
-        timeSlotId: timeSlotId,
-      );
-
-      if (success) {
-        _cartService.clearEditingOrder();
-        _cartService.clearOrder();
-        _navigationService.back();
-      } else {
-        await _dialogService.showDialog(
-          title: 'Error al modificar pedido',
-          description:
-              'No se pudo modificar la orden. Verificá tu conexión e intentá nuevamente.',
-        );
-      }
-
-      setBusy(false);
-      return;
-    }
-
     final result = await _historyService.createOrder(
       updatedOrder,
       timeSlotId: timeSlotId,
     );
 
     if (result.success) {
-      _cartService.clearEditingOrder();
       _cartService.clearOrder();
 
       // El total viaja calculado por el back en el alta (no se manda desde la

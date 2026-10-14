@@ -34,6 +34,7 @@ import 'package:splg_customer/ui/views/signup_done/signup_done_view.dart';
 import 'package:splg_customer/ui/views/orders/orders_view.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_view.dart';
 import 'package:splg_customer/ui/views/cancel_order/cancel_order_view.dart';
+import 'package:splg_customer/ui/views/edit_order/edit_order_view.dart';
 import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
 import 'package:splg_customer/ui/views/claim_detail/claim_detail_view.dart';
@@ -68,6 +69,7 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     MaterialRoute(page: OrdersView),
     MaterialRoute(page: OrderDetailView),
     MaterialRoute(page: CancelOrderView),
+    MaterialRoute(page: EditOrderView),
     MaterialRoute(page: AddressFormView),
     MaterialRoute(page: ClaimsView),
     MaterialRoute(page: ClaimDetailView),

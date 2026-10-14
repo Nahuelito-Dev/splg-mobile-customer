@@ -7,8 +7,10 @@ import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/domain/time_slot_availability.dart';
+import 'package:splg_customer/domain/update_order_result.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/claim_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
@@ -26,6 +28,8 @@ import 'package:splg_customer/ui/views/change_password/change_password_view.dart
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
 import 'package:splg_customer/ui/views/claim_detail/claim_detail_view.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
+import 'package:splg_customer/ui/views/edit_order/edit_order_view.dart';
+import 'package:splg_customer/ui/views/edit_order/edit_order_viewmodel.dart';
 import 'package:splg_customer/ui/views/edit_profile/edit_profile_view.dart';
 import 'package:splg_customer/ui/views/help/help_view.dart';
 import 'package:splg_customer/ui/views/home/home_view.dart';
@@ -474,8 +478,8 @@ void main() {
 
     phoneTest('detalle de un pedido pendiente: cancelar y modificar',
         (t) async {
-      when(history.fetchOrder('o1'))
-          .thenAnswer((_) async => order(status: OrderStatus.pending));
+      when(history.fetchOrderDetail('o1')).thenAnswer(
+          (_) async => OrderDetail(order(status: OrderStatus.pending), null));
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.byKey(const Key('detail-total')), findsOneWidget);
@@ -484,10 +488,37 @@ void main() {
       expect(find.text('Calificar al repartidor'), findsNothing);
     });
 
+    phoneTest(
+        'detalle: el total se explica con los renglones y los recargos de zona '
+        'y de medio de pago', (t) async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order(total: 17380),
+          const OrderBreakdown(
+              total: 17380,
+              itemsSubtotal: 14900,
+              zoneSurcharge: 900,
+              zoneName: 'Villa Cabello')));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.text('Recargo por zona'), findsOneWidget);
+      expect(find.text('• \$900'), findsOneWidget);
+      expect(find.text('Recargo por medio de pago'), findsOneWidget);
+      expect(find.text('• \$1.580'), findsOneWidget);
+    });
+
+    phoneTest('detalle sin recargos no muestra renglones de más', (t) async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order(), const OrderBreakdown(total: 1000, itemsSubtotal: 1000)));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.text('Recargo por zona'), findsNothing);
+      expect(find.text('Recargo por medio de pago'), findsNothing);
+    });
+
     phoneTest('detalle de un pedido entregado: calificar, reclamar, repetir',
         (t) async {
-      when(history.fetchOrder('o1'))
-          .thenAnswer((_) async => order(status: OrderStatus.delivered));
+      when(history.fetchOrderDetail('o1')).thenAnswer(
+          (_) async => OrderDetail(order(status: OrderStatus.delivered), null));
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.text('Calificar al repartidor'), findsOneWidget);
@@ -497,7 +528,7 @@ void main() {
     });
 
     phoneTest('detalle de un pedido que no existe muestra el error', (t) async {
-      when(history.fetchOrder('nada')).thenThrow(Exception('x'));
+      when(history.fetchOrderDetail('nada')).thenThrow(Exception('x'));
       await t.pumpWidget(app(const OrderDetailView(orderId: 'nada')));
       await settle(t);
       expect(find.text('No pudimos cargar'), findsOneWidget);
@@ -902,6 +933,95 @@ void main() {
       expect(find.text('\$1.980'), findsWidgets);
       expect(
           find.byKey(const Key('checkout-payment-surcharge')), findsOneWidget);
+    });
+  });
+  group('Modificar pedido', () {
+    setUp(() {
+      EditOrderViewModel.quoteDebounce = Duration.zero;
+      EditOrderViewModel.now = () => DateTime(2026, 10, 14);
+      addTearDown(() {
+        EditOrderViewModel.quoteDebounce = const Duration(milliseconds: 400);
+        EditOrderViewModel.now = DateTime.now;
+      });
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+          .thenAnswer((i) async => backQuote(
+              qty: (i.positionalArguments.first as Order)
+                  .items
+                  .fold<int>(0, (n, it) => n + it.quantity),
+              zoneSurcharge: 50,
+              paymentSurcharge:
+                  (i.positionalArguments.first as Order).paymentMethod ==
+                          PaymentMethod.cash
+                      ? 0
+                      : 180));
+      final customersMock = locator<CustomerService>() as MockCustomerService;
+      when(customersMock.customer)
+          .thenReturn(customerWith([addr('a1', 'Mitre 100', primary: true)]));
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenAnswer((_) async => [
+            cylinder(price: 1000),
+            cylinder(id: 'g2', price: 2000),
+          ]);
+      final slots = locator<TimeSlotService>() as MockTimeSlotService;
+      when(slots.availabilityFor(any)).thenAnswer((_) async => const [
+            TimeSlotAvailability(
+                timeSlotId: 's1',
+                name: 'Mañana',
+                startTime: '08:00:00',
+                endTime: '12:00:00',
+                remaining: 5),
+          ]);
+    });
+
+    Order editable() => order(
+          items: [OrderItem(cylinder: cylinder(price: 1000), quantity: 2)],
+          address: addr('a1', 'Mitre 100'),
+        ).copyWith(
+            deliveryWindowStart: '08:00:00', deliveryWindowEnd: '12:00:00');
+
+    phoneTest('muestra el pedido, el total del back y guarda', (t) async {
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.updateOrder(any, any, timeSlotId: anyNamed('timeSlotId')))
+          .thenAnswer((_) async =>
+              UpdateOrderResult(success: true, order: order(total: 1850)));
+      await t.pumpWidget(app(EditOrderView(order: editable())));
+      await settle(t);
+
+      expect(find.text('Sin fecha agendada'), findsOneWidget);
+      // Sin cambios no hay qué guardar.
+      expect(
+          t
+              .widget<SplgButton>(
+                  find.widgetWithText(SplgButton, 'Guardar cambios'))
+              .onPressed,
+          isNull);
+      expect(find.text('Modificar pedido'), findsOneWidget);
+      expect(find.text('Mitre 100'), findsOneWidget);
+      expect(find.byKey(const Key('edit-total')), findsOneWidget);
+      expect(find.text('\$1.850'), findsWidgets);
+      expect(find.byKey(const Key('edit-zone-surcharge')), findsOneWidget);
+
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await settle(t);
+      expect(find.text('\$2.750'), findsWidgets);
+
+      await t.tap(find.widgetWithText(SplgButton, 'Guardar cambios'));
+      await settle(t);
+      verify(history.updateOrder('o1', any, timeSlotId: null)).called(1);
+    });
+
+    phoneTest('la forma de pago no ofrece Mercado Pago', (t) async {
+      await t.pumpWidget(app(EditOrderView(order: editable())));
+      await settle(t);
+      await t.tap(find.byKey(const Key('edit-payment')));
+      await settle(t);
+
+      expect(find.byKey(const Key('edit-pay-cash')), findsOneWidget);
+      expect(find.byKey(const Key('edit-pay-online')), findsOneWidget);
+      expect(find.byKey(const Key('edit-pay-mercadoPago')), findsNothing);
+      expect(find.text('Mercado Pago'), findsNothing);
     });
   });
 }

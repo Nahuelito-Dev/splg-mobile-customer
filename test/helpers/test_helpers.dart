@@ -22,7 +22,9 @@ import 'package:splg_lib/domain/address.dart';
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/order_quote.dart';
+import 'package:splg_customer/domain/update_order_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_lib/permissions/app_permission.dart';
 // @stacked-import
@@ -67,14 +69,17 @@ void registerServices() {
       const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success));
   provideDummy<SignInOutcome>(SignInOutcome.ok);
   provideDummy<OrdersPage>(const OrdersPage(orders: [], total: 0, offset: 0));
-  provideDummy<Order>(Order(
+  final dummyOrder = Order(
     id: 'dummy',
     items: [],
     total: 0,
     status: OrderStatus.pending,
     createdAt: DateTime(2026),
     paymentMethod: PaymentMethod.cash,
-  ));
+  );
+  provideDummy<Order>(dummyOrder);
+  provideDummy<OrderDetail>(OrderDetail(dummyOrder, null));
+  provideDummy<UpdateOrderResult>(const UpdateOrderResult(success: false));
   getAndRegisterNavigationService();
   getAndRegisterBottomSheetService();
   getAndRegisterDialogService();

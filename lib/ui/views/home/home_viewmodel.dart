@@ -366,7 +366,6 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   }
 
   void _createOrder() {
-    _cartService.clearEditingOrder();
     _cartService.setOrder(Order(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       address: deliveryAddress,
@@ -392,7 +391,6 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     if (!canPlaceOrder) return;
 
     if (_customerService.isUserLoggedIn) {
-      _cartService.clearEditingOrder();
       _navigationService.navigateToCheckoutView();
     } else {
       _navigationService.navigateToLoginView();

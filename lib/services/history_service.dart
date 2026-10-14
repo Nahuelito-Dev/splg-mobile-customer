@@ -18,6 +18,9 @@ import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/usecases/create_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_orders_usecases.dart';
 import 'package:splg_customer/domain/usecases/cancel_order_usecases.dart';
+import 'package:splg_customer/domain/usecases/update_order_usecases.dart';
+import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/update_order_result.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
@@ -29,6 +32,7 @@ class HistoryService with ListenableServiceMixin {
     _createOrderUseCase = CreateOrderUseCase(_orderRepository);
     _fetchCustomerOrdersUseCase = FetchCustomerOrdersUseCase(_orderRepository);
     _cancelOrderUseCase = CancelOrderUseCase(_orderRepository);
+    _updateOrderUseCase = UpdateOrderUseCase(_orderRepository);
     listenToReactiveValues([_history]);
   }
 
@@ -39,6 +43,7 @@ class HistoryService with ListenableServiceMixin {
   late CreateOrderUseCase _createOrderUseCase;
   late FetchCustomerOrdersUseCase _fetchCustomerOrdersUseCase;
   late CancelOrderUseCase _cancelOrderUseCase;
+  late UpdateOrderUseCase _updateOrderUseCase;
 
   final ReactiveValue<bool> _hasPendingOrder = ReactiveValue<bool>(false);
   bool get hasPendingOrder => _hasPendingOrder.value;
@@ -109,14 +114,24 @@ class HistoryService with ListenableServiceMixin {
 
   /// Cotiza el pedido en el back (`POST /orders/quote`): promociones por
   /// volumen, recargo de zona y por medio de pago los calcula el servidor.
-  Future<QuoteOutcome> quoteOrder(Order order, {String? timeSlotId}) async {
+  ///
+  /// Con [orderId] es la cotización de una edición: el back cuenta el stock y
+  /// el cupo que ese pedido ya ocupa y no revalida lo que no cambió.
+  Future<QuoteOutcome> quoteOrder(
+    Order order, {
+    String? timeSlotId,
+    String? orderId,
+  }) async {
     final token = await _customerService.token;
     if (token == null) {
       return const QuoteOutcome.failed(ApiErrorText.sessionExpired,
           retryable: false);
     }
     final result = await _orderDatasource.quoteOrder(
-      _toQuotePayload(order, timeSlotId),
+      {
+        ..._toQuotePayload(order, timeSlotId),
+        if (orderId != null) 'orderId': orderId,
+      },
       token,
     );
     if (!result.ok) {
@@ -130,7 +145,9 @@ class HistoryService with ListenableServiceMixin {
     return QuoteOutcome.ok(quote);
   }
 
-  Future<bool> updateOrder(
+  /// Edita un pedido pendiente (`PATCH /orders/:id`). El precio lo calcula el
+  /// back: el cuerpo lleva sólo garrafas y cantidades.
+  Future<UpdateOrderResult> updateOrder(
     String orderId,
     Order order, {
     String? timeSlotId,
@@ -138,18 +155,23 @@ class HistoryService with ListenableServiceMixin {
     final session = _session;
     final token = await _customerService.token;
     if (token == null) {
-      return false;
+      return const UpdateOrderResult(
+          success: false, message: ApiErrorText.sessionExpired);
     }
 
-    final updatedOrder = await _orderRepository.updateOrder(
+    final result = await _updateOrderUseCase(
       orderId,
       _toUpdateOrderPayload(order, timeSlotId),
       token,
     );
-    if (updatedOrder == null) {
-      return false;
-    }
+    if (!result.success) return result;
 
+    final updatedOrder = result.order;
+    if (updatedOrder == null) {
+      await tryRefreshHistory();
+      notifyListeners();
+      return result;
+    }
     if (session == _session) {
       _localChanges++;
       _history
@@ -159,7 +181,7 @@ class HistoryService with ListenableServiceMixin {
     _hasPendingOrder.value = _history
         .any((historyOrder) => historyOrder.status == OrderStatus.pending);
     notifyListeners();
-    return true;
+    return result;
   }
 
   Future<CancelResult> cancelOrder(String orderId, {String? reason}) async {
@@ -265,6 +287,19 @@ class HistoryService with ListenableServiceMixin {
     }
   }
 
+  /// Como [fetchOrder], con el desglose del total (recargos) y el estado del
+  /// cobro; lanza ante cualquier error.
+  Future<OrderDetail> fetchOrderDetail(String orderId) async {
+    final token = await _customerService.token;
+    if (token == null) throw const LoadFailure(ApiErrorText.sessionExpired);
+    try {
+      return await _orderRepository.fetchOrderDetail(orderId, token);
+    } catch (e) {
+      if (isOrderGone(e)) throw orderGoneFailure;
+      rethrow;
+    }
+  }
+
   /// Limpia lo del usuario anterior (cierre de sesión / baja de cuenta).
   void reset() {
     _session++;
@@ -272,6 +307,7 @@ class HistoryService with ListenableServiceMixin {
     _hasPendingOrder.value = false;
     _cancelOrderUseCase.clear();
     _createOrderUseCase.clear();
+    _updateOrderUseCase.clear();
     notifyListeners();
   }
 
@@ -311,13 +347,15 @@ class HistoryService with ListenableServiceMixin {
   Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId) =>
       _toCreateOrderPayload(order, timeSlotId);
 
+  /// Cuerpo de la edición: sin precios (los pone el back). Sólo lleva lo que
+  /// el cliente cambió: sin `customerNotes` no manda notas (con '' las vacía) y
+  /// sin `requestedDeliveryDate` no manda fecha.
   Map<String, dynamic> _toUpdateOrderPayload(Order order, String? timeSlotId) {
     final items = order.items
         .where((item) => item.quantity > 0)
         .map((item) => {
               'gasCylinderId': item.cylinder.id,
               'quantity': item.quantity,
-              'unitPrice': item.cylinder.price,
             })
         .toList();
 
@@ -328,6 +366,7 @@ class HistoryService with ListenableServiceMixin {
       ),
       'items': items,
       ..._schedulingPayload(order, timeSlotId),
+      if (order.customerNotes != null) 'notes': order.customerNotes!.trim(),
     };
   }
 

@@ -17,12 +17,13 @@ Customer customerWith([List<Address> addresses = const []]) => Customer(
 
 GasCylinder cylinder({
   String id = 'g1',
+  String type = 'Garrafa 10kg',
   double price = 1000,
   List<Discount>? discounts,
 }) =>
     GasCylinder(
       id: id,
-      type: 'Garrafa 10kg',
+      type: type,
       weight: '10',
       price: price,
       active: true,

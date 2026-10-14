@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:dio/dio.dart';
 import 'package:splg_customer/core/network/api_client.dart';
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/core/network/order_gone.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
 
 class OrderRemoteDatasource {
@@ -53,27 +54,47 @@ class OrderRemoteDatasource {
     }
   }
 
-  /// `PATCH /orders/:id`. El back no tiene `PUT` para pedidos, y hoy el `PATCH`
-  /// sólo lo permite a admin y super admin: con un cliente responde 403.
-  Future<(bool, dynamic)> updateOrder(
+  /// `PATCH /orders/:id`: el cliente dueño edita su pedido mientras está
+  /// pendiente y sin repartidor. Idempotente por `Idempotency-Key`, que llega
+  /// de afuera para que los reintentos de una misma edición lleven la misma
+  /// clave. Un error vuelve como `ApiResult.fail` con el texto listo.
+  Future<ApiResult<dynamic>> updateOrder(
     String orderId,
     Map<String, dynamic> orderData,
     String token,
+    String idempotencyKey,
   ) async {
     try {
       final response = await _apiClient.patch(
         'orders/$orderId',
         orderData,
         token,
+        {'Idempotency-Key': idempotencyKey},
       );
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        return (true, response.data);
-      }
+      final status = response.statusCode;
+      if (status == 200 || status == 204) return ApiResult.ok(response.data);
+      return ApiResult.fromError(DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+      ));
     } catch (e) {
       log('e in updateOrder: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return _notFoundOf(e) ?? ApiResult.fromError(e);
     }
+  }
 
-    return (false, null);
+  /// Un 404 del PATCH: o el pedido ya no existe (texto propio, el del back es
+  /// técnico) o es otro recurso ("Dirección no encontrada") y vale su mensaje.
+  ApiResult<dynamic>? _notFoundOf(Object e) {
+    if (e is! DioException || e.response?.statusCode != 404) return null;
+    final data = e.response?.data;
+    final message = data is Map && data['message'] is String
+        ? (data['message'] as String).trim()
+        : '';
+    if (message.isEmpty || message.startsWith('Order with ID')) {
+      return const ApiResult.fail(kOrderGoneText, status: 404);
+    }
+    return ApiResult.fail(message, status: 404);
   }
 
   /// `GET /orders/customer/:userId?limit&offset`. Ante cualquier error
