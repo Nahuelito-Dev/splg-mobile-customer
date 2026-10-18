@@ -8,6 +8,9 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/consumption_service.dart';
+import 'package:splg_customer/ui/views/cart/cart_view.dart';
+import 'package:splg_customer/ui/views/consumption/consumption_view.dart';
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
 import 'package:splg_customer/ui/views/login/login_view.dart';
 import 'package:splg_customer/ui/views/signup/signup_view.dart';
@@ -58,6 +61,8 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     MaterialRoute(page: SignupView),
     MaterialRoute(page: MapView),
     MaterialRoute(page: ProfileView),
+    MaterialRoute(page: CartView),
+    MaterialRoute(page: ConsumptionView),
     MaterialRoute(page: AddressesView),
     MaterialRoute(page: OrderTrackingView),
     MaterialRoute(page: QrScanView),
@@ -89,6 +94,7 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     LazySingleton(classType: GasCylinderService),
     LazySingleton(classType: CustomerService),
     LazySingleton(classType: CartService),
+    LazySingleton(classType: ConsumptionService),
     LazySingleton(classType: LocationService),
     LazySingleton(classType: OrderTrackingService),
     LazySingleton(classType: TimeSlotService),

@@ -8,7 +8,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_lib/domain/gas_cylinder.dart';
 import 'package:splg_lib/domain/order.dart';
-import 'package:splg_lib/domain/order_item.dart';
 
 import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
@@ -34,6 +33,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   final _bottomSheetService = locator<BottomSheetService>();
   final _gasCylinderService = locator<GasCylinderService>();
   final _historyService = locator<HistoryService>();
+  final _dialogService = locator<DialogService>();
   final _locationService = locator<LocationService>();
 
   Timer? _poll;
@@ -47,6 +47,9 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
 
   /// Texto de error si no se pudo cargar el catálogo.
   String? loadError;
+
+  /// Por qué no se pudo traer el carrito al abrir (sin conexión, sesión...).
+  String? cartError;
 
   /// El polling está programado (hay un `Timer` pendiente o una consulta en
   /// curso). Para los tests.
@@ -75,6 +78,9 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
       try {
         await _customerService.refreshAddresses();
       } catch (_) {}
+      // El carrito es el del back: al abrir la app se trae.
+      final cart = await _cartService.refresh();
+      cartError = cart.ok ? null : cart.message;
     }
     if (_closed) return;
     setBusy(false);
@@ -270,7 +276,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   /// Elegida en el carrito o en la hoja, siempre contra las direcciones
   /// vigentes; sin una válida, la predeterminada (o ninguna).
   Address? get deliveryAddress =>
-      _current(_cartService.order?.address) ??
+      _current(_cartService.address) ??
       _current(_chosenAddress) ??
       _fallbackAddress;
 
@@ -288,8 +294,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   /// nuevos; el carrito sigue lo que muestra la píldora.
   void reconcileAddress() {
     if (_closed) return;
-    final wasId =
-        _cartService.order?.address?.addressId ?? _chosenAddress?.addressId;
+    final wasId = _cartService.address?.addressId ?? _chosenAddress?.addressId;
     final resolved = deliveryAddress;
     if (wasId != null && resolved?.addressId != wasId) {
       addressNotice = resolved == null
@@ -302,9 +307,8 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   }
 
   void _syncCartAddress(Address? address) {
-    final order = _cartService.order;
-    if (order == null || order.address == address) return;
-    _cartService.setOrder(order.copyWith(address: address));
+    if (_cartService.address == address) return;
+    _cartService.setAddress(address);
   }
 
   void _choose(Address address) {
@@ -341,44 +345,30 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     _choose(_current(created) ?? created);
   }
 
-  // ─── Carrito ───
-  int getItemQuantity(String cylinderId) {
-    final order = _cartService.order;
-    if (order == null) return 0;
-    for (final item in order.items) {
-      if (item.cylinder.id == cylinderId) return item.quantity;
+  // ─── Carrito (el del back) ───
+  int getItemQuantity(String cylinderId) => _cartService.quantityOf(cylinderId);
+
+  /// Suma o resta una unidad del tipo en el carrito del back. Sin sesión no hay
+  /// carrito: lleva al login. Un rechazo del back (tope, tipo dado de baja, sin
+  /// conexión) se muestra; nunca se da por hecho el cambio.
+  Future<void> addItem(GasCylinder cylinder, int quantity) async {
+    if (quantity == 0) return;
+    if (!_customerService.isUserLoggedIn) {
+      await _navigationService.navigateToLoginView();
+      return;
     }
-    return 0;
+    final result = quantity > 0
+        ? await _cartService.add(cylinder.id, quantity)
+        : await _cartService.removeOne(cylinder.id);
+    if (result.ok || _closed) return;
+    await _dialogService.showDialog(
+      title: 'No pudimos actualizar el carrito',
+      description: result.message,
+      buttonTitle: 'Aceptar',
+    );
   }
 
-  void addItem(GasCylinder cylinder, int quantity) {
-    if (_cartService.order == null) _createOrder();
-
-    final order = _cartService.order!;
-    final current = getItemQuantity(cylinder.id);
-    final newQty = current + quantity;
-    final others =
-        order.items.where((i) => i.cylinder.id != cylinder.id).toList();
-    if (newQty > 0) {
-      others.add(OrderItem(cylinder: cylinder, quantity: newQty));
-    }
-    _cartService.setOrder(order.copyWith(items: others));
-  }
-
-  void _createOrder() {
-    _cartService.setOrder(Order(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      address: deliveryAddress,
-      items: [],
-      total: 0,
-      paymentMethod: PaymentMethod.cash,
-      status: OrderStatus.pending,
-      createdAt: DateTime.now(),
-    ));
-  }
-
-  int get itemCount => (_cartService.order?.items ?? const <OrderItem>[])
-      .fold(0, (n, i) => n + i.quantity);
+  int get itemCount => _cartService.itemCount;
 
   /// Texto del botón que sigue al carrito. No lleva precio: el total (con
   /// promociones, zona y medio de pago) lo cotiza el back en la confirmación.
@@ -391,7 +381,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     if (!canPlaceOrder) return;
 
     if (_customerService.isUserLoggedIn) {
-      _navigationService.navigateToCheckoutView();
+      _navigationService.navigateToCartView();
     } else {
       _navigationService.navigateToLoginView();
     }

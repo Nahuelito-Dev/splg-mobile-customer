@@ -20,6 +20,8 @@ class CustomerRepositoryImp implements CustomerRepository {
       }
     } on RegistrationConflictException {
       rethrow;
+    } on ConsumptionOutOfRangeException {
+      rethrow;
     } catch (e) {
       log(e.toString());
     }

@@ -66,9 +66,12 @@ class HistoryService with ListenableServiceMixin {
     createOrder(order);
   }
 
+  /// Con [fromCart] el back arma el pedido con el carrito del cliente (a precios
+  /// vigentes) y lo vacía en la misma transacción: el cuerpo no lleva ítems.
   Future<CreateOrderResult> createOrder(
     Order order, {
     String? timeSlotId,
+    bool fromCart = false,
   }) async {
     final session = _session;
     final token = await _customerService.token;
@@ -82,7 +85,7 @@ class HistoryService with ListenableServiceMixin {
 
     final notificationToken = await _notificationService.currentToken;
     final result = await _createOrderUseCase(
-      _toCreateOrderPayload(order, timeSlotId, notificationToken),
+      _toCreateOrderPayload(order, timeSlotId, notificationToken, fromCart),
       token,
     );
     final createdOrder = result.order;
@@ -117,10 +120,13 @@ class HistoryService with ListenableServiceMixin {
   ///
   /// Con [orderId] es la cotización de una edición: el back cuenta el stock y
   /// el cupo que ese pedido ya ocupa y no revalida lo que no cambió.
+  ///
+  /// Con [fromCart] cotiza el carrito del cliente (sin ítems en el cuerpo).
   Future<QuoteOutcome> quoteOrder(
     Order order, {
     String? timeSlotId,
     String? orderId,
+    bool fromCart = false,
   }) async {
     final token = await _customerService.token;
     if (token == null) {
@@ -129,7 +135,7 @@ class HistoryService with ListenableServiceMixin {
     }
     final result = await _orderDatasource.quoteOrder(
       {
-        ..._toQuotePayload(order, timeSlotId),
+        ..._toQuotePayload(order, timeSlotId, fromCart: fromCart),
         if (orderId != null) 'orderId': orderId,
       },
       token,
@@ -315,6 +321,7 @@ class HistoryService with ListenableServiceMixin {
     Order order,
     String? timeSlotId, [
     String? notificationToken,
+    bool fromCart = false,
   ]) {
     final items = order.items
         .where((item) => item.quantity > 0)
@@ -331,7 +338,7 @@ class HistoryService with ListenableServiceMixin {
       'paymentMethod': OrderApiMapper.serializePaymentMethod(
         order.paymentMethod,
       ),
-      'items': items,
+      if (fromCart) 'fromCart': true else 'items': items,
       // Agendamiento: fecha (YYYY-MM-DD) + franja, más las notas del cliente.
       // Antes se recogían en el checkout pero NO se enviaban (se perdían).
       ..._schedulingPayload(order, timeSlotId),
@@ -344,8 +351,9 @@ class HistoryService with ListenableServiceMixin {
   }
 
   /// Mismo cuerpo que el alta, sin el token de notificaciones.
-  Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId) =>
-      _toCreateOrderPayload(order, timeSlotId);
+  Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId,
+          {bool fromCart = false}) =>
+      _toCreateOrderPayload(order, timeSlotId, null, fromCart);
 
   /// Cuerpo de la edición: sin precios (los pone el back). Sólo lleva lo que
   /// el cliente cambió: sin `customerNotes` no manda notas (con '' las vacía) y

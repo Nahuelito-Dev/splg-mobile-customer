@@ -9,9 +9,11 @@ class ApiResult<T> {
       : ok = true,
         message = null,
         status = null,
+        body = null,
         keepKey = false;
 
-  const ApiResult.fail(String this.message, {this.status, this.keepKey = false})
+  const ApiResult.fail(String this.message,
+      {this.status, this.body, this.keepKey = false})
       : ok = false,
         data = null;
 
@@ -25,6 +27,7 @@ class ApiResult<T> {
             ? kIdempotencyConflictText
             : ApiErrorText.of(code, data),
         status: code,
+        body: data,
         keepKey: keepIdempotencyKey(code, data),
       );
     }
@@ -35,6 +38,10 @@ class ApiResult<T> {
   final T? data;
   final String? message;
   final int? status;
+
+  /// Cuerpo de la respuesta de error, para quien necesita distinguir un 400 de
+  /// negocio concreto (p. ej. el pedido de confirmar un consumo fuera de rango).
+  final dynamic body;
 
   /// La llamada lleva `Idempotency-Key` y el próximo intento de la misma
   /// intención tiene que reusarla (no hubo respuesta, 5xx, 429, 409 "en curso"

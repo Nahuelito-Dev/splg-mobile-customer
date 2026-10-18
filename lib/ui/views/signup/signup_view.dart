@@ -108,6 +108,55 @@ class SignupView extends StackedView<SignupViewModel> {
         ),
     ];
 
+    final step3 = [
+      label('Garrafa habitual (opcional)'),
+      if (model.loadingCylinders)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: SplgLoader(),
+        )
+      else if (model.cylinders.isEmpty)
+        Text('No pudimos traer las garrafas. Podés omitir este paso.',
+            style: type.caption)
+      else
+        SplgChoiceChips(
+          labels: [for (final g in model.cylinders) g.label],
+          selected: model.cylinders
+              .indexWhere((g) => g.id == model.consumptionCylinderId),
+          onSelected: (i) =>
+              model.selectConsumptionCylinder(model.cylinders[i].id),
+        ),
+      label('Garrafas por mes'),
+      SplgTextField(
+        key: const Key('signup-consumption'),
+        controller: model.consumptionQuantity,
+        enabled: !model.isBusy,
+        hint: 'Ej.: 2',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      if (model.consumptionError != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(model.consumptionError!,
+              key: const Key('signup-consumption-error'),
+              style: type.body.copyWith(color: brasa.danger)),
+        ),
+      if (model.generalError != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(model.generalError!,
+              key: const Key('signup-error'),
+              style: type.body.copyWith(color: brasa.danger)),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+            'Con esto estimamos cuándo se te termina el gas. Podés cambiarlo '
+            'después en tu perfil.',
+            style: type.caption),
+      ),
+    ];
+
     return PopScope(
       canPop: model.step == 0,
       onPopInvokedWithResult: (didPop, _) {
@@ -142,9 +191,18 @@ class SignupView extends StackedView<SignupViewModel> {
                       Text('Registro',
                           style: type.title.copyWith(fontSize: context.sp(16))),
                       const SizedBox(height: 4),
-                      Text(model.step == 0 ? '1. Tus datos' : '2. Tu cuenta',
+                      Text(
+                          switch (model.step) {
+                            0 => '1. Tus datos',
+                            1 => '2. Tu cuenta',
+                            _ => '3. Tu consumo (opcional)',
+                          },
                           style: type.subtitle),
-                      ...(model.step == 0 ? step1 : step2),
+                      ...switch (model.step) {
+                        0 => step1,
+                        1 => step2,
+                        _ => step3,
+                      },
                     ],
                   ),
                 ),
@@ -161,10 +219,19 @@ class SignupView extends StackedView<SignupViewModel> {
                           current: model.step),
                       const SizedBox(height: 12),
                       SplgButton(
-                        title: model.step == 0 ? 'Siguiente' : 'Registrarme',
+                        title: model.step < SignupViewModel.stepCount - 1
+                            ? 'Siguiente'
+                            : 'Registrarme',
                         loading: model.isBusy,
                         onPressed: model.next,
                       ),
+                      if (model.step == SignupViewModel.stepCount - 1)
+                        TextButton(
+                          key: const Key('signup-skip-consumption'),
+                          onPressed:
+                              model.isBusy ? null : model.skipConsumption,
+                          child: const Text('Omitir y registrarme'),
+                        ),
                     ],
                   ),
                 ),

@@ -151,7 +151,7 @@ void main() {
       await settle(t);
       expect(find.text('2. Tu cuenta'), findsOneWidget);
       expect(find.text('Aceptar Términos y condiciones'), findsOneWidget);
-      await t.tap(find.text('Registrarme'));
+      await t.tap(find.text('Siguiente'));
       await settle(t);
       expect(find.byKey(const Key('signup-error')), findsOneWidget);
     });
@@ -300,7 +300,7 @@ void main() {
       expect(find.textContaining('Continuar · 2 garrafas'), findsWidgets);
       await t.tap(find.textContaining('Continuar ·').last);
       await t.pumpAndSettle();
-      verify(nav.navigateToCheckoutView()).called(1);
+      verify(nav.navigateToCartView()).called(1);
     });
 
     phoneTest('la píldora abre las direcciones y el + el alta', (t) async {
@@ -856,7 +856,7 @@ void main() {
     setUp(() {
       locator.unregister<CartService>();
       final cart = FakeCart();
-      cart.setOrder(order(
+      cart.seedOrder(order(
         items: [
           OrderItem(
               cylinder: cylinder(price: 1000, discounts: [
@@ -872,7 +872,9 @@ void main() {
           CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
       // El precio lo calcula el back: la transferencia suma su recargo.
       final history = locator<HistoryService>() as MockHistoryService;
-      when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
           .thenAnswer((i) async => backQuote(
               paymentSurcharge:
                   (i.positionalArguments.first as Order).paymentMethod ==
@@ -945,7 +947,9 @@ void main() {
       });
       final history = locator<HistoryService>() as MockHistoryService;
       when(history.quoteOrder(any,
-              timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              orderId: anyNamed('orderId')))
           .thenAnswer((i) async => backQuote(
               qty: (i.positionalArguments.first as Order)
                   .items

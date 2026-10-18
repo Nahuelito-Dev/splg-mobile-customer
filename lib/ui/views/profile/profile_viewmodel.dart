@@ -106,6 +106,11 @@ class ProfileViewModel extends ReactiveViewModel {
     return _nav.navigateToAddressesView();
   }
 
+  Future<void> openConsumption() {
+    _select(4);
+    return _nav.navigateToConsumptionView();
+  }
+
   Future<void> editProfile() async {
     await _nav.navigateToEditProfileView();
     notifyListeners();

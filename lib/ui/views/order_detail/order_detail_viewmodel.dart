@@ -94,11 +94,21 @@ class OrderDetailViewModel extends LoadViewModel {
     await _reload();
   }
 
-  void repeat() {
+  /// Repetir: el carrito del back pasa a tener los ítems de este pedido y se
+  /// sigue por el carrito, donde el cliente ve precios y disponibilidad de hoy.
+  Future<void> repeat() async {
     final o = order;
     if (o == null) return;
-    _cart.setOrder(o);
-    _nav.navigateToCheckoutView();
+    final r = await _cart.replaceWith(o.items);
+    if (!r.ok) {
+      await _dialogs.showDialog(
+        title: 'No pudimos armar el carrito',
+        description: r.message,
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    await _nav.navigateToCartView();
   }
 
   Future<void> rate() async {

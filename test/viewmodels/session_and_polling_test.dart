@@ -181,8 +181,7 @@ void main() {
       verify((locator<OrderTrackingService>() as MockOrderTrackingService)
               .disconnect())
           .called(1);
-      verify((locator<CartService>() as MockCartService).clearOrder())
-          .called(1);
+      verify((locator<CartService>() as MockCartService).reset()).called(1);
       verify(history.reset()).called(1);
       verify((locator<NotificationService>() as MockNotificationService)
               .clearToken())

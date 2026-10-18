@@ -15,6 +15,7 @@ import 'package:stacked_shared/stacked_shared.dart';
 import '../services/app_permissions.dart';
 import '../services/cart_service.dart';
 import '../services/claim_service.dart';
+import '../services/consumption_service.dart';
 import '../services/customer_service.dart';
 import '../services/gas_cylinder_service.dart';
 import '../services/history_service.dart';
@@ -45,6 +46,7 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => GasCylinderService());
   locator.registerLazySingleton(() => CustomerService());
   locator.registerLazySingleton(() => CartService());
+  locator.registerLazySingleton(() => ConsumptionService());
   locator.registerLazySingleton(() => LocationService());
   locator.registerLazySingleton(() => OrderTrackingService());
   locator.registerLazySingleton(() => TimeSlotService());

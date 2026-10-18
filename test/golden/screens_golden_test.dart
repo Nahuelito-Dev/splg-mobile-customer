@@ -275,7 +275,7 @@ void main() {
     addTearDown(() => CheckoutViewModel.now = DateTime.now);
     locator.unregister<CartService>();
     final cart = FakeCart();
-    cart.setOrder(order(
+    cart.seedOrder(order(
       items: [
         OrderItem(
             cylinder: cylinder(price: 14900, discounts: [
@@ -290,7 +290,8 @@ void main() {
     addTearDown(() =>
         CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
     final history = locator<HistoryService>() as MockHistoryService;
-    when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+    when(history.quoteOrder(any,
+            timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')))
         .thenAnswer((_) async => backQuote(unit: 14155));
     final slots = locator<TimeSlotService>() as MockTimeSlotService;
     when(slots.availabilityFor(any)).thenAnswer((_) async => const [
@@ -322,7 +323,9 @@ void main() {
     });
     final history = locator<HistoryService>() as MockHistoryService;
     when(history.quoteOrder(any,
-            timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+            timeSlotId: anyNamed('timeSlotId'),
+            fromCart: anyNamed('fromCart'),
+            orderId: anyNamed('orderId')))
         .thenAnswer((_) async =>
             backQuote(unit: 14155, zoneSurcharge: 900, zoneName: 'Centro'));
     final customersMock = locator<CustomerService>() as MockCustomerService;

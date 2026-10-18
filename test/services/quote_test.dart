@@ -138,4 +138,52 @@ void main() {
       await expectLater(history.fetchOrder('o1'), throwsA(isA<DioException>()));
     });
   });
+
+  group('desde el carrito -', () {
+    test('la cotización manda fromCart y ningún ítem', () async {
+      final log = fakeHttp((_) => const FakeReply(200, _respuesta));
+      await history.quoteOrder(pedido(PaymentMethod.cash), fromCart: true);
+      final body = log.single.body as Map;
+      expect(body['fromCart'], isTrue);
+      expect(body.containsKey('items'), isFalse);
+      expect(body['addressId'], 'a1');
+    });
+
+    test('sin fromCart sigue mandando los ítems armados', () async {
+      final log = fakeHttp((_) => const FakeReply(200, _respuesta));
+      await history.quoteOrder(pedido(PaymentMethod.cash));
+      final body = log.single.body as Map;
+      expect(body.containsKey('fromCart'), isFalse);
+      expect(body['items'], hasLength(1));
+    });
+
+    test('el alta manda fromCart sin ítems y sin borrar nada del carrito',
+        () async {
+      final log = fakeHttp((_) => const FakeReply(201, {
+            'order_id': 'o9',
+            'status': 'pending',
+            'total_amount': 1000,
+            'items': [],
+          }));
+      final r =
+          await history.createOrder(pedido(PaymentMethod.cash), fromCart: true);
+      expect(r.success, isTrue);
+      final body = log.single.body as Map;
+      expect(log.single.path, 'orders');
+      expect(body['fromCart'], isTrue);
+      expect(body.containsKey('items'), isFalse);
+      // La app no toca /cart: el back lo vacía en la transacción del pedido.
+      expect(log.where((r) => r.path.startsWith('cart')), isEmpty);
+    });
+
+    test('el 400 de carrito vacío o con ítems dados de baja se muestra',
+        () async {
+      fakeHttp((_) => const FakeReply(400,
+          {'message': 'El carrito está vacío o tiene ítems no disponibles'}));
+      final r =
+          await history.createOrder(pedido(PaymentMethod.cash), fromCart: true);
+      expect(r.success, isFalse);
+      expect(r.message, contains('carrito'));
+    });
+  });
 }

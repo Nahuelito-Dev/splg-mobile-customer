@@ -1,3 +1,5 @@
+import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/domain/cart.dart';
 import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_lib/splg_lib.dart';
@@ -49,7 +51,71 @@ Order order({
     );
 
 /// Carrito de verdad: el mock de CartService no guarda nada.
-class FakeCart extends CartService {}
+class FakeCart extends CartService {
+  FakeCart() : super(tokenReader: () async => 'tok');
+
+  /// Sin red: el carrito sembrado es el que "devolvió el back".
+  @override
+  Future<ApiResult<void>> refresh() async => const ApiResult.ok();
+
+  /// Carga el carrito con los ítems y la dirección de [o], como los devolvería
+  /// el back.
+  @override
+  Future<ApiResult<void>> add(String gasCylinderId, int quantity) async {
+    final line = cart.lineFor(gasCylinderId);
+    final qty = (line?.quantity ?? 0) + quantity;
+    seed(
+        cart: _withLine(gasCylinderId, qty, line?.type ?? 'Garrafa 10kg'),
+        address: address);
+    return const ApiResult.ok();
+  }
+
+  Cart _withLine(String id, int qty, String type) {
+    final others = cart.items.where((l) => l.gasCylinderId != id);
+    return Cart(
+      cartId: 'c1',
+      items: [
+        ...others,
+        CartLine(
+          cartItemId: 'ci-$id',
+          gasCylinderId: id,
+          type: type,
+          quantity: qty,
+          savedUnitPrice: 1000,
+          currentUnitPrice: 1000,
+          priceDifference: 0,
+          subtotal: 1000.0 * qty,
+          available: true,
+          hasEnoughStock: true,
+        ),
+      ],
+    );
+  }
+
+  void seedOrder(Order o) => seed(cart: cartOf(o), address: o.address);
+}
+
+/// El carrito que devolvería el back por los ítems de [o].
+Cart cartOf(Order o) => Cart(
+      cartId: 'c1',
+      items: [
+        for (final i in o.items)
+          CartLine(
+            cartItemId: 'ci-${i.cylinder.id}',
+            gasCylinderId: i.cylinder.id,
+            type: i.cylinder.type,
+            quantity: i.quantity,
+            savedUnitPrice: i.cylinder.price,
+            currentUnitPrice: i.cylinder.price,
+            priceDifference: 0,
+            subtotal: i.cylinder.price * i.quantity,
+            available: true,
+            hasEnoughStock: true,
+          ),
+      ],
+      totalUnits: o.items.fold(0, (n, i) => n + i.quantity),
+      total: o.items.fold(0.0, (n, i) => n + i.cylinder.price * i.quantity),
+    );
 
 /// Cotización como la devolvería `POST /orders/quote` por [qty] garrafas de
 /// [unit] cada una (promoción por volumen ya aplicada) más los recargos.

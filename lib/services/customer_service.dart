@@ -16,13 +16,22 @@ import 'package:splg_customer/domain/usecases/fetch_customer_usecases.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/domain/address_draft.dart';
+import 'package:splg_customer/domain/consumption.dart';
 import 'package:splg_customer/services/address_geocoder.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_lib/network/api_error_text.dart';
 import 'package:splg_lib/domain/customer.dart';
 
 /// Resultado del alta: el back responde 409 si el email o teléfono ya existen.
-enum RegisterOutcome { created, alreadyExists, failed }
+enum RegisterOutcome {
+  created,
+  alreadyExists,
+
+  /// El consumo declarado está fuera del rango razonable: no se creó la cuenta
+  /// y hay que pedir confirmación y reenviar con `confirmOutOfRange`.
+  consumptionOutOfRange,
+  failed,
+}
 
 /// Resultado de cambiar la contraseña (Firebase: reautenticar y actualizar).
 enum PasswordChangeResult {
@@ -148,12 +157,14 @@ class CustomerService with ListenableServiceMixin {
     required String email,
     required String password,
     required String phoneNumber,
+    ConsumptionDeclaration? consumption,
   }) async {
     final body = {
       'full_name': name,
       'email': email,
       'password': password,
       'phone_number': phoneNumber,
+      if (consumption != null) 'consumption': consumption.toJson(),
     };
 
     final createCustomerUseCase = CreateCustomerUseCase(_customerRepository);
@@ -166,6 +177,8 @@ class CustomerService with ListenableServiceMixin {
       }
     } on RegistrationConflictException {
       return RegisterOutcome.alreadyExists;
+    } on ConsumptionOutOfRangeException {
+      return RegisterOutcome.consumptionOutOfRange;
     }
 
     return RegisterOutcome.failed;

@@ -12,24 +12,25 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import '../helpers/fake_cart_backend.dart';
+import '../helpers/fake_http.dart';
 import '../helpers/fixtures.dart';
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
-
-/// Un carrito de verdad (el mock de CartService no guarda nada).
-class _Cart extends CartService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late MockCustomerService customers;
   late MockHistoryService history;
   late MockNavigationService nav;
+  late FakeCartBackend backend;
 
   setUp(() {
     registerServices();
-    // El carrito real: HomeViewModel arma el pedido ahí.
+    // El carrito real contra un /cart simulado: HomeViewModel lo maneja ahí.
+    backend = FakeCartBackend();
     locator.unregister<CartService>();
-    locator.registerSingleton<CartService>(_Cart());
+    locator.registerSingleton<CartService>(TestCart());
     customers = locator<CustomerService>() as MockCustomerService;
     history = locator<HistoryService>() as MockHistoryService;
     nav = locator<NavigationService>() as MockNavigationService;
@@ -39,32 +40,87 @@ void main() {
   });
   tearDown(() => locator.reset());
 
-  test('suma y resta garrafas y calcula el total', () {
+  test('suma y resta garrafas en el carrito del back', () async {
     final c = cylinder(price: 1000);
     final model = HomeViewModel();
-    model.addItem(c, 1);
-    model.addItem(c, 1);
+    await model.addItem(c, 1);
+    await model.addItem(c, 1);
     expect(model.getItemQuantity(c.id), 2);
     expect(model.itemCount, 2);
     expect(model.continueLabel, 'Continuar · 2 garrafas');
-    model.addItem(c, -1);
+    await model.addItem(c, -1);
     expect(model.continueLabel, 'Continuar · 1 garrafa');
-    model.addItem(c, -1);
+    await model.addItem(c, -1);
     expect(model.getItemQuantity(c.id), 0);
     expect(model.canPlaceOrder, isFalse);
+    // Cada tap fue una llamada: agregar, agregar, bajar a 1 (PATCH), quitar.
+    expect(backend.calls, [
+      'POST cart/items',
+      'POST cart/items',
+      startsWith('PATCH cart/items/'),
+      startsWith('DELETE cart/items/'),
+    ]);
   });
 
-  test('el botón no lleva precio: lo cotiza el back en la confirmación', () {
+  test('el botón no lleva precio: lo cotiza el back en la confirmación',
+      () async {
     final c = cylinder(price: 1000, discounts: [
       Discount(quantity: 4, percentage: 20),
       Discount(quantity: 2, percentage: 10),
     ]);
     final model = HomeViewModel();
     for (var i = 0; i < 2; i++) {
-      model.addItem(c, 1);
+      await model.addItem(c, 1);
     }
     expect(model.continueLabel, 'Continuar · 2 garrafas');
     expect(model.continueLabel, isNot(contains('\$')));
+  });
+
+  test('sin sesión agregar lleva al login y no toca el carrito', () async {
+    when(customers.isUserLoggedIn).thenReturn(false);
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
+    verify(nav.navigateToLoginView()).called(1);
+    expect(backend.calls, isEmpty);
+    expect(model.itemCount, 0);
+  });
+
+  test('si el back rechaza agregar, lo muestra y no cambia el carrito',
+      () async {
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
+    backend.failNext = const FakeReply(
+        400, {'message': 'La cantidad no puede superar 999 unidades por ítem'});
+    await model.addItem(cylinder(), 1);
+    expect(model.getItemQuantity('g1'), 1);
+    verify(locator<DialogService>().showDialog(
+      title: 'No pudimos actualizar el carrito',
+      description: 'La cantidad no puede superar 999 unidades por ítem',
+      buttonTitle: 'Aceptar',
+    )).called(1);
+  });
+
+  test('sin conexión no se da por hecho el cambio y se avisa', () async {
+    final model = HomeViewModel();
+    backend.failNext = const FakeReply.networkError();
+    await model.addItem(cylinder(), 1);
+    expect(model.itemCount, 0);
+    verify(locator<DialogService>().showDialog(
+      title: 'No pudimos actualizar el carrito',
+      description: 'Sin conexión. Revisá tu internet.',
+      buttonTitle: 'Aceptar',
+    )).called(1);
+  });
+
+  test('al abrir trae el carrito que ya tenía en el back', () async {
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+    await TestCart().add('g1', 3);
+    final model = HomeViewModel();
+    await model.initialize();
+    expect(model.itemCount, 3);
+    expect(model.cartError, isNull);
+    model.dispose();
   });
 
   test('la dirección de entrega es la predeterminada, o la primera', () {
@@ -79,10 +135,12 @@ void main() {
     expect(HomeViewModel().deliveryLabel, 'Elegí tu dirección de entrega');
   });
 
-  test('"Continuar" con sesión abre la confirmación; sin sesión, el login', () {
-    final model = HomeViewModel()..addItem(cylinder(), 1);
+  test('"Continuar" con sesión abre el carrito; sin sesión, el login',
+      () async {
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
     model.placeOrder();
-    verify(nav.navigateToCheckoutView()).called(1);
+    verify(nav.navigateToCartView()).called(1);
 
     when(customers.isUserLoggedIn).thenReturn(false);
     model.placeOrder();
@@ -92,7 +150,7 @@ void main() {
   test('sin garrafas elegidas no deja continuar', () {
     final model = HomeViewModel();
     model.placeOrder();
-    verifyNever(nav.navigateToCheckoutView());
+    verifyNever(nav.navigateToCartView());
   });
 
   test('el pedido en curso se informa con su estado', () {
@@ -120,24 +178,26 @@ void main() {
       title: anyNamed('title'),
       data: anyNamed('data'),
     )).thenAnswer((_) async => SheetResponse(confirmed: true, data: chosen));
-    final model = HomeViewModel()..addItem(cylinder(), 1);
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
 
     await model.chooseAddress();
 
     expect(model.deliveryAddress?.addressId, 'z');
-    expect(locator<CartService>().order?.address?.addressId, 'z');
+    expect(locator<CartService>().address?.addressId, 'z');
   });
 
-  test('pedido con item de otra garrafa suma por separado', () {
-    final a = cylinder(id: 'a');
-    final b = cylinder(id: 'b', price: 500);
-    final model = HomeViewModel()
-      ..addItem(a, 1)
-      ..addItem(b, 2);
+  test('pedido con item de otra garrafa suma por separado', () async {
+    final a = cylinder(id: 'g1');
+    final b = cylinder(id: 'g2', price: 500);
+    final model = HomeViewModel();
+    await model.addItem(a, 1);
+    await model.addItem(b, 1);
+    await model.addItem(b, 1);
     expect(model.itemCount, 3);
     expect(
         locator<CartService>().order!.items.map((OrderItem i) => i.cylinder.id),
-        containsAll(['a', 'b']));
+        containsAll(['g1', 'g2']));
   });
 
   // ─── Dirección elegida: alta, borrado y edición ───
@@ -159,7 +219,8 @@ void main() {
       data: anyNamed('data'),
     )).thenAnswer((_) async => SheetResponse(
         confirmed: true, data: all.firstWhere((a) => a.addressId == id)));
-    final model = HomeViewModel()..addItem(cylinder(), 1);
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
     await model.chooseAddress();
     return model;
   }
@@ -175,7 +236,7 @@ void main() {
     await model.addAddress();
 
     expect(model.deliveryAddress?.addressId, 'c');
-    expect(locator<CartService>().order?.address?.addressId, 'c');
+    expect(locator<CartService>().address?.addressId, 'c');
   });
 
   test('cancelar el formulario no pisa la dirección elegida', () async {
@@ -188,7 +249,7 @@ void main() {
     await model.addAddress();
 
     expect(model.deliveryAddress?.addressId, 'b');
-    expect(locator<CartService>().order?.address?.addressId, 'b');
+    expect(locator<CartService>().address?.addressId, 'b');
   });
 
   test('editar el formulario (devuelve true) tampoco cambia la elegida',
@@ -215,7 +276,7 @@ void main() {
     model.reconcileAddress();
 
     expect(model.deliveryAddress?.addressId, 'a');
-    expect(locator<CartService>().order?.address?.addressId, 'a');
+    expect(locator<CartService>().address?.addressId, 'a');
     expect(model.addressNotice, contains('ya no existe'));
   });
 
@@ -229,7 +290,7 @@ void main() {
     model.reconcileAddress();
 
     expect(model.deliveryAddress, isNull);
-    expect(locator<CartService>().order?.address, isNull);
+    expect(locator<CartService>().address, isNull);
     expect(model.deliveryLabel, 'Elegí tu dirección de entrega');
   });
 
@@ -243,7 +304,7 @@ void main() {
     model.reconcileAddress();
 
     expect(model.deliveryLabel, 'Entregar en: Calle B 2');
-    expect(locator<CartService>().order?.address?.streetName, 'Calle B 2');
+    expect(locator<CartService>().address?.streetName, 'Calle B 2');
     expect(model.addressNotice, isNull);
   });
 

@@ -6,6 +6,9 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/consumption_service.dart';
+import 'package:splg_customer/domain/cart.dart';
+import 'package:splg_customer/domain/consumption.dart';
 import 'package:splg_customer/services/location_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
@@ -41,6 +44,7 @@ import 'test_helpers.mocks.dart';
     MockSpec<GasCylinderService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<CustomerService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<CartService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<ConsumptionService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<LocationService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<NotificationService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<TimeSlotService>(onMissingStub: OnMissingStub.returnDefault),
@@ -60,6 +64,10 @@ void registerServices() {
   provideDummy<ApiResult<String?>>(const ApiResult.ok());
   provideDummy<ApiResult<SignedUrl?>>(const ApiResult.ok());
   provideDummy<ApiResult<Address?>>(const ApiResult.ok());
+  provideDummy<Cart>(Cart.empty);
+  provideDummy<ApiResult<Consumption>>(const ApiResult.ok(Consumption()));
+  provideDummy<ConsumptionSaveOutcome>(
+      const ConsumptionSaveOutcome(ConsumptionSaveStatus.failed));
   provideDummy<ApiResult<ClaimsPage>>(
       const ApiResult.ok(ClaimsPage(claims: [], total: 0)));
   provideDummy<PasswordChangeResult>(PasswordChangeResult.ok);
@@ -87,6 +95,7 @@ void registerServices() {
   getAndRegisterGasCylinderService();
   getAndRegisterCustomerService();
   getAndRegisterCartService();
+  getAndRegisterConsumptionService();
   getAndRegisterLocationService();
   getAndRegisterNotificationService();
   getAndRegisterTimeSlotService();
@@ -178,7 +187,16 @@ MockCustomerService getAndRegisterCustomerService() {
 MockCartService getAndRegisterCartService() {
   _removeRegistrationIfExists<CartService>();
   final service = MockCartService();
+  when(service.cart).thenReturn(Cart.empty);
+  when(service.refresh()).thenAnswer((_) async => const ApiResult.ok());
   locator.registerSingleton<CartService>(service);
+  return service;
+}
+
+MockConsumptionService getAndRegisterConsumptionService() {
+  _removeRegistrationIfExists<ConsumptionService>();
+  final service = MockConsumptionService();
+  locator.registerSingleton<ConsumptionService>(service);
   return service;
 }
 

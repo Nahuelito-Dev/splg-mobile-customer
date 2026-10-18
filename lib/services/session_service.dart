@@ -32,7 +32,7 @@ class SessionService {
 
     await step('foto', () => locator<ProfilePhotoService>().clear());
     await step('tracking', () => locator<OrderTrackingService>().disconnect());
-    await step('cart', () => locator<CartService>().clearOrder());
+    await step('cart', () => locator<CartService>().reset());
     await step('history', () => locator<HistoryService>().reset());
     await step('push', () => locator<NotificationService>().clearToken());
     await step('firebase', () => locator<CustomerService>().signOut());

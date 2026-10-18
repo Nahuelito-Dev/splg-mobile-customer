@@ -42,15 +42,15 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   void initialize() {
     setBusy(true);
-    // El carrito se arma antes del login (sin dirección): al llegar acá se
-    // toma la predeterminada (o la primera) de las direcciones guardadas.
-    var address = _cartService.order?.address;
+    // El carrito no lleva dirección: al llegar acá se toma la elegida, o la
+    // predeterminada (o la primera) de las direcciones guardadas.
+    var address = _cartService.address;
     final saved = _customerService.customer.addresses;
     if (address != null && saved.isNotEmpty) {
       // Si se borró o editó en otra pantalla, vale la vigente (o ninguna).
       address = _current(address);
       final current = address;
-      if (current != null && current != _cartService.order?.address) {
+      if (current != null && current != _cartService.address) {
         Future.microtask(() => _setOrderAddress(current));
       }
     }
@@ -62,8 +62,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       Future.microtask(() => _setOrderAddress(selected));
     }
     addressController.text = address?.streetName ?? '';
-    _selectedPaymentMethod =
-        _cartService.order?.paymentMethod ?? PaymentMethod.cash;
+    _selectedPaymentMethod = PaymentMethod.cash;
     setBusy(false);
     // Trae las franjas de la fecha por defecto (hoy) para que el cliente elija.
     loadTimeSlots();
@@ -105,7 +104,7 @@ class CheckoutViewModel extends ReactiveViewModel {
     final response = await _bottomSheetService.showCustomSheet(
       variant: BottomSheetType.addressList,
       title: 'Selecciona una dirección',
-      data: {'selectedId': _cartService.order?.address?.addressId},
+      data: {'selectedId': _cartService.address?.addressId},
     );
 
     if (response?.data == AddressListSheetModel.addNew) {
@@ -140,11 +139,8 @@ class CheckoutViewModel extends ReactiveViewModel {
   }
 
   void _setOrderAddress(Address address) {
-    final newOrder = _cartService.order?.copyWith(address: address);
-    if (newOrder != null) {
-      _cartService.setOrder(newOrder);
-      scheduleQuote();
-    }
+    _cartService.setAddress(address);
+    scheduleQuote();
   }
 
   // ─── Cotización (el precio lo calcula el back) ───
@@ -209,6 +205,7 @@ class CheckoutViewModel extends ReactiveViewModel {
         paymentMethod: _selectedPaymentMethod,
       ),
       timeSlotId: _selectedTimeSlotId,
+      fromCart: true,
     );
     if (_disposed || version != _quoteVersion) return;
     _quoting = false;
@@ -272,6 +269,7 @@ class CheckoutViewModel extends ReactiveViewModel {
   bool get canConfirmOrder {
     return order != null &&
         order!.items.isNotEmpty &&
+        !_cartService.cart.hasUnavailableItems &&
         addressController.text.isNotEmpty &&
         _selectedTimeSlotId != null &&
         _quote != null;
@@ -312,15 +310,14 @@ class CheckoutViewModel extends ReactiveViewModel {
     try {
       await _customerService.refreshAddresses();
     } catch (_) {}
-    final chosen = _cartService.order?.address;
+    final chosen = _cartService.address;
     final current = _current(chosen);
     if (current != null) {
       if (current != chosen) _setOrderAddress(current);
       return true;
     }
     addressController.clear();
-    final order = _cartService.order;
-    if (order != null) _cartService.setOrder(order.copyWith(address: null));
+    _cartService.setAddress(null);
     rebuildUi();
     await _dialogService.showDialog(
       title: 'Dirección no disponible',
@@ -387,14 +384,16 @@ class CheckoutViewModel extends ReactiveViewModel {
       total: quoted.total,
     );
 
-    _cartService.setOrder(updatedOrder);
+    // El back arma el pedido con el carrito y lo vacía en la misma transacción:
+    // la app sólo vuelve a pedirlo (viene vacío) y no borra nada por su cuenta.
     final result = await _historyService.createOrder(
       updatedOrder,
       timeSlotId: timeSlotId,
+      fromCart: true,
     );
 
     if (result.success) {
-      _cartService.clearOrder();
+      await _cartService.refresh();
 
       // El total viaja calculado por el back en el alta (no se manda desde la
       // app): si difiere del que se mostró, se avisa con el real antes de
@@ -435,6 +434,13 @@ class CheckoutViewModel extends ReactiveViewModel {
         description: result.message ??
             'No se pudo crear la orden. Verificá tu conexión e intentá nuevamente.',
       );
+      // Si el rechazo fue por el carrito (vacío o con ítems dados de baja) se
+      // lo muestra tal como está en el back para que el cliente lo arregle.
+      await _cartService.refresh();
+      final cart = _cartService.cart;
+      if (cart.isEmpty || cart.hasUnavailableItems) {
+        await _navigationService.navigateToCartView();
+      }
     }
 
     setBusy(false);

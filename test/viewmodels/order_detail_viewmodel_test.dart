@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_lib/domain/order_item.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
@@ -106,11 +108,28 @@ void main() {
     expect(m.canCancel, isTrue);
   });
 
-  test('repetir arma el carrito y abre la confirmación', () async {
+  test('repetir arma el carrito del back con los ítems y lo abre', () async {
+    when(cart.replaceWith(any)).thenAnswer((_) async => const ApiResult.ok());
     final m = await loaded(OrderStatus.delivered);
-    m.repeat();
-    verify(cart.setOrder(any)).called(1);
-    verify(nav.navigateToCheckoutView()).called(1);
+    await m.repeat();
+    final sent =
+        verify(cart.replaceWith(captureAny)).captured.single as List<OrderItem>;
+    expect(sent.single.cylinder.id, 'g1');
+    verify(nav.navigateToCartView()).called(1);
+    verifyNever(nav.navigateToCheckoutView());
+  });
+
+  test('si el back rechaza armar el carrito, avisa y no navega', () async {
+    when(cart.replaceWith(any)).thenAnswer(
+        (_) async => const ApiResult.fail('Sin conexión. Revisá tu internet.'));
+    final m = await loaded(OrderStatus.delivered);
+    await m.repeat();
+    verify(locator<DialogService>().showDialog(
+      title: 'No pudimos armar el carrito',
+      description: 'Sin conexión. Revisá tu internet.',
+      buttonTitle: 'Aceptar',
+    )).called(1);
+    verifyNever(nav.navigateToCartView());
   });
 
   group('modificar', () {
@@ -132,7 +151,8 @@ void main() {
       expect(args.order.id, 'o1');
       expect(args.breakdown, same(breakdown));
       verifyNever(nav.navigateToCheckoutView());
-      verify(history.fetchOrderDetail('o1')).called(2); // la carga y la relectura
+      verify(history.fetchOrderDetail('o1'))
+          .called(2); // la carga y la relectura
     });
 
     test('si al volver lo tomó un repartidor, ya no se ofrece modificar',
@@ -150,8 +170,8 @@ void main() {
 
     test('con repartidor asignado no se puede modificar aunque siga pendiente',
         () async {
-      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
-          order().copyWith(deliveryId: 'd1'), null));
+      when(history.fetchOrderDetail('o1')).thenAnswer(
+          (_) async => OrderDetail(order().copyWith(deliveryId: 'd1'), null));
       final m = OrderDetailViewModel(orderId: 'o1');
       await m.load();
 

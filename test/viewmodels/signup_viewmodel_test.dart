@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/domain/consumption.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/ui/views/signup/signup_viewmodel.dart';
@@ -35,12 +36,20 @@ void main() {
       return m;
     }
 
+    /// Con el paso 3 (consumo, opcional) a la vista.
+    Future<SignupViewModel> atStep3() async {
+      final m = atStep2();
+      await m.next();
+      return m;
+    }
+
     void stubRegister(RegisterOutcome outcome) {
       when(customers.registerCustomer(
         name: anyNamed('name'),
         email: anyNamed('email'),
         password: anyNamed('password'),
         phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
       )).thenAnswer((_) async => outcome);
     }
 
@@ -82,6 +91,7 @@ void main() {
         email: anyNamed('email'),
         password: anyNamed('password'),
         phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
       ));
     });
 
@@ -93,13 +103,14 @@ void main() {
       final notifications =
           locator<NotificationService>() as MockNotificationService;
 
-      await atStep2().next();
+      await (await atStep3()).next();
 
       verify(customers.registerCustomer(
         name: 'QA Test',
         email: 'qa@splg.com',
         password: 'Test1234',
         phoneNumber: '+543815550999',
+        consumption: null,
       )).called(1);
       verify(customers.signIn('qa@splg.com', 'Test1234')).called(1);
       verify(notifications.requestPermissionAndRegister()).called(1);
@@ -108,7 +119,7 @@ void main() {
 
     test('email o teléfono repetidos muestran un mensaje específico', () async {
       stubRegister(RegisterOutcome.alreadyExists);
-      final m = atStep2();
+      final m = await atStep3();
       await m.next();
       expect(m.generalError, contains('dada de baja o ya registrada'));
       expect(m.generalError, contains('contactá a tu distribuidora'));
@@ -125,7 +136,7 @@ void main() {
           locator<NotificationService>() as MockNotificationService;
       final dialogs = locator<DialogService>() as MockDialogService;
 
-      await atStep2().next();
+      await (await atStep3()).next();
 
       verifyNever(nav.clearStackAndShow(Routes.signupDoneView));
       verifyNever(notifications.requestPermissionAndRegister());
@@ -139,9 +150,136 @@ void main() {
 
     test('un fallo cualquiera muestra el mensaje genérico', () async {
       stubRegister(RegisterOutcome.failed);
-      final m = atStep2();
+      final m = await atStep3();
       await m.next();
       expect(m.generalError, contains('No pudimos completar el registro'));
+    });
+
+    test('el paso 2 avanza al paso 3 (consumo) sin registrar todavía',
+        () async {
+      final m = atStep2();
+      await m.next();
+      expect(m.step, 2);
+      verifyNever(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
+      ));
+    });
+
+    test('"Omitir" registra sin consumo', () async {
+      stubRegister(RegisterOutcome.created);
+      when(customers.signIn(any, any))
+          .thenAnswer((_) async => SignInOutcome.ok);
+      final m = await atStep3();
+      await m.skipConsumption();
+      verify(customers.registerCustomer(
+        name: 'QA Test',
+        email: 'qa@splg.com',
+        password: 'Test1234',
+        phoneNumber: '+543815550999',
+        consumption: null,
+      )).called(1);
+    });
+
+    test('declarar a medias pide completar y no registra', () async {
+      final m = await atStep3();
+      m.consumptionQuantity.text = '2';
+      await m.next();
+      expect(m.consumptionError, contains('garrafa habitual'));
+      m.selectConsumptionCylinder('g1');
+      m.consumptionQuantity.text = 'abc';
+      await m.next();
+      expect(m.consumptionError, contains('cuántas garrafas'));
+      verifyNever(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
+      ));
+    });
+
+    test('registra con el consumo declarado (coma decimal)', () async {
+      stubRegister(RegisterOutcome.created);
+      when(customers.signIn(any, any))
+          .thenAnswer((_) async => SignInOutcome.ok);
+      final m = await atStep3();
+      m.selectConsumptionCylinder('g1');
+      m.consumptionQuantity.text = '1,5';
+      await m.next();
+      final sent = verify(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: captureAnyNamed('consumption'),
+      )).captured.single as ConsumptionDeclaration;
+      expect(sent.cylinderTypeId, 'g1');
+      expect(sent.quantityPerMonth, 1.5);
+      expect(sent.confirmOutOfRange, isFalse);
+    });
+
+    test('fuera de rango pide confirmación y reenvía con confirmOutOfRange',
+        () async {
+      final dialogs = locator<DialogService>() as MockDialogService;
+      when(dialogs.showConfirmationDialog(
+        title: anyNamed('title'),
+        description: anyNamed('description'),
+        confirmationTitle: anyNamed('confirmationTitle'),
+        cancelTitle: anyNamed('cancelTitle'),
+      )).thenAnswer((_) async => DialogResponse(confirmed: true));
+      var calls = 0;
+      when(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
+      )).thenAnswer((_) async => ++calls == 1
+          ? RegisterOutcome.consumptionOutOfRange
+          : RegisterOutcome.created);
+      when(customers.signIn(any, any))
+          .thenAnswer((_) async => SignInOutcome.ok);
+      final m = await atStep3();
+      m.selectConsumptionCylinder('g1');
+      m.consumptionQuantity.text = '900';
+      await m.next();
+      final sent = verify(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: captureAnyNamed('consumption'),
+      )).captured.cast<ConsumptionDeclaration>();
+      expect(sent.map((d) => d.confirmOutOfRange), [false, true]);
+      verify(nav.clearStackAndShow(Routes.signupDoneView)).called(1);
+    });
+
+    test('fuera de rango y el cliente corrige: no se reenvía', () async {
+      final dialogs = locator<DialogService>() as MockDialogService;
+      when(dialogs.showConfirmationDialog(
+        title: anyNamed('title'),
+        description: anyNamed('description'),
+        confirmationTitle: anyNamed('confirmationTitle'),
+        cancelTitle: anyNamed('cancelTitle'),
+      )).thenAnswer((_) async => DialogResponse(confirmed: false));
+      stubRegister(RegisterOutcome.consumptionOutOfRange);
+      final m = await atStep3();
+      m.selectConsumptionCylinder('g1');
+      m.consumptionQuantity.text = '900';
+      await m.next();
+      verify(customers.registerCustomer(
+        name: anyNamed('name'),
+        email: anyNamed('email'),
+        password: anyNamed('password'),
+        phoneNumber: anyNamed('phoneNumber'),
+        consumption: anyNamed('consumption'),
+      )).called(1);
+      verifyNever(nav.clearStackAndShow(Routes.signupDoneView));
+      expect(m.isBusy, isFalse);
     });
 
     test('la política de contraseña', () {

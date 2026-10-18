@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:splg_customer/domain/cart.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -42,7 +43,8 @@ Future<CheckoutViewModel> _ready(MockHistoryService history) async {
   CheckoutViewModel.quoteDebounce = Duration.zero;
   addTearDown(() =>
       CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
-  when(history.quoteOrder(any, timeSlotId: anyNamed('timeSlotId')))
+  when(history.quoteOrder(any,
+          timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')))
       .thenAnswer((_) async => backQuote(unit: 1000, qty: 1));
   final model = CheckoutViewModel()..initialize();
   await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -75,8 +77,7 @@ void main() {
 
     test('si el carrito no trae dirección usa la predeterminada del cliente',
         () async {
-      final order = _orderWithout(null);
-      when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(null);
       when(customers.customer).thenReturn(withAddresses([
         _addr('a', 'Calle 1'),
         _addr('b', 'Calle 2', primary: true),
@@ -86,12 +87,13 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(model.addressController.text, 'Calle 2');
-      final saved = verify(cart.setOrder(captureAny)).captured.single as Order;
-      expect(saved.address?.addressId, 'b');
+      final saved =
+          verify(cart.setAddress(captureAny)).captured.single as Address;
+      expect(saved.addressId, 'b');
     });
 
     test('sin predeterminada toma la primera; sin direcciones queda vacío', () {
-      when(cart.order).thenReturn(_orderWithout(null));
+      when(cart.address).thenReturn(null);
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle 1')]));
       expect((CheckoutViewModel()..initialize()).addressController.text,
@@ -102,19 +104,19 @@ void main() {
     });
 
     test('respeta la dirección que el carrito ya tiene', () {
-      when(cart.order).thenReturn(_orderWithout(_addr('z', 'Calle Elegida')));
+      when(cart.address).thenReturn(_addr('z', 'Calle Elegida'));
       when(customers.customer).thenReturn(withAddresses(
           [_addr('a', 'Calle 1', primary: true), _addr('z', 'Calle Elegida')]));
 
       final model = CheckoutViewModel()..initialize();
 
       expect(model.addressController.text, 'Calle Elegida');
-      verifyNever(cart.setOrder(any));
+      verifyNever(cart.setAddress(any));
     });
 
     test('si la dirección del carrito se borró vuelve a la predeterminada',
         () async {
-      when(cart.order).thenReturn(_orderWithout(_addr('z', 'Calle Borrada')));
+      when(cart.address).thenReturn(_addr('z', 'Calle Borrada'));
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
 
@@ -122,13 +124,14 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(model.addressController.text, 'Calle 1');
-      final saved = verify(cart.setOrder(captureAny)).captured.single as Order;
-      expect(saved.address?.addressId, 'a');
+      final saved =
+          verify(cart.setAddress(captureAny)).captured.single as Address;
+      expect(saved.addressId, 'a');
     });
 
     test('si la dirección del carrito se editó toma los datos nuevos',
         () async {
-      when(cart.order).thenReturn(_orderWithout(_addr('a', 'Calle Vieja')));
+      when(cart.address).thenReturn(_addr('a', 'Calle Vieja'));
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle Nueva')]));
 
@@ -136,8 +139,9 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(model.addressController.text, 'Calle Nueva');
-      final saved = verify(cart.setOrder(captureAny)).captured.single as Order;
-      expect(saved.address?.streetName, 'Calle Nueva');
+      final saved =
+          verify(cart.setAddress(captureAny)).captured.single as Address;
+      expect(saved.streetName, 'Calle Nueva');
     });
 
     Future<void> stubForm(Object? result) async {
@@ -154,7 +158,7 @@ void main() {
 
     test('el alta desde el checkout elige la dirección creada, no la primaria',
         () async {
-      when(cart.order).thenReturn(_orderWithout(_addr('b', 'Calle B')));
+      when(cart.address).thenReturn(_addr('b', 'Calle B'));
       final c = _addr('c', 'Calle C');
       when(customers.customer).thenReturn(withAddresses(
           [_addr('a', 'Calle A', primary: true), _addr('b', 'Calle B'), c]));
@@ -171,12 +175,13 @@ void main() {
       await model.showAddressList();
 
       expect(model.addressController.text, 'Calle C');
-      final saved = verify(cart.setOrder(captureAny)).captured.last as Order;
-      expect(saved.address?.addressId, 'c');
+      final saved =
+          verify(cart.setAddress(captureAny)).captured.last as Address;
+      expect(saved.addressId, 'c');
     });
 
     test('cancelar el formulario no cambia la dirección elegida', () async {
-      when(cart.order).thenReturn(_orderWithout(_addr('b', 'Calle B')));
+      when(cart.address).thenReturn(_addr('b', 'Calle B'));
       when(customers.customer).thenReturn(withAddresses(
           [_addr('a', 'Calle A', primary: true), _addr('b', 'Calle B')]));
       await stubForm(null);
@@ -192,7 +197,7 @@ void main() {
       await model.showAddressList();
 
       expect(model.addressController.text, 'Calle B');
-      verifyNever(cart.setOrder(any));
+      verifyNever(cart.setAddress(any));
     });
 
     Order withItems(Address? a) => _orderWithout(a).copyWith(
@@ -201,6 +206,7 @@ void main() {
     test('confirmar con la dirección borrada no manda el pedido', () async {
       final order = withItems(_addr('z', 'Calle Borrada'));
       when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
       when(customers.isUserLoggedIn).thenReturn(true);
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
@@ -209,7 +215,8 @@ void main() {
       final model = await _ready(history);
       await model.confirmOrder();
 
-      verifyNever(history.createOrder(any, timeSlotId: anyNamed('timeSlotId')));
+      verifyNever(history.createOrder(any,
+          timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')));
       verify(locator<DialogService>().showDialog(
         title: 'Dirección no disponible',
         description: anyNamed('description'),
@@ -221,6 +228,7 @@ void main() {
         () async {
       final order = withItems(_addr('a', 'Calle 1', primary: true));
       when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
       when(customers.isUserLoggedIn).thenReturn(true);
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
@@ -228,7 +236,9 @@ void main() {
       // El historial todavía trae un pedido viejo primero.
       when(history.history)
           .thenReturn([_orderWithout(null).copyWith(id: 'viejo')]);
-      when(history.createOrder(any, timeSlotId: anyNamed('timeSlotId')))
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
           .thenAnswer((_) async => CreateOrderResult(
               success: true, order: _orderWithout(null).copyWith(id: 'nuevo')));
       final nav = locator<NavigationService>() as MockNavigationService;
@@ -249,15 +259,77 @@ void main() {
       )).called(1);
     });
 
-    test('si el back rechaza el pedido, muestra su mensaje (no el de conexión)',
-        () async {
+    test(
+        'el pedido sale desde el carrito del back: no borra ítems, sólo lo '
+        'vuelve a pedir', () async {
       final order = withItems(_addr('a', 'Calle 1', primary: true));
       when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
       when(customers.isUserLoggedIn).thenReturn(true);
       when(customers.customer)
           .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
       final history = locator<HistoryService>() as MockHistoryService;
-      when(history.createOrder(any, timeSlotId: anyNamed('timeSlotId')))
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
+          .thenAnswer((_) async => CreateOrderResult(
+              success: true, order: _orderWithout(null).copyWith(id: 'nuevo')));
+
+      final model = await _ready(history);
+      await model.confirmOrder();
+
+      verify(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), fromCart: true))
+          .called(1);
+      verify(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), fromCart: true))
+          .called(greaterThan(0));
+      verify(cart.refresh()).called(1);
+      verifyNever(cart.remove(any));
+      verifyNever(cart.clear());
+    });
+
+    test('si el pedido falla el carrito queda y, si está vacío, lleva a él',
+        () async {
+      final order = withItems(_addr('a', 'Calle 1', primary: true));
+      when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
+      when(cart.cart).thenReturn(Cart.empty);
+      when(customers.isUserLoggedIn).thenReturn(true);
+      when(customers.customer)
+          .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
+          .thenAnswer((_) async => const CreateOrderResult(
+                success: false,
+                message: 'El carrito está vacío',
+                retryable: false,
+              ));
+      final nav = locator<NavigationService>() as MockNavigationService;
+
+      final model = await _ready(history);
+      await model.confirmOrder();
+
+      verifyNever(cart.remove(any));
+      verifyNever(cart.clear());
+      verify(nav.navigateToCartView()).called(1);
+    });
+
+    test('si el back rechaza el pedido, muestra su mensaje (no el de conexión)',
+        () async {
+      final order = withItems(_addr('a', 'Calle 1', primary: true));
+      when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
+      when(cart.cart).thenReturn(Cart.empty);
+      when(customers.isUserLoggedIn).thenReturn(true);
+      when(customers.customer)
+          .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
           .thenAnswer((_) async => const CreateOrderResult(
                 success: false,
                 message: 'La dirección está fuera de la zona de cobertura',

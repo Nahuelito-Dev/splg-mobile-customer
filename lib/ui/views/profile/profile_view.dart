@@ -57,6 +57,13 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       onTap: model.openAddresses,
                     ),
                     SplgMenuItem(
+                      key: const Key('profile-consumption'),
+                      label: 'Mi consumo',
+                      selected: model.selected == 4,
+                      icon: SplgIcons.flame,
+                      onTap: model.openConsumption,
+                    ),
+                    SplgMenuItem(
                       label: 'Eliminar cuenta',
                       selected: model.selected == 3,
                       icon: SplgIcons.userMinus,

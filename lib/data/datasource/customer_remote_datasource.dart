@@ -5,10 +5,17 @@ import 'package:dio/dio.dart';
 import 'package:splg_customer/core/network/api_client.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/domain/consumption.dart';
 
 /// El back responde 409 cuando el email o el teléfono ya tienen cuenta.
 class RegistrationConflictException implements Exception {
   const RegistrationConflictException();
+}
+
+/// El back rechazó el consumo declarado en el alta por estar fuera del rango
+/// razonable y pide confirmarlo (no se creó la cuenta).
+class ConsumptionOutOfRangeException implements Exception {
+  const ConsumptionOutOfRangeException();
 }
 
 class CustomerRemoteDatasource {
@@ -30,6 +37,9 @@ class CustomerRemoteDatasource {
       log('e in createCustomer: ${e.toString()}');
       if (e.response?.statusCode == 409) {
         throw const RegistrationConflictException();
+      }
+      if (isConsumptionOutOfRange(e.response?.statusCode, e.response?.data)) {
+        throw const ConsumptionOutOfRangeException();
       }
     } catch (e) {
       log('e in createCustomer: ${e.toString()}');
