@@ -26,6 +26,7 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/delivery_options.dart';
 import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/update_order_result.dart';
 import 'package:splg_customer/domain/my_claim.dart';
@@ -166,6 +167,9 @@ MockDialogService getAndRegisterDialogService() {
 MockHistoryService getAndRegisterHistoryService() {
   _removeRegistrationIfExists<HistoryService>();
   final service = MockHistoryService();
+  // Por omisión la distribuidora no ofrece modalidades: sólo el reparto común.
+  when(service.deliveryOptions(any)).thenAnswer(
+      (_) async => const ApiResult<DeliveryOptions>.ok(DeliveryOptions([])));
   locator.registerSingleton<HistoryService>(service);
   return service;
 }
@@ -238,6 +242,8 @@ MockAppPermissions getAndRegisterAppPermissions() {
 MockOrderTrackingService getAndRegisterOrderTrackingService() {
   _removeRegistrationIfExists<OrderTrackingService>();
   final service = MockOrderTrackingService();
+  when(service.expressDegradedUpdates)
+      .thenAnswer((_) => const Stream<void>.empty());
   locator.registerSingleton<OrderTrackingService>(service);
   return service;
 }

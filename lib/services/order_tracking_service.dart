@@ -87,6 +87,7 @@ class OrderTrackingService {
   final _cancellationController = StreamController<String>.broadcast();
   final _cancelledByController = StreamController<String>.broadcast();
   final _arrivedController = StreamController<void>.broadcast();
+  final _expressDegradedController = StreamController<void>.broadcast();
 
   Stream<DriverLocationUpdate> get driverLocationUpdates =>
       _driverLocationController.stream;
@@ -103,6 +104,9 @@ class OrderTrackingService {
 
   /// El repartidor avisó que llegó (`order:arrived`).
   Stream<void> get arrivedUpdates => _arrivedController.stream;
+
+  /// Un pedido express pasó al reparto común (`order:express-degraded`).
+  Stream<void> get expressDegradedUpdates => _expressDegradedController.stream;
 
   /// Renueva la URL firmada de la foto del chofer. 409 (pedido fuera de
   /// aceptado/en camino) y 404 no son error: significan "sin foto".
@@ -299,6 +303,7 @@ class OrderTrackingService {
     // El chofer liberó el pedido: vuelve a buscarse repartidor (`pending`).
     _socket?.on('order:searching-driver', onOrderStatusUpdate);
     _socket?.on('order:arrived', onArrived);
+    _socket?.on('order:express-degraded', onExpressDegraded);
 
     _socket?.onConnectError((e) => log('socket order tracking connect error'));
     _socket?.onError((e) => log('socket order tracking error: $e'));
@@ -315,6 +320,7 @@ class OrderTrackingService {
     _socket?.off('order:cancelled');
     _socket?.off('order:searching-driver');
     _socket?.off('order:arrived');
+    _socket?.off('order:express-degraded');
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
@@ -348,6 +354,13 @@ class OrderTrackingService {
         at: DateTime.tryParse(data['at']?.toString() ?? ''),
       ),
     );
+  }
+
+  @visibleForTesting
+  void onExpressDegraded(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    _expressDegradedController.add(null);
   }
 
   @visibleForTesting

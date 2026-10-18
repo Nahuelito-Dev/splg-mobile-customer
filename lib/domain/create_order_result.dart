@@ -14,6 +14,7 @@ class CreateOrderResult {
     this.message,
     this.retryable = true,
     this.idempotencyConflict = false,
+    this.expressUnavailableReason,
   });
 
   final bool success;
@@ -29,6 +30,11 @@ class CreateOrderResult {
   /// 422: la misma `Idempotency-Key` ya se usó con otro cuerpo, es decir que el
   /// primer envío llegó y el pedido probablemente existe.
   final bool idempotencyConflict;
+
+  /// 409 `EXPRESS_NOT_AVAILABLE`: el motivo (`out_of_hours`, ...) por el que el
+  /// express dejó de estar disponible entre que se eligió y se creó el pedido.
+  /// No se creó nada: el cliente puede elegir el reparto común.
+  final String? expressUnavailableReason;
 
   final Order? order;
   final String? paymentUrl;

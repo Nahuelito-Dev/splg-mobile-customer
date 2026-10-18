@@ -131,6 +131,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
   StreamSubscription<String>? _cancellationSubscription;
   StreamSubscription<String>? _cancelledBySubscription;
   StreamSubscription<void>? _arrivedSubscription;
+  StreamSubscription<void>? _expressDegradedSubscription;
 
   RouteTracker? _tracker;
   Set<Polyline> _polylines = const {};
@@ -189,6 +190,41 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     final suffix =
         orderId.length > 6 ? orderId.substring(orderId.length - 6) : orderId;
     return 'Pedido #$suffix';
+  }
+
+  bool _isExpress = false;
+  bool _expressDegraded = false;
+  double _expressSurcharge = 0;
+  bool _paidOnline = false;
+
+  void _readExpress(Map<String, dynamic> raw) {
+    _isExpress = raw['deliveryMode'] == 'express';
+    _expressDegraded = !_isExpress && raw['expressDegradedAt'] != null;
+    _paidOnline = raw['paymentStatus'] == 'paid' &&
+        raw['paymentMethod'] != null &&
+        raw['paymentMethod'] != 'cash';
+    final amount = raw['expressSurchargeAmount'];
+    _expressSurcharge = amount is num
+        ? amount.toDouble()
+        : double.tryParse('${amount ?? ''}') ?? 0;
+  }
+
+  /// Aviso del express: busca moto, o ninguna aceptó y pasó al reparto común
+  /// sin el recargo (que se descuenta, o se devuelve si ya se pagó en línea).
+  /// Null si el pedido no es ni fue express.
+  String? get expressNotice {
+    if (_expressDegraded) {
+      final amount =
+          _expressSurcharge > 0 ? ' (${money.format(_expressSurcharge)})' : '';
+      return 'Ningún repartidor en moto aceptó tu pedido express: pasó al '
+          'reparto común. El recargo express$amount ya no se cobra.'
+          '${_paidOnline ? ' Como lo pagaste en línea, se te devuelve.' : ''}';
+    }
+    if (_isExpress && stage == TrackingStage.pending) {
+      return 'Pedido express: lo ofrecemos a repartidores en moto cercanos. '
+          'Si ninguno lo acepta, pasa al reparto común sin el recargo.';
+    }
+    return null;
   }
 
   String get statusTitle {
@@ -579,6 +615,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
   /// estado y el repartidor de esta respuesta ya pueden estar viejos.
   void _applyOrder(Map<String, dynamic> raw, {bool fresh = true}) {
     _order = OrderApiMapper.parseOrder(raw);
+    _readExpress(raw);
     _cancellationReason =
         _readString(raw, const ['cancellation_reason']) ?? _cancellationReason;
     _cancelledBy = _readString(raw, const ['cancelledBy']) ?? _cancelledBy;
@@ -614,8 +651,11 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     try {
       final before = _status;
       final hadError = _loadError != null;
+      final noticeBefore = expressNotice;
       final ok = await _loadTrackingData();
       if (_closed) return;
+      // El express pasó al reparto común sin cambiar el estado: el aviso cambia.
+      if (ok && expressNotice != noticeBefore) rebuildUi();
       if (ok && (_status != before || hadError)) {
         _afterStatusChange();
       }
@@ -633,6 +673,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     _cancellationSubscription?.cancel();
     _cancelledBySubscription?.cancel();
     _arrivedSubscription?.cancel();
+    _expressDegradedSubscription?.cancel();
 
     _driverLocationSubscription = _trackingService.driverLocationUpdates.listen(
       (update) {
@@ -665,6 +706,9 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
 
     _cancelledBySubscription =
         _trackingService.cancelledBys.listen((who) => _cancelledBy = who);
+
+    _expressDegradedSubscription = _trackingService.expressDegradedUpdates
+        .listen((_) => unawaited(poll()));
 
     _arrivedSubscription = _trackingService.arrivedUpdates.listen((_) {
       if (_status != 'out_for_delivery') return;
@@ -1155,6 +1199,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     _cancellationSubscription?.cancel();
     _cancelledBySubscription?.cancel();
     _arrivedSubscription?.cancel();
+    _expressDegradedSubscription?.cancel();
     _trackingService.disconnect();
     super.dispose();
   }

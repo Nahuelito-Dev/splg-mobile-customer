@@ -1,3 +1,5 @@
+import 'package:splg_customer/domain/delivery_options.dart';
+
 /// Renglón de la cotización: precio unitario con la promoción por volumen ya
 /// aplicada por el back.
 class QuoteLine {
@@ -27,6 +29,8 @@ class OrderQuote {
     required this.total,
     required this.balance,
     this.zoneName,
+    this.deliveryMode = DeliveryMode.standard,
+    this.expressSurcharge = 0,
   });
 
   final List<QuoteLine> lines;
@@ -37,6 +41,10 @@ class OrderQuote {
   final double deposit;
   final double total;
   final double balance;
+  final DeliveryMode deliveryMode;
+
+  /// Recargo express que ya está sumado al [total] (0 si no es express).
+  final double expressSurcharge;
 
   /// Lee la respuesta del back; null si no trae un `total` numérico (no se
   /// inventa un precio con una respuesta ilegible).
@@ -58,6 +66,8 @@ class OrderQuote {
       deposit: _num(raw['deposit']) ?? 0,
       total: total,
       balance: _num(raw['balance']) ?? total,
+      deliveryMode: DeliveryMode.fromWire(raw['deliveryMode']),
+      expressSurcharge: _num(raw['expressSurcharge']) ?? 0,
     );
   }
 
@@ -86,13 +96,19 @@ class OrderQuote {
 class QuoteOutcome {
   const QuoteOutcome.ok(OrderQuote this.quote)
       : message = null,
-        retryable = false;
+        retryable = false,
+        expressUnavailableReason = null;
 
-  const QuoteOutcome.failed(String this.message, {this.retryable = true})
+  const QuoteOutcome.failed(String this.message,
+      {this.retryable = true, this.expressUnavailableReason})
       : quote = null;
 
   final OrderQuote? quote;
   final String? message;
+
+  /// 409 `EXPRESS_NOT_AVAILABLE`: el motivo por el que el express no se puede
+  /// cotizar (`out_of_hours`, ...); [message] ya lo trae en castellano.
+  final String? expressUnavailableReason;
 
   /// Volver a pedirla puede funcionar (red, 429, 5xx).
   final bool retryable;

@@ -221,6 +221,16 @@ void main() {
       expect(llegadas, 1);
     });
 
+    test('order:express-degraded avisa que pasó al reparto común', () async {
+      var avisos = 0;
+      service.expressDegradedUpdates.listen((_) => avisos++);
+
+      service.onExpressDegraded({'orderId': 'o1', 'surchargeRemoved': true});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(avisos, 1);
+    });
+
     test('la ubicación del chofer se lee de lat y lng', () async {
       final out = <DriverLocationUpdate>[];
       service.driverLocationUpdates.listen(out.add);

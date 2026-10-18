@@ -103,9 +103,8 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: viewModel.isBusy
-                          ? null
-                          : viewModel.onForgotPassword,
+                      onPressed:
+                          viewModel.isBusy ? null : viewModel.onForgotPassword,
                       child: Text(
                         loginViewForgotPassword,
                         style: type.captionStrong.copyWith(

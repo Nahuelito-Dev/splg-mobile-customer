@@ -13,11 +13,14 @@ import 'package:splg_customer/data/datasource/order_remote_datasource.dart';
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/data/repository/order_repository_imp.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
+import 'package:splg_customer/domain/delivery_options.dart';
+import 'package:splg_customer/domain/order_receiver.dart';
 import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
 import 'package:splg_customer/domain/usecases/create_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_orders_usecases.dart';
 import 'package:splg_customer/domain/usecases/cancel_order_usecases.dart';
+import 'package:splg_customer/domain/usecases/change_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/update_order_usecases.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/update_order_result.dart';
@@ -33,6 +36,7 @@ class HistoryService with ListenableServiceMixin {
     _fetchCustomerOrdersUseCase = FetchCustomerOrdersUseCase(_orderRepository);
     _cancelOrderUseCase = CancelOrderUseCase(_orderRepository);
     _updateOrderUseCase = UpdateOrderUseCase(_orderRepository);
+    _changeOrderUseCase = ChangeOrderUseCase(_orderRepository);
     listenToReactiveValues([_history]);
   }
 
@@ -44,6 +48,7 @@ class HistoryService with ListenableServiceMixin {
   late FetchCustomerOrdersUseCase _fetchCustomerOrdersUseCase;
   late CancelOrderUseCase _cancelOrderUseCase;
   late UpdateOrderUseCase _updateOrderUseCase;
+  late ChangeOrderUseCase _changeOrderUseCase;
 
   final ReactiveValue<bool> _hasPendingOrder = ReactiveValue<bool>(false);
   bool get hasPendingOrder => _hasPendingOrder.value;
@@ -68,10 +73,16 @@ class HistoryService with ListenableServiceMixin {
 
   /// Con [fromCart] el back arma el pedido con el carrito del cliente (a precios
   /// vigentes) y lo vacía en la misma transacción: el cuerpo no lleva ítems.
+  ///
+  /// Con [deliveryMode] express el pedido no se agenda (ni fecha ni franja) y
+  /// el back vuelve a evaluar la disponibilidad. [receiver] es quien recibe, si
+  /// no es el cliente.
   Future<CreateOrderResult> createOrder(
     Order order, {
     String? timeSlotId,
     bool fromCart = false,
+    DeliveryMode deliveryMode = DeliveryMode.standard,
+    OrderReceiver? receiver,
   }) async {
     final session = _session;
     final token = await _customerService.token;
@@ -85,7 +96,11 @@ class HistoryService with ListenableServiceMixin {
 
     final notificationToken = await _notificationService.currentToken;
     final result = await _createOrderUseCase(
-      _toCreateOrderPayload(order, timeSlotId, notificationToken, fromCart),
+      {
+        ..._toCreateOrderPayload(
+            order, timeSlotId, notificationToken, fromCart, deliveryMode),
+        if (receiver != null) 'receiver': receiver.toJson(),
+      },
       token,
     );
     final createdOrder = result.order;
@@ -96,6 +111,7 @@ class HistoryService with ListenableServiceMixin {
         message: result.message,
         retryable: result.retryable,
         idempotencyConflict: result.idempotencyConflict,
+        expressUnavailableReason: result.expressUnavailableReason,
       );
     }
 
@@ -122,11 +138,15 @@ class HistoryService with ListenableServiceMixin {
   /// el cupo que ese pedido ya ocupa y no revalida lo que no cambió.
   ///
   /// Con [fromCart] cotiza el carrito del cliente (sin ítems en el cuerpo).
+  ///
+  /// Con [deliveryMode] express suma el recargo express; si dejó de estar
+  /// disponible responde con el motivo del back.
   Future<QuoteOutcome> quoteOrder(
     Order order, {
     String? timeSlotId,
     String? orderId,
     bool fromCart = false,
+    DeliveryMode deliveryMode = DeliveryMode.standard,
   }) async {
     final token = await _customerService.token;
     if (token == null) {
@@ -135,15 +155,25 @@ class HistoryService with ListenableServiceMixin {
     }
     final result = await _orderDatasource.quoteOrder(
       {
-        ..._toQuotePayload(order, timeSlotId, fromCart: fromCart),
+        ..._toQuotePayload(order, timeSlotId,
+            fromCart: fromCart, deliveryMode: deliveryMode),
         if (orderId != null) 'orderId': orderId,
       },
       token,
     );
     if (!result.ok) {
+      final body = result.body;
+      final expressReason = result.status == 409 &&
+              body is Map &&
+              body['code'] == 'EXPRESS_NOT_AVAILABLE'
+          ? body['reason']?.toString()
+          : null;
       return QuoteOutcome.failed(
-        result.message ?? ApiErrorText.generic,
+        expressReason != null
+            ? expressUnavailableText(expressReason)
+            : result.message ?? ApiErrorText.generic,
         retryable: ApiErrorText.isRetryable(result.status),
+        expressUnavailableReason: expressReason,
       );
     }
     final quote = OrderQuote.fromJson(result.data);
@@ -172,6 +202,59 @@ class HistoryService with ListenableServiceMixin {
     );
     if (!result.success) return result;
 
+    return _applyChanged(result, session);
+  }
+
+  /// Modalidades de entrega que ofrece la distribuidora para una dirección
+  /// (`GET /orders/delivery-options`).
+  Future<ApiResult<DeliveryOptions>> deliveryOptions(String addressId) async {
+    final token = await _customerService.token;
+    if (token == null) {
+      return const ApiResult.fail(ApiErrorText.sessionExpired, status: 401);
+    }
+    return _orderRepository.deliveryOptions(addressId, token);
+  }
+
+  /// Cambia la dirección de entrega de un pedido pendiente o aceptado
+  /// (`PATCH /orders/:id/address`). El total lo recalcula el back.
+  Future<UpdateOrderResult> changeOrderAddress(
+    String orderId,
+    String addressId, {
+    String? reason,
+  }) async {
+    final session = _session;
+    final token = await _customerService.token;
+    if (token == null) {
+      return const UpdateOrderResult(
+          success: false, message: ApiErrorText.sessionExpired);
+    }
+    final result = await _changeOrderUseCase
+        .changeAddress(orderId, addressId, token, reason: reason);
+    if (!result.success) return result;
+    return _applyChanged(result, session);
+  }
+
+  /// Indica quién recibe el pedido (`PATCH /orders/:id/receiver`).
+  Future<UpdateOrderResult> setOrderReceiver(
+    String orderId,
+    OrderReceiver receiver,
+  ) async {
+    final session = _session;
+    final token = await _customerService.token;
+    if (token == null) {
+      return const UpdateOrderResult(
+          success: false, message: ApiErrorText.sessionExpired);
+    }
+    final result =
+        await _changeOrderUseCase.setReceiver(orderId, receiver, token);
+    if (!result.success) return result;
+    return _applyChanged(result, session);
+  }
+
+  /// Un cambio aplicado: el pedido que devolvió el back reemplaza al de la
+  /// lista; si la respuesta no se pudo leer se relee el historial.
+  Future<UpdateOrderResult> _applyChanged(
+      UpdateOrderResult result, int session) async {
     final updatedOrder = result.order;
     if (updatedOrder == null) {
       await tryRefreshHistory();
@@ -314,6 +397,7 @@ class HistoryService with ListenableServiceMixin {
     _cancelOrderUseCase.clear();
     _createOrderUseCase.clear();
     _updateOrderUseCase.clear();
+    _changeOrderUseCase.clear();
     notifyListeners();
   }
 
@@ -322,6 +406,7 @@ class HistoryService with ListenableServiceMixin {
     String? timeSlotId, [
     String? notificationToken,
     bool fromCart = false,
+    DeliveryMode deliveryMode = DeliveryMode.standard,
   ]) {
     final items = order.items
         .where((item) => item.quantity > 0)
@@ -341,7 +426,11 @@ class HistoryService with ListenableServiceMixin {
       if (fromCart) 'fromCart': true else 'items': items,
       // Agendamiento: fecha (YYYY-MM-DD) + franja, más las notas del cliente.
       // Antes se recogían en el checkout pero NO se enviaban (se perdían).
-      ..._schedulingPayload(order, timeSlotId),
+      // El express no se agenda: sin fecha ni franja.
+      ..._schedulingPayload(order, timeSlotId,
+          scheduled: deliveryMode != DeliveryMode.express),
+      if (deliveryMode == DeliveryMode.express)
+        'deliveryMode': deliveryMode.wire,
       // Token FCM del device: el backend lo usa para notificar el estado de
       // ESTE pedido aunque `notification_token` del customer todavía no esté
       // seteado (p.ej. primer pedido justo después de otorgar el permiso).
@@ -352,8 +441,9 @@ class HistoryService with ListenableServiceMixin {
 
   /// Mismo cuerpo que el alta, sin el token de notificaciones.
   Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId,
-          {bool fromCart = false}) =>
-      _toCreateOrderPayload(order, timeSlotId, null, fromCart);
+          {bool fromCart = false,
+          DeliveryMode deliveryMode = DeliveryMode.standard}) =>
+      _toCreateOrderPayload(order, timeSlotId, null, fromCart, deliveryMode);
 
   /// Cuerpo de la edición: sin precios (los pone el back). Sólo lleva lo que
   /// el cliente cambió: sin `customerNotes` no manda notas (con '' las vacía) y
@@ -381,14 +471,17 @@ class HistoryService with ListenableServiceMixin {
   /// Campos de agendamiento comunes a create/update, con los nombres que espera
   /// el backend (`scheduledDate`, `timeSlotId`, `notes`). Solo incluye cada
   /// clave si hay dato, para no pisar con null.
-  Map<String, dynamic> _schedulingPayload(Order order, String? timeSlotId) {
+  ///
+  /// Con [scheduled] en false (pedido express) no lleva fecha ni franja.
+  Map<String, dynamic> _schedulingPayload(Order order, String? timeSlotId,
+      {bool scheduled = true}) {
     final payload = <String, dynamic>{};
 
     final date = order.requestedDeliveryDate;
-    if (date != null) {
+    if (scheduled && date != null) {
       payload['scheduledDate'] = DateFormat('yyyy-MM-dd').format(date);
     }
-    if (timeSlotId != null && timeSlotId.isNotEmpty) {
+    if (scheduled && timeSlotId != null && timeSlotId.isNotEmpty) {
       payload['timeSlotId'] = timeSlotId;
     }
     final notes = order.customerNotes;

@@ -12,12 +12,14 @@ import '../ui/bottom_sheets/address_list/address_list_sheet.dart';
 import '../ui/bottom_sheets/claim/claim_sheet.dart';
 import '../ui/bottom_sheets/notice/notice_sheet.dart';
 import '../ui/bottom_sheets/rate_driver/rate_driver_sheet.dart';
+import '../ui/bottom_sheets/receiver/receiver_sheet.dart';
 
 enum BottomSheetType {
   notice,
   addressList,
   rateDriver,
   claim,
+  receiver,
 }
 
 void setupBottomSheetUi() {
@@ -32,6 +34,8 @@ void setupBottomSheetUi() {
         RateDriverSheet(request: request, completer: completer),
     BottomSheetType.claim: (context, request, completer) =>
         ClaimSheet(request: request, completer: completer),
+    BottomSheetType.receiver: (context, request, completer) =>
+        ReceiverSheet(request: request, completer: completer),
   };
 
   bottomsheetService.setCustomSheetBuilders(builders);

@@ -261,6 +261,11 @@ class _ActiveContent extends StatelessWidget {
           key: const Key('tracking-status-title'),
           style: type.subtitle,
         ),
+        if (model.expressNotice != null) ...[
+          const SizedBox(height: 6),
+          Text(model.expressNotice!,
+              key: const Key('tracking-express-notice'), style: type.caption),
+        ],
         if (model.showDriverCard || model.stage == TrackingStage.pending) ...[
           const SizedBox(height: 4),
           Text(model.etaTitle,

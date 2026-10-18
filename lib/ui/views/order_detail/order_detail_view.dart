@@ -43,6 +43,20 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                 title: 'Modificar pedido',
                 style: SplgButtonStyle.outlined,
                 onPressed: model.modify),
+          if (model.canChangeAddress)
+            SplgButton(
+                key: const Key('detail-change-address'),
+                title: 'Cambiar dirección de entrega',
+                style: SplgButtonStyle.outlined,
+                onPressed: model.changeAddress),
+          if (model.canSetReceiver)
+            SplgButton(
+                key: const Key('detail-receiver'),
+                title: model.receiver == null
+                    ? 'Indicar quién recibe'
+                    : 'Cambiar quién recibe',
+                style: SplgButtonStyle.outlined,
+                onPressed: model.editReceiver),
           if (model.canRepeat)
             SplgButton(
                 title: 'Repetir pedido',
@@ -92,6 +106,11 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                               title: 'Recargo por zona',
                               value:
                                   money.format(model.breakdown!.zoneSurcharge)),
+                        if ((model.breakdown?.expressSurchargeInTotal ?? 0) > 0)
+                          SplgInfoRow(
+                              title: 'Recargo express',
+                              value: money.format(
+                                  model.breakdown!.expressSurchargeInTotal)),
                         if ((model.breakdown?.paymentSurcharge ?? 0) > 0)
                           SplgInfoRow(
                               title: 'Recargo por medio de pago',
@@ -116,8 +135,27 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                                   '${hhmm(o.deliveryWindowStart!)} – ${hhmm(o.deliveryWindowEnd ?? '')}'),
                         if ((o.customerNotes ?? '').isNotEmpty)
                           SplgInfoRow(title: 'Notas:', value: o.customerNotes),
+                        if (model.isExpress)
+                          const SplgInfoRow(
+                              title: 'Modalidad:', value: 'Express'),
+                        if (model.receiver != null)
+                          SplgInfoRow(
+                              title: 'Recibe:',
+                              value:
+                                  '${model.receiver!.name} (${model.receiver!.relationship}) · Doc. ${model.receiver!.document}'),
                       ],
                     ),
+                    if (model.expressDegraded)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                            'Ningún repartidor en moto aceptó tu pedido express: '
+                            'pasó al reparto común y se descontó el recargo '
+                            'express${(model.breakdown?.expressSurchargeAmount ?? 0) > 0 ? ' (${money.format(model.breakdown!.expressSurchargeAmount)})' : ''}.'
+                            '${model.paidOnline ? ' Como lo pagaste en línea, el recargo se te devuelve.' : ''}',
+                            key: const Key('detail-express-degraded'),
+                            style: type.caption),
+                      ),
                     if (o.deliveryName != null)
                       SplgInfoSection(
                         icon: SplgIcons.truck,

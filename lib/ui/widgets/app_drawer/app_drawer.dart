@@ -14,8 +14,7 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
       AppDrawerViewModel();
 
   @override
-  void onViewModelReady(AppDrawerViewModel viewModel) =>
-      viewModel.loadPhoto();
+  void onViewModelReady(AppDrawerViewModel viewModel) => viewModel.loadPhoto();
 
   @override
   Widget builder(
@@ -95,8 +94,9 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(model.fullName,
-                              style: SplgType.of(context).subtitle.copyWith(
-                                  color: Colors.white)),
+                              style: SplgType.of(context)
+                                  .subtitle
+                                  .copyWith(color: Colors.white)),
                         ),
                     ],
                   ),

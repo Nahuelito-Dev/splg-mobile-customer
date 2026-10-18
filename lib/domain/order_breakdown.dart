@@ -1,4 +1,6 @@
 import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/domain/delivery_options.dart';
+import 'package:splg_customer/domain/order_receiver.dart';
 
 /// Lo que `GET /orders/:id` trae del pedido además de los datos que lee
 /// `Order`: el desglose del total (renglones, recargo de zona y por medio de
@@ -15,6 +17,10 @@ class OrderBreakdown {
     this.paymentStatus,
     this.editable,
     this.scheduledDate,
+    this.deliveryMode = DeliveryMode.standard,
+    this.expressSurchargeAmount = 0,
+    this.expressDegradedAt,
+    this.receiver,
   });
 
   final double total;
@@ -35,11 +41,35 @@ class OrderBreakdown {
   /// Fecha agendada de la entrega (`YYYY-MM-DD`), si hay.
   final String? scheduledDate;
 
+  /// Modalidad vigente: un express que ninguna moto aceptó pasa a `standard`.
+  final DeliveryMode deliveryMode;
+
+  /// Recargo express que se cobró al pedir. Se conserva aunque el pedido pase
+  /// al reparto común; en ese caso el [total] ya no lo incluye.
+  final double expressSurchargeAmount;
+
+  /// Cuándo el express pasó al reparto común; null si no pasó.
+  final DateTime? expressDegradedAt;
+
+  /// Quién recibe, si el cliente lo indicó.
+  final OrderReceiver? receiver;
+
+  bool get isExpress => deliveryMode == DeliveryMode.express;
+
+  /// El express no encontró moto y siguió por el reparto común sin recargo.
+  bool get expressDegraded => !isExpress && expressDegradedAt != null;
+
+  /// Recargo express que hoy forma parte del [total].
+  double get expressSurchargeInTotal => isExpress ? expressSurchargeAmount : 0;
+
   /// Recargo por el medio de pago; 0 si no hay con qué calcularlo.
   double get paymentSurcharge {
     final items = itemsSubtotal;
     if (items == null) return 0;
-    final rest = ((total - items - zoneSurcharge) * 100).round() / 100;
+    final rest =
+        ((total - items - zoneSurcharge - expressSurchargeInTotal) * 100)
+                .round() /
+            100;
     return rest > 0 ? rest : 0;
   }
 
@@ -57,6 +87,12 @@ class OrderBreakdown {
       paymentStatus: raw['paymentStatus']?.toString(),
       editable: raw['editable'] is bool ? raw['editable'] as bool : null,
       scheduledDate: raw['scheduledDate']?.toString(),
+      deliveryMode: DeliveryMode.fromWire(raw['deliveryMode']),
+      expressSurchargeAmount: _num(raw['expressSurchargeAmount']) ?? 0,
+      expressDegradedAt: raw['expressDegradedAt'] == null
+          ? null
+          : DateTime.tryParse(raw['expressDegradedAt'].toString()),
+      receiver: OrderReceiver.fromJson(raw['receiver']),
     );
   }
 
@@ -76,6 +112,22 @@ bool canEditOrder(Order order, OrderBreakdown? breakdown) =>
     order.paymentMethod != PaymentMethod.mercadoPago &&
     (breakdown?.paymentStatus ?? 'pending') == 'pending' &&
     breakdown?.editable != false;
+
+/// Si el cliente puede elegir otra dirección de entrega (CU-127): el pedido
+/// está pendiente o aceptado y se sabe que no es express (se evaluó con la
+/// dirección original); sin el desglose no se sabe, así que no se ofrece. Lo demás (pago en línea con otro recargo, ya salió) lo resuelve el
+/// back con un 409.
+bool canChangeOrderAddress(Order order, OrderBreakdown? breakdown) =>
+    (order.status == OrderStatus.pending ||
+        order.status == OrderStatus.accepted) &&
+    breakdown != null &&
+    !breakdown.isExpress;
+
+/// Si el cliente puede indicar quién recibe (CU-128): mientras el pedido no
+/// esté entregado ni cancelado.
+bool canSetOrderReceiver(Order order) =>
+    order.status != OrderStatus.delivered &&
+    order.status != OrderStatus.cancelled;
 
 /// Un pedido con su desglose.
 class OrderDetail {

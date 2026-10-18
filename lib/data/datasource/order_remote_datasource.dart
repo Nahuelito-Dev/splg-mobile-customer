@@ -83,6 +83,81 @@ class OrderRemoteDatasource {
     }
   }
 
+  /// `GET /orders/delivery-options?addressId=`: modalidades de entrega que
+  /// ofrece la distribuidora para esa dirección (no escribe nada). Un error
+  /// vuelve como `ApiResult.fail` con el texto listo.
+  Future<ApiResult<dynamic>> deliveryOptions(
+    String addressId,
+    String token,
+  ) async {
+    try {
+      final response = await _apiClient.get(
+        'orders/delivery-options?addressId=${Uri.encodeQueryComponent(addressId)}',
+        token,
+      );
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      log('e in deliveryOptions: ${e is DioException ? e.type : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
+  /// `PATCH /orders/:id/address` (CU-127): el cliente dueño elige otra de sus
+  /// direcciones mientras el pedido está pendiente o aceptado. Idempotente por
+  /// `Idempotency-Key`. Responde el pedido completo.
+  Future<ApiResult<dynamic>> changeOrderAddress(
+    String orderId,
+    String addressId,
+    String token,
+    String idempotencyKey, {
+    String? reason,
+  }) =>
+      _patchOrder(
+        'orders/$orderId/address',
+        {
+          'addressId': addressId,
+          if (reason != null && reason.trim().isNotEmpty)
+            'reason': reason.trim(),
+        },
+        token,
+        idempotencyKey,
+      );
+
+  /// `PATCH /orders/:id/receiver` (CU-128): quién recibe el pedido. Reemplaza lo
+  /// anterior. Idempotente por `Idempotency-Key`. Responde el pedido completo.
+  Future<ApiResult<dynamic>> setOrderReceiver(
+    String orderId,
+    Map<String, dynamic> receiver,
+    String token,
+    String idempotencyKey,
+  ) =>
+      _patchOrder('orders/$orderId/receiver', receiver, token, idempotencyKey);
+
+  Future<ApiResult<dynamic>> _patchOrder(
+    String path,
+    Map<String, dynamic> body,
+    String token,
+    String idempotencyKey,
+  ) async {
+    try {
+      final response = await _apiClient.patch(
+        path,
+        body,
+        token,
+        {'Idempotency-Key': idempotencyKey},
+      );
+      final status = response.statusCode;
+      if (status == 200 || status == 204) return ApiResult.ok(response.data);
+      return ApiResult.fromError(DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+      ));
+    } catch (e) {
+      log('e in $path: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return _notFoundOf(e) ?? ApiResult.fromError(e);
+    }
+  }
+
   /// Un 404 del PATCH: o el pedido ya no existe (texto propio, el del back es
   /// técnico) o es otro recurso ("Dirección no encontrada") y vale su mensaje.
   ApiResult<dynamic>? _notFoundOf(Object e) {

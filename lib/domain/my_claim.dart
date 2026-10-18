@@ -9,11 +9,11 @@ enum ClaimStatus {
   final String label;
 
   static ClaimStatus parse(Object? raw) => switch (raw) {
-    'in_process' => ClaimStatus.inProcess,
-    'resolved' => ClaimStatus.resolved,
-    'rejected' => ClaimStatus.rejected,
-    _ => ClaimStatus.pending,
-  };
+        'in_process' => ClaimStatus.inProcess,
+        'resolved' => ClaimStatus.resolved,
+        'rejected' => ClaimStatus.rejected,
+        _ => ClaimStatus.pending,
+      };
 }
 
 /// Un reclamo propio (`GET /claims/mine`, camelCase).
@@ -45,8 +45,7 @@ class MyClaim {
       status: ClaimStatus.parse(json['status']),
       reason: json['reason']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      createdAt:
-          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       orderId: order is Map ? order['orderId']?.toString() ?? '' : '',
       orderTotal: order is Map && order['totalAmount'] is num

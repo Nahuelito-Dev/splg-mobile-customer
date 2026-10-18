@@ -12,7 +12,9 @@ import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/core/network/idempotency.dart';
+import 'package:splg_customer/domain/delivery_options.dart';
 import 'package:splg_customer/domain/order_quote.dart';
+import 'package:splg_customer/domain/order_receiver.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -66,6 +68,7 @@ class CheckoutViewModel extends ReactiveViewModel {
     setBusy(false);
     // Trae las franjas de la fecha por defecto (hoy) para que el cliente elija.
     loadTimeSlots();
+    loadDeliveryOptions();
     scheduleQuote();
   }
 
@@ -140,7 +143,120 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   void _setOrderAddress(Address address) {
     _cartService.setAddress(address);
+    _deliveryNotice = null;
+    loadDeliveryOptions();
     scheduleQuote();
+  }
+
+  // ─── Modalidad de entrega (CU-148) ───
+  // Normal o express, con lo que ofrece la distribuidora para la dirección
+  // (`GET /orders/delivery-options`): disponibilidad, recargo y por qué no. El
+  // express no se agenda, así que sin fecha ni franja.
+
+  DeliveryMode _mode = DeliveryMode.standard;
+  DeliveryMode get deliveryMode => _mode;
+  bool get isExpress => _mode == DeliveryMode.express;
+
+  DeliveryOptions? _options;
+  String? _optionsAddressId;
+  String? _optionsInFlight;
+  int _optionsVersion = 0;
+
+  bool _loadingOptions = false;
+  bool get loadingOptions => _loadingOptions;
+
+  /// Aviso de por qué se volvió al reparto común (el express dejó de estar
+  /// disponible); null si no hubo.
+  String? _deliveryNotice;
+  String? get deliveryNotice => _deliveryNotice;
+
+  DeliveryOption? get standardOption =>
+      _options?.optionFor(DeliveryMode.standard);
+  DeliveryOption? get expressOption =>
+      _options?.optionFor(DeliveryMode.express);
+
+  /// Se ofrece elegir modalidad: la distribuidora tiene el express habilitado.
+  /// Si lo apagó (`disabled`) o la consulta falló, no hay nada que elegir.
+  bool get showDeliveryChoice {
+    final express = expressOption;
+    return express != null && express.reason != 'disabled';
+  }
+
+  /// Pide las modalidades de la dirección elegida. Una respuesta que llega
+  /// vieja (se cambió la dirección mientras tanto) no pisa a la última. Si la
+  /// consulta falla no se ofrece el express: el reparto común sigue andando.
+  Future<void> loadDeliveryOptions({bool force = false}) async {
+    final addressId = order?.address?.addressId;
+    if (addressId == null || addressId.isEmpty) {
+      _options = null;
+      _optionsAddressId = null;
+      _backToStandard();
+      return;
+    }
+    if (!force &&
+        (addressId == _optionsAddressId || addressId == _optionsInFlight)) {
+      return;
+    }
+    final version = ++_optionsVersion;
+    _optionsInFlight = addressId;
+    _loadingOptions = true;
+    if (!_disposed) notifyListeners();
+    final result = await _historyService.deliveryOptions(addressId);
+    if (_disposed || version != _optionsVersion) return;
+    _optionsInFlight = null;
+    _loadingOptions = false;
+    _options = result.ok ? result.data : null;
+    // Sólo cuenta como cargada si salió bien: una falla se reintenta.
+    _optionsAddressId = result.ok ? addressId : null;
+    if (expressOption?.available ?? false) _deliveryNotice = null;
+    if (isExpress && !(expressOption?.available ?? false)) {
+      _deliveryNotice = expressOption?.unavailableText ??
+          'La entrega express no está disponible en este momento.';
+      _backToStandard();
+    }
+    notifyListeners();
+  }
+
+  void _backToStandard() {
+    if (_mode == DeliveryMode.standard) return;
+    _mode = DeliveryMode.standard;
+    scheduleQuote();
+  }
+
+  void setDeliveryMode(DeliveryMode mode) {
+    if (isBusy || mode == _mode) return;
+    if (mode == DeliveryMode.express && !(expressOption?.available ?? false)) {
+      return;
+    }
+    _mode = mode;
+    _deliveryNotice = null;
+    notifyListeners();
+    scheduleQuote();
+  }
+
+  // ─── Quién recibe (CU-128, opcional) ───
+
+  OrderReceiver? _receiver;
+  OrderReceiver? get receiver => _receiver;
+
+  Future<void> editReceiver() async {
+    if (isBusy) return;
+    final response = await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.receiver,
+      isScrollControlled: true,
+      enableDrag: false,
+      data: {'receiver': _receiver},
+    );
+    if (response?.confirmed == true && response?.data is OrderReceiver) {
+      _receiver = response!.data as OrderReceiver;
+      rebuildUi();
+    }
+  }
+
+  void clearReceiver() {
+    if (isBusy) return;
+    _receiver = null;
+    rebuildUi();
   }
 
   // ─── Cotización (el precio lo calcula el back) ───
@@ -206,8 +322,17 @@ class CheckoutViewModel extends ReactiveViewModel {
       ),
       timeSlotId: _selectedTimeSlotId,
       fromCart: true,
+      deliveryMode: _mode,
     );
     if (_disposed || version != _quoteVersion) return;
+    // El express dejó de estar disponible: se vuelve al reparto común con el
+    // motivo a la vista y se cotiza de nuevo.
+    if (outcome.expressUnavailableReason != null && isExpress) {
+      _deliveryNotice = outcome.message;
+      _backToStandard();
+      unawaited(loadDeliveryOptions(force: true));
+      return;
+    }
     _quoting = false;
     _quote = outcome.quote;
     _quoteError = outcome.ok ? null : outcome.message;
@@ -271,7 +396,7 @@ class CheckoutViewModel extends ReactiveViewModel {
         order!.items.isNotEmpty &&
         !_cartService.cart.hasUnavailableItems &&
         addressController.text.isNotEmpty &&
-        _selectedTimeSlotId != null &&
+        (isExpress || _selectedTimeSlotId != null) &&
         _quote != null;
   }
 
@@ -353,9 +478,12 @@ class CheckoutViewModel extends ReactiveViewModel {
 
     // Lo que se confirma es lo que se cotizó: se toma ahora, antes de esperar.
     final paymentMethod = _selectedPaymentMethod;
+    final mode = _mode;
+    final receiver = _receiver;
     final selectedDate = _selectedDate;
-    final timeSlotId = _selectedTimeSlotId;
-    final slot = _selectedSlot;
+    final timeSlotId =
+        mode == DeliveryMode.express ? null : _selectedTimeSlotId;
+    final slot = mode == DeliveryMode.express ? null : _selectedSlot;
     final notes = deliveryDetailsController.text;
 
     // La dirección tiene que seguir vigente: pudo borrarse desde otra pantalla.
@@ -390,6 +518,8 @@ class CheckoutViewModel extends ReactiveViewModel {
       updatedOrder,
       timeSlotId: timeSlotId,
       fromCart: true,
+      deliveryMode: mode,
+      receiver: receiver,
     );
 
     if (result.success) {
@@ -420,6 +550,18 @@ class CheckoutViewModel extends ReactiveViewModel {
       await _navigationService.replaceWithOrderTrackingView(
         orderId: trackedOrderId,
       );
+    } else if (result.expressUnavailableReason != null) {
+      // No se creó nada: el express dejó de estar disponible entre que se
+      // eligió y se confirmó. Se vuelve al reparto común, que pide franja.
+      await _dialogService.showDialog(
+        title: 'El express ya no está disponible',
+        description: '${result.message ?? ''}\n\nPodés pedir con el reparto '
+            'común y elegir una franja de entrega.',
+        buttonTitle: 'Aceptar',
+      );
+      _deliveryNotice = result.message;
+      _backToStandard();
+      unawaited(loadDeliveryOptions(force: true));
     } else if (result.idempotencyConflict) {
       // El primer envío llegó con otros datos: no se manda otro pedido.
       await _dialogService.showDialog(

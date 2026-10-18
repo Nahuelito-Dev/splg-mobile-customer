@@ -4,9 +4,8 @@ import 'package:splg_customer/domain/my_claim.dart';
 
 class ClaimRemoteDatasource {
   /// El alta responde en snake_case (`claim_id`); el listado, en camelCase.
-  static String? claimIdFrom(Object? body) => body is Map
-      ? (body['claim_id'] ?? body['claimId'])?.toString()
-      : null;
+  static String? claimIdFrom(Object? body) =>
+      body is Map ? (body['claim_id'] ?? body['claimId'])?.toString() : null;
 
   final _apiClient = ApiClient();
 

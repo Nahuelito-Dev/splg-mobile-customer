@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/domain/delivery_options.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'checkout_viewmodel.dart';
 
@@ -112,6 +113,14 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                                         textAlign: TextAlign.right,
                                         style: type.caption
                                             .copyWith(color: Colors.white70)),
+                                  if ((model.quote?.expressSurcharge ?? 0) > 0)
+                                    Text(
+                                        'Recargo express ${money.format(model.quote!.expressSurcharge)}',
+                                        key: const Key(
+                                            'checkout-express-surcharge'),
+                                        textAlign: TextAlign.right,
+                                        style: type.caption
+                                            .copyWith(color: Colors.white70)),
                                   if ((model.quote?.paymentSurcharge ?? 0) > 0)
                                     Text(
                                         'Recargo por medio de pago ${money.format(model.quote!.paymentSurcharge)}',
@@ -143,6 +152,48 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                         ),
                       const SizedBox(height: 8),
                       divider(),
+                      if (model.showDeliveryChoice) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 10, 6, 2),
+                          child: Text('Modalidad de entrega',
+                              style:
+                                  type.caption.copyWith(color: Colors.white70)),
+                        ),
+                        SplgRadioRow(
+                          key: const Key('mode-standard'),
+                          onDark: true,
+                          icon: SplgIcons.truck,
+                          title: 'Entrega normal',
+                          subtitle: _modeSubtitle(model.standardOption),
+                          selected: !model.isExpress,
+                          onTap: model.isBusy
+                              ? null
+                              : () =>
+                                  model.setDeliveryMode(DeliveryMode.standard),
+                        ),
+                        SplgRadioRow(
+                          key: const Key('mode-express'),
+                          onDark: true,
+                          icon: SplgIcons.online,
+                          title: 'Entrega express',
+                          subtitle: _modeSubtitle(model.expressOption),
+                          selected: model.isExpress,
+                          onTap: model.isBusy ||
+                                  !(model.expressOption?.available ?? false)
+                              ? null
+                              : () =>
+                                  model.setDeliveryMode(DeliveryMode.express),
+                        ),
+                        divider(),
+                      ],
+                      if (model.deliveryNotice != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+                          child: Text(model.deliveryNotice!,
+                              key: const Key('checkout-delivery-notice'),
+                              style:
+                                  type.caption.copyWith(color: Colors.white)),
+                        ),
                       SplgOptionRow(
                         key: const Key('checkout-payment'),
                         onDark: true,
@@ -162,53 +213,85 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                             onTap: () => model.setPaymentMethod(m),
                           ),
                       divider(),
-                      SplgOptionRow(
-                        key: const Key('checkout-date'),
-                        onDark: true,
-                        icon: SplgIcons.calendar,
-                        title: 'Fecha de entrega',
-                        value: model.formattedDate,
-                        onTap: () => model.selectDate(context),
-                      ),
+                      if (model.isExpress)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 12),
+                          child: Text(
+                              'El pedido express sale ahora: no se agenda '
+                              'fecha ni franja.',
+                              key: const Key('checkout-express-note'),
+                              style: white),
+                        )
+                      else ...[
+                        SplgOptionRow(
+                          key: const Key('checkout-date'),
+                          onDark: true,
+                          icon: SplgIcons.calendar,
+                          title: 'Fecha de entrega',
+                          value: model.formattedDate,
+                          onTap: () => model.selectDate(context),
+                        ),
+                        divider(),
+                        SplgOptionRow(
+                          key: const Key('checkout-slots'),
+                          onDark: true,
+                          dropdown: true,
+                          icon: SplgIcons.clock,
+                          title: 'Franja de entrega',
+                          value: model.selectedSlotLabel ?? 'Elegí una',
+                          onTap: model.toggleSlots,
+                        ),
+                        if (model.slotsOpen)
+                          if (model.loadingTimeSlots)
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SplgLoader(onDark: true),
+                            )
+                          else if (model.timeSlots.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                  'No hay franjas disponibles para esta fecha. '
+                                  'Probá con otro día.',
+                                  style: white),
+                            )
+                          else
+                            for (final slot in model.timeSlots)
+                              SplgRadioRow(
+                                key: Key('slot-${slot.timeSlotId}'),
+                                onDark: true,
+                                title: slot.label,
+                                subtitle: slot.isFull
+                                    ? 'Sin cupo'
+                                    : 'Quedan ${slot.remaining}',
+                                selected:
+                                    slot.timeSlotId == model.selectedTimeSlotId,
+                                onTap: slot.isFull
+                                    ? null
+                                    : () =>
+                                        model.selectTimeSlot(slot.timeSlotId),
+                              ),
+                      ],
                       divider(),
                       SplgOptionRow(
-                        key: const Key('checkout-slots'),
+                        key: const Key('checkout-receiver'),
                         onDark: true,
-                        dropdown: true,
-                        icon: SplgIcons.clock,
-                        title: 'Franja de entrega',
-                        value: model.selectedSlotLabel ?? 'Elegí una',
-                        onTap: model.toggleSlots,
+                        icon: SplgIcons.user,
+                        title: 'Quién recibe',
+                        value: model.receiver?.name ?? 'Yo (opcional)',
+                        onTap: model.editReceiver,
                       ),
-                      if (model.slotsOpen)
-                        if (model.loadingTimeSlots)
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SplgLoader(onDark: true),
-                          )
-                        else if (model.timeSlots.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(
-                                'No hay franjas disponibles para esta fecha. '
-                                'Probá con otro día.',
-                                style: white),
-                          )
-                        else
-                          for (final slot in model.timeSlots)
-                            SplgRadioRow(
-                              key: Key('slot-${slot.timeSlotId}'),
-                              onDark: true,
-                              title: slot.label,
-                              subtitle: slot.isFull
-                                  ? 'Sin cupo'
-                                  : 'Quedan ${slot.remaining}',
-                              selected:
-                                  slot.timeSlotId == model.selectedTimeSlotId,
-                              onTap: slot.isFull
-                                  ? null
-                                  : () => model.selectTimeSlot(slot.timeSlotId),
-                            ),
+                      if (model.receiver != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            key: const Key('checkout-receiver-clear'),
+                            onPressed: model.clearReceiver,
+                            child: const Text('Quitar',
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                        ),
                       divider(),
                       const SizedBox(height: 12),
                       Text('Detalles de la entrega (opcional)',
@@ -280,4 +363,15 @@ String? _promo(CheckoutViewModel model, OrderItem item) {
   if (line == null || list <= 0 || line.unitPrice >= list) return null;
   final pct = (1 - line.unitPrice / list) * 100;
   return '−${pct.toStringAsFixed(0)}% x${item.quantity}';
+}
+
+/// Demora y recargo de una modalidad, o por qué no se puede elegir.
+String? _modeSubtitle(DeliveryOption? option) {
+  if (option == null) return null;
+  if (!option.available) return option.unavailableText;
+  final parts = <String>[
+    if (option.estimatedMinutes != null) '~${option.estimatedMinutes} min',
+    if (option.surchargeAmount > 0) '+ ${money.format(option.surchargeAmount)}',
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
 }

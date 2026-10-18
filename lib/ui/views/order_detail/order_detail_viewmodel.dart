@@ -6,6 +6,8 @@ import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/order_receiver.dart';
+import 'package:splg_lib/domain/address.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
@@ -74,6 +76,82 @@ class OrderDetailViewModel extends LoadViewModel {
   bool get canRate => order?.status == OrderStatus.delivered;
   bool get canClaim => order?.status == OrderStatus.delivered;
   bool get canRepeat => order != null && !_active;
+  bool get canChangeAddress =>
+      order != null && !saving && canChangeOrderAddress(order!, breakdown);
+  bool get canSetReceiver =>
+      order != null && !saving && canSetOrderReceiver(order!);
+
+  /// El pedido es express, o lo fue y pasó al reparto común.
+  bool get isExpress => breakdown?.isExpress ?? false;
+  bool get expressDegraded => breakdown?.expressDegraded ?? false;
+
+  /// El cobro ya se hizo por una pasarela o transferencia.
+  bool get paidOnline =>
+      breakdown?.paymentStatus == 'paid' &&
+      order?.paymentMethod != PaymentMethod.cash;
+  OrderReceiver? get receiver => breakdown?.receiver;
+
+  /// Hay un cambio (dirección) guardándose: no se lanza otro encima.
+  bool saving = false;
+
+  /// Elige otra de las direcciones del cliente para este pedido (CU-127). El
+  /// back recalcula el total y rechaza lo que no corresponde (ya salió, pago en
+  /// línea con otro recargo, fuera de cobertura): ese texto se muestra tal cual.
+  Future<void> changeAddress() async {
+    final o = order;
+    if (o == null || saving) return;
+    final response = await _sheets.showCustomSheet(
+      variant: BottomSheetType.addressList,
+      title: 'Elegí la dirección de entrega',
+      data: {'selectedId': o.address?.addressId},
+    );
+    if (response?.confirmed != true || response?.data is! Address) return;
+    final chosen = response!.data as Address;
+    if (chosen.addressId == o.address?.addressId) return;
+
+    saving = true;
+    notifyListeners();
+    final result = await _history.changeOrderAddress(orderId, chosen.addressId);
+    saving = false;
+    if (result.success) {
+      // Lo que devolvió el back manda; la relectura sólo completa el desglose
+      // y, si falla, no deshace el cambio.
+      final updated = result.order;
+      if (updated != null) order = updated;
+      notifyListeners();
+      await _reload();
+      final now = order ?? updated ?? o;
+      await _dialogs.showDialog(
+        title: 'Dirección actualizada',
+        description:
+            'Tu pedido se entrega en ${now.address?.streetName ?? chosen.streetName}. '
+            'El total ahora es ${money.format(now.total)}.',
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    notifyListeners();
+    await _dialogs.showDialog(
+      title: 'No pudimos cambiar la dirección',
+      description: result.message,
+      buttonTitle: 'Aceptar',
+    );
+    // El pedido pudo cambiar de estado (ya salió): se relee.
+    if (result.rejected) await _reload();
+  }
+
+  /// Indica quién recibe el pedido (CU-128), desde la hoja del receptor.
+  Future<void> editReceiver() async {
+    if (order == null || saving) return;
+    await _sheets.showCustomSheet(
+      variant: BottomSheetType.receiver,
+      isScrollControlled: true,
+      enableDrag: false,
+      data: {'orderId': orderId, 'receiver': receiver},
+    );
+    // También tras un rechazo: el pedido pudo cambiar (ya se entregó).
+    await _reload();
+  }
 
   Future<void> track() async {
     await _nav.navigateToOrderTrackingView(orderId: orderId);
