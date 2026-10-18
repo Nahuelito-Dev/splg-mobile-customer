@@ -219,4 +219,38 @@ void main() {
       expect(detail.breakdown!.editable, isTrue);
     });
   });
+
+  group('GET /orders/:id/refunds/mine', () {
+    test('pide la ruta del pedido con el token y devuelve la lista', () async {
+      final log = fakeHttp((_) => const FakeReply(200, [
+            {
+              'kind': 'full',
+              'amount': 15800,
+              'status': 'failed',
+              'requestedAt': '2026-10-18T04:09:23.013Z',
+              'completedAt': null,
+            }
+          ]));
+
+      final result = await OrderRemoteDatasource().fetchMyRefunds('o1', 'tok');
+
+      expect(result.ok, isTrue);
+      expect(log.single.method, 'GET');
+      expect(log.single.path, 'orders/o1/refunds/mine');
+      expect(log.single.headers['Authorization'], contains('tok'));
+    });
+
+    test('un pedido ajeno (404) vuelve como fallo, no como lista vacía',
+        () async {
+      fakeHttp((_) => const FakeReply(404, {
+            'statusCode': 404,
+            'message': 'Order with ID: o1 not found',
+          }));
+
+      final result = await OrderRemoteDatasource().fetchMyRefunds('o1', 'tok');
+
+      expect(result.ok, isFalse);
+      expect(result.status, 404);
+    });
+  });
 }

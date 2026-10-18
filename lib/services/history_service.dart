@@ -23,6 +23,7 @@ import 'package:splg_customer/domain/usecases/cancel_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/change_order_usecases.dart';
 import 'package:splg_customer/domain/usecases/update_order_usecases.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/order_refund.dart';
 import 'package:splg_customer/domain/update_order_result.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/notification_service.dart';
@@ -387,6 +388,17 @@ class HistoryService with ListenableServiceMixin {
       if (isOrderGone(e)) throw orderGoneFailure;
       rethrow;
     }
+  }
+
+  /// Las devoluciones del pago del pedido (`GET /orders/:id/refunds/mine`);
+  /// lista vacía si no hubo ninguna y null si no se pudo leer (que no es lo
+  /// mismo que "sin reintegro").
+  Future<List<OrderRefund>?> fetchOrderRefunds(String orderId) async {
+    final token = await _customerService.token;
+    if (token == null) return null;
+    final result = await _orderDatasource.fetchMyRefunds(orderId, token);
+    if (!result.ok) return null;
+    return OrderRefund.listFromJson(result.data);
   }
 
   /// Limpia lo del usuario anterior (cierre de sesión / baja de cuenta).

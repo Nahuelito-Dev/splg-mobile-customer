@@ -193,6 +193,22 @@ class OrderRemoteDatasource {
     return response.data;
   }
 
+  /// `GET /orders/:id/refunds/mine`: las devoluciones del pago del pedido del
+  /// cliente dueño. Un error vuelve como `ApiResult.fail`.
+  Future<ApiResult<dynamic>> fetchMyRefunds(
+    String orderId,
+    String token,
+  ) async {
+    try {
+      final response =
+          await _apiClient.get('orders/$orderId/refunds/mine', token);
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      log('e in fetchMyRefunds: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
   /// `PATCH /orders/:id/cancel`: el cliente no puede usar `/status` (sólo
   /// chofer y admin). Idempotente por `Idempotency-Key`, que llega de afuera
   /// para que los reintentos de una misma intención lleven la misma clave.

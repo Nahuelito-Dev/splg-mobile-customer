@@ -7,6 +7,7 @@ import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/order_receiver.dart';
+import 'package:splg_customer/domain/order_refund.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
@@ -34,10 +35,15 @@ class OrderDetailViewModel extends LoadViewModel {
   /// se lee.
   OrderBreakdown? breakdown;
 
+  /// Devoluciones del pago (`GET /orders/:id/refunds/mine`); vacía hasta que se
+  /// leen o si no hubo ninguna.
+  List<OrderRefund> refunds = const [];
+
   @override
   Future<void> fetch() async {
     try {
       _apply(await _history.fetchOrderDetail(orderId));
+      await _loadRefunds();
     } catch (e) {
       // Con el pedido de la lista a mano se muestra eso; sin él, el error. Un
       // pedido que ya no existe no se muestra con datos viejos.
@@ -50,11 +56,25 @@ class OrderDetailViewModel extends LoadViewModel {
     breakdown = detail.breakdown;
   }
 
+  /// Sólo un pedido cancelado, o uno express que pasó al reparto común, puede
+  /// tener devolución. Si no se puede leer se queda con lo que ya mostraba.
+  Future<void> _loadRefunds() async {
+    final o = order;
+    if (o == null) return;
+    if (o.status != OrderStatus.cancelled && !expressDegraded) {
+      refunds = const [];
+      return;
+    }
+    final read = await _history.fetchOrderRefunds(orderId);
+    if (read != null) refunds = read;
+  }
+
   static bool _isGone(Object e) => e is LoadFailure && !e.retryable;
 
   Future<void> _reload() async {
     try {
       _apply(await _history.fetchOrderDetail(orderId));
+      await _loadRefunds();
     } catch (e) {
       if (_isGone(e)) {
         order = null;
@@ -90,6 +110,24 @@ class OrderDetailViewModel extends LoadViewModel {
       breakdown?.paymentStatus == 'paid' &&
       order?.paymentMethod != PaymentMethod.cash;
   OrderReceiver? get receiver => breakdown?.receiver;
+
+  /// Una fila por devolución: qué se devuelve y en qué estado está.
+  List<({String title, String value})> get refundRows => [
+        for (final r in refunds)
+          (
+            title: r.expressSurchargeOnly
+                ? 'Reintegro del recargo express:'
+                : 'Reintegro:',
+            value: switch (r.status) {
+              RefundStatus.pending => '${money.format(r.amount)} · en trámite',
+              RefundStatus.succeeded => r.completedAt == null
+                  ? '${money.format(r.amount)} · acreditado'
+                  : '${money.format(r.amount)} · acreditado el ${dateLabel(r.completedAt!)}',
+              RefundStatus.failed =>
+                '${money.format(r.amount)} · no se pudo acreditar todavía; lo estamos revisando',
+            },
+          ),
+      ];
 
   /// Hay un cambio (dirección) guardándose: no se lanza otro encima.
   bool saving = false;

@@ -145,6 +145,16 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                                   '${model.receiver!.name} (${model.receiver!.relationship}) · Doc. ${model.receiver!.document}'),
                       ],
                     ),
+                    if (model.refundRows.isNotEmpty)
+                      SplgInfoSection(
+                        key: const Key('detail-refunds'),
+                        icon: SplgIcons.cash,
+                        title: 'Devolución del pago',
+                        rows: [
+                          for (final r in model.refundRows)
+                            SplgInfoRow(title: r.title, value: r.value),
+                        ],
+                      ),
                     if (model.expressDegraded)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),

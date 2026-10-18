@@ -1,11 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/core/network/order_gone.dart';
+import 'package:splg_customer/domain/delivery_options.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/order_refund.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_viewmodel.dart';
@@ -21,6 +24,8 @@ void main() {
   late MockNavigationService nav;
   late MockCartService cart;
   OrderBreakdown? breakdown;
+
+  setUpAll(() => initializeDateFormatting('es_AR', null));
 
   setUp(() {
     breakdown = null;
@@ -210,5 +215,61 @@ void main() {
     await m.cancel();
 
     verify(history.fetchOrderDetail('o1')).called(2); // la carga y el refresco
+  });
+
+  group('reintegro', () {
+    OrderRefund refund(RefundStatus status,
+            {bool express = false, double amount = 1500, DateTime? done}) =>
+        OrderRefund(
+            expressSurchargeOnly: express,
+            amount: amount,
+            status: status,
+            completedAt: done);
+
+    test('cancelado: lee el reintegro y lo muestra según su estado', () async {
+      when(history.fetchOrderRefunds('o1')).thenAnswer((_) async => [
+            refund(RefundStatus.pending),
+            refund(RefundStatus.failed, express: true, amount: 500),
+            refund(RefundStatus.succeeded, done: DateTime(2026, 10, 18)),
+          ]);
+      final m = await loaded(OrderStatus.cancelled);
+
+      expect(m.refundRows, hasLength(3));
+      expect(m.refundRows[0].title, 'Reintegro:');
+      expect(m.refundRows[0].value, contains('en trámite'));
+      expect(m.refundRows[1].title, 'Reintegro del recargo express:');
+      expect(m.refundRows[1].value, contains('lo estamos revisando'));
+      expect(m.refundRows[2].value, contains('acreditado el'));
+      verify(history.fetchOrderRefunds('o1')).called(1);
+    });
+
+    test('express que pasó al reparto común: también lo busca', () async {
+      breakdown = OrderBreakdown(
+          total: 1,
+          deliveryMode: DeliveryMode.standard,
+          expressDegradedAt: DateTime(2026, 10, 18));
+      when(history.fetchOrderRefunds('o1')).thenAnswer(
+          (_) async => [refund(RefundStatus.pending, express: true)]);
+      final m = await loaded(OrderStatus.pending);
+
+      expect(m.refundRows, hasLength(1));
+    });
+
+    test('pedido común en curso: no consulta reintegros', () async {
+      final m = await loaded(OrderStatus.pending);
+
+      expect(m.refundRows, isEmpty);
+      verifyNever(history.fetchOrderRefunds(any));
+    });
+
+    test('si no se pudo leer el reintegro, la pantalla carga igual sin él',
+        () async {
+      when(history.fetchOrderRefunds('o1')).thenAnswer((_) async => null);
+      final m = await loaded(OrderStatus.cancelled);
+
+      expect(m.order, isNotNull);
+      expect(m.loadError, isNull);
+      expect(m.refundRows, isEmpty);
+    });
   });
 }
