@@ -191,6 +191,8 @@ void main() {
       ]) {
         expect(find.text(item), findsOneWidget, reason: item);
       }
+      expect(t.getTopLeft(find.text('Mis pedidos')).dy,
+          lessThan(t.getTopLeft(find.text('Mi perfil')).dy));
       await t.tap(find.text('Mis pedidos'));
       await t.pumpAndSettle();
       verify(nav.navigateToOrdersView()).called(1);
@@ -412,11 +414,12 @@ void main() {
       expect(find.text('No pudimos cargar'), findsNothing);
     });
 
-    phoneTest('el botón de pedidos abre Mis pedidos', (t) async {
+    phoneTest('el inicio tiene un solo botón de menú y no el de pedidos',
+        (t) async {
       await t.pumpWidget(app(const HomeView()));
       await settle(t);
-      await t.tap(find.byTooltip('Ir a mis pedidos'));
-      verify(nav.navigateToOrdersView()).called(1);
+      expect(find.byTooltip('Abrir menú'), findsOneWidget);
+      expect(find.byTooltip('Ir a mis pedidos'), findsNothing);
     });
 
     phoneTest('el menú abre el cajón', (t) async {
@@ -501,9 +504,9 @@ void main() {
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.text('Recargo por zona'), findsOneWidget);
-      expect(find.text('• \$900'), findsOneWidget);
+      expect(find.text('\$900'), findsOneWidget);
       expect(find.text('Recargo por medio de pago'), findsOneWidget);
-      expect(find.text('• \$1.580'), findsOneWidget);
+      expect(find.text('\$1.580'), findsOneWidget);
     });
 
     phoneTest('detalle sin recargos no muestra renglones de más', (t) async {

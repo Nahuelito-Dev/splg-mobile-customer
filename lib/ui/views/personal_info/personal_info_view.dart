@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/widgets/app_info.dart';
+
 import 'package:splg_customer/ui/widgets/app_header.dart';
 import 'personal_info_viewmodel.dart';
 
@@ -32,27 +34,26 @@ class PersonalInfoView extends StackedView<PersonalInfoViewModel> {
               Divider(
                   color: brasa.primaryStrong.withValues(alpha: 0.35),
                   height: 30),
-              SplgInfoSection(
+              AppInfoSection(
                 icon: SplgIcons.user,
                 title: 'Datos personales',
                 rows: [
-                  SplgInfoRow(title: 'Nombre y apellido:', value: c.fullName)
+                  AppInfoRow(title: 'Nombre y apellido:', value: c.fullName)
                 ],
               ),
-              SplgInfoSection(
+              AppInfoSection(
                 icon: SplgIcons.phone,
                 title: 'Información de contacto',
                 rows: [
-                  SplgInfoRow(
-                      title: 'Número de teléfono:', value: c.phoneNumber)
+                  AppInfoRow(title: 'Número de teléfono:', value: c.phoneNumber)
                 ],
               ),
-              SplgInfoSection(
+              AppInfoSection(
                 icon: SplgIcons.mail,
                 title: 'Información de la cuenta',
                 rows: [
-                  SplgInfoRow(title: 'Correo electrónico:', value: c.email),
-                  SplgInfoRow(title: 'Domicilio:', value: model.primaryAddress),
+                  AppInfoRow(title: 'Correo electrónico:', value: c.email),
+                  AppInfoRow(title: 'Domicilio:', value: model.primaryAddress),
                 ],
               ),
             ],

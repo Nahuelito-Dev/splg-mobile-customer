@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/widgets/app_info.dart';
+
 import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
@@ -101,27 +103,27 @@ class ClaimDetailView extends StackedView<ClaimDetailViewModel> {
                           style: type.caption
                               .copyWith(color: context.brasa.danger)),
                     const SizedBox(height: 16),
-                    SplgInfoSection(
+                    AppInfoSection(
                       icon: SplgIcons.deliveries,
                       title: 'Pedido reclamado',
                       rows: [
-                        SplgInfoRow(
+                        AppInfoRow(
                             title: 'Código:',
                             value: claim.orderId.length > 6
                                 ? '#${claim.orderId.substring(claim.orderId.length - 6)}'
                                 : claim.orderId),
                         if (claim.orderTotal != null)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Total:',
                               value: money.format(claim.orderTotal!)),
                       ],
                     ),
                     if ((claim.resolutionNote ?? '').isNotEmpty)
-                      SplgInfoSection(
+                      AppInfoSection(
                         icon: SplgIcons.ok,
                         title: 'Respuesta de la distribuidora',
                         rows: [
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Nota:', value: claim.resolutionNote)
                         ],
                       ),

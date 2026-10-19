@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/widgets/app_info.dart';
+
 import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/widgets/load_scaffold.dart';
@@ -26,7 +28,6 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
   Widget builder(
       BuildContext context, OrderDetailViewModel model, Widget? child) {
     final type = SplgType.of(context);
-    final brasa = context.brasa;
     return LoadScaffold(
       title: 'Mi pedido',
       model: model,
@@ -93,66 +94,66 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                       amountKey: const Key('detail-total'),
                     ),
                     const SizedBox(height: 16),
-                    SplgInfoSection(
+                    AppInfoSection(
                       icon: SplgIcons.cart,
                       title: 'Tu pedido',
                       rows: [
                         for (final i in o.items)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: itemLabel(i),
                               value: money.format(Pricing.subtotal(i))),
                         if ((model.breakdown?.zoneSurcharge ?? 0) > 0)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Recargo por zona',
                               value:
                                   money.format(model.breakdown!.zoneSurcharge)),
                         if ((model.breakdown?.expressSurchargeInTotal ?? 0) > 0)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Recargo express',
                               value: money.format(
                                   model.breakdown!.expressSurchargeInTotal)),
                         if ((model.breakdown?.paymentSurcharge ?? 0) > 0)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Recargo por medio de pago',
                               value: money
                                   .format(model.breakdown!.paymentSurcharge)),
                       ],
                     ),
-                    SplgInfoSection(
+                    AppInfoSection(
                       icon: SplgIcons.location,
                       title: 'Entrega',
                       rows: [
-                        SplgInfoRow(
+                        AppInfoRow(
                             title: 'Dirección:',
                             value: street.isEmpty ? null : street),
                         if (o.address?.city != null)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Localidad:', value: o.address!.city),
                         if (o.deliveryWindowStart != null)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Franja:',
                               value:
                                   '${hhmm(o.deliveryWindowStart!)} – ${hhmm(o.deliveryWindowEnd ?? '')}'),
                         if ((o.customerNotes ?? '').isNotEmpty)
-                          SplgInfoRow(title: 'Notas:', value: o.customerNotes),
+                          AppInfoRow(title: 'Notas:', value: o.customerNotes),
                         if (model.isExpress)
-                          const SplgInfoRow(
+                          const AppInfoRow(
                               title: 'Modalidad:', value: 'Express'),
                         if (model.receiver != null)
-                          SplgInfoRow(
+                          AppInfoRow(
                               title: 'Recibe:',
                               value:
                                   '${model.receiver!.name} (${model.receiver!.relationship}) · Doc. ${model.receiver!.document}'),
                       ],
                     ),
                     if (model.refundRows.isNotEmpty)
-                      SplgInfoSection(
+                      AppInfoSection(
                         key: const Key('detail-refunds'),
                         icon: SplgIcons.cash,
                         title: 'Devolución del pago',
                         rows: [
                           for (final r in model.refundRows)
-                            SplgInfoRow(title: r.title, value: r.value),
+                            AppInfoRow(title: r.title, value: r.value),
                         ],
                       ),
                     if (model.expressDegraded)
@@ -167,16 +168,14 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                             style: type.caption),
                       ),
                     if (o.deliveryName != null)
-                      SplgInfoSection(
+                      AppInfoSection(
                         icon: SplgIcons.truck,
                         title: 'Repartidor',
                         rows: [
-                          SplgInfoRow(title: 'Nombre:', value: o.deliveryName)
+                          AppInfoRow(title: 'Nombre:', value: o.deliveryName)
                         ],
                       ),
-                    const SizedBox(height: 8),
-                    Divider(color: brasa.outline),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     for (final a in actions)
                       Padding(
                           padding: const EdgeInsets.only(bottom: 10), child: a),

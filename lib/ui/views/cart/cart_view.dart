@@ -172,10 +172,43 @@ class _LineTile extends StatelessWidget {
     final type = SplgType.of(context);
     final name = line.type.trim().isEmpty ? 'Garrafa' : line.type.trim();
     final diff = line.priceDifference;
+    final stepper = Container(
+      decoration: BoxDecoration(
+        color: brasa.surfaceMuted,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: Key('cart-minus-${line.gasCylinderId}'),
+            tooltip: 'Restar',
+            color: brasa.primaryStrong,
+            icon: const Icon(SplgIcons.minus),
+            onPressed: busy || line.quantity <= 1 ? null : onSubtract,
+          ),
+          SizedBox(
+            width: 28,
+            child: Text('${line.quantity}',
+                key: Key('cart-qty-${line.gasCylinderId}'),
+                textAlign: TextAlign.center,
+                style: type.value),
+          ),
+          IconButton(
+            key: Key('cart-plus-${line.gasCylinderId}'),
+            tooltip: 'Sumar',
+            color: brasa.primaryStrong,
+            icon: const Icon(SplgIcons.plus),
+            onPressed: busy ? null : onAdd,
+          ),
+        ],
+      ),
+    );
     return Container(
       key: Key('cart-line-${line.gasCylinderId}'),
-      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+      padding: const EdgeInsets.fromLTRB(16, 8, 4, 12),
       decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         border:
             Border.all(color: line.available ? brasa.outline : brasa.danger),
@@ -185,12 +218,11 @@ class _LineTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(name, style: type.value)),
-              Text(line.available ? money.format(line.subtotal) : '—',
-                  style: type.value),
+              Expanded(child: Text(name, style: type.subtitle)),
               IconButton(
                 key: Key('cart-remove-${line.gasCylinderId}'),
                 tooltip: 'Quitar',
+                color: brasa.danger,
                 icon: const Icon(SplgIcons.trash),
                 onPressed: busy ? null : onRemove,
               ),
@@ -203,8 +235,6 @@ class _LineTile extends StatelessWidget {
                   label: 'No disponible', tone: SplgTone.danger),
             )
           else ...[
-            Text('${money.format(line.currentUnitPrice)} c/u',
-                style: type.caption),
             if (line.priceChanged)
               Text(
                 'Antes ${money.format(line.savedUnitPrice)} '
@@ -216,24 +246,24 @@ class _LineTile extends StatelessWidget {
               Text('Stock justo: puede que no alcance para ${line.quantity}.',
                   key: Key('cart-stock-${line.gasCylinderId}'),
                   style: type.caption.copyWith(color: brasa.warn)),
-            Row(
-              children: [
-                IconButton(
-                  key: Key('cart-minus-${line.gasCylinderId}'),
-                  tooltip: 'Restar',
-                  icon: const Icon(SplgIcons.minus),
-                  onPressed: busy || line.quantity <= 1 ? null : onSubtract,
-                ),
-                Text('${line.quantity}',
-                    key: Key('cart-qty-${line.gasCylinderId}'),
-                    style: type.value),
-                IconButton(
-                  key: Key('cart-plus-${line.gasCylinderId}'),
-                  tooltip: 'Sumar',
-                  icon: const Icon(SplgIcons.plus),
-                  onPressed: busy ? null : onAdd,
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(money.format(line.subtotal), style: type.heading),
+                        Text('${money.format(line.currentUnitPrice)} c/u',
+                            style: type.caption),
+                      ],
+                    ),
+                  ),
+                  stepper,
+                ],
+              ),
             ),
           ],
         ],

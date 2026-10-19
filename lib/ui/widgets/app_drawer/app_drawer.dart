@@ -103,8 +103,8 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
                 ),
                 line(),
                 group([
-                  item('Mi perfil', SplgIcons.user, model.openProfile),
                   item('Mis pedidos', SplgIcons.deliveries, model.openOrders),
+                  item('Mi perfil', SplgIcons.user, model.openProfile),
                   item('Mis direcciones', SplgIcons.location,
                       model.openAddresses),
                 ]),

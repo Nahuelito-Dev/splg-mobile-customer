@@ -36,23 +36,12 @@ class HomeView extends StackedView<HomeViewModel> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Align(
                 alignment: Alignment.topLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Builder(
-                      builder: (ctx) => SplgIconButton(
-                        icon: SplgIcons.menu,
-                        tooltip: 'Abrir menú',
-                        onPressed: () => Scaffold.of(ctx).openDrawer(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SplgIconButton(
-                      icon: SplgIcons.deliveries,
-                      tooltip: 'Ir a mis pedidos',
-                      onPressed: model.openOrders,
-                    ),
-                  ],
+                child: Builder(
+                  builder: (ctx) => SplgIconButton(
+                    icon: SplgIcons.menu,
+                    tooltip: 'Abrir menú',
+                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+                  ),
                 ),
               ),
             ),

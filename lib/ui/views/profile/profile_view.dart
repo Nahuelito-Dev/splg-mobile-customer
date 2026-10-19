@@ -63,9 +63,11 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       icon: SplgIcons.flame,
                       onTap: model.openConsumption,
                     ),
+                    Divider(color: brasa.outline, height: 24),
                     SplgMenuItem(
+                      key: const Key('profile-delete'),
                       label: 'Eliminar cuenta',
-                      selected: model.selected == 3,
+                      destructive: true,
                       icon: SplgIcons.userMinus,
                       onTap: () => _confirmDelete(context, model),
                     ),

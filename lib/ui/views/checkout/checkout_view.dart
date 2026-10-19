@@ -23,6 +23,20 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
 
     Widget divider() => const Divider(color: Colors.white24, height: 1);
 
+    Widget surcharge(Key key, String label, num amount) => Padding(
+          key: key,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Row(
+            children: [
+              Expanded(
+                  child: Text(label,
+                      style: type.caption.copyWith(color: Colors.white70))),
+              Text(money.format(amount),
+                  style: type.caption.copyWith(color: Colors.white70)),
+            ],
+          ),
+        );
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: const SplgHeader(title: 'Confirmación', onGradient: true),
@@ -74,64 +88,46 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                               ],
                             ),
                           ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+                      if (model.quoting)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('Calculando…',
+                              key: const Key('checkout-quoting'),
+                              style:
+                                  type.caption.copyWith(color: Colors.white70)),
+                        ),
+                      if ((model.quote?.zoneSurcharge ?? 0) > 0)
+                        surcharge(const Key('checkout-zone-surcharge'),
+                            'Recargo por zona', model.quote!.zoneSurcharge),
+                      if ((model.quote?.expressSurcharge ?? 0) > 0)
+                        surcharge(const Key('checkout-express-surcharge'),
+                            'Recargo express', model.quote!.expressSurcharge),
+                      if ((model.quote?.paymentSurcharge ?? 0) > 0)
+                        surcharge(
+                            const Key('checkout-payment-surcharge'),
+                            'Recargo por medio de pago',
+                            model.quote!.paymentSurcharge),
+                      const SizedBox(height: 8),
+                      divider(),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        padding: const EdgeInsets.fromLTRB(6, 10, 6, 0),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Total',
-                                    style: type.caption
-                                        .copyWith(color: Colors.white70)),
-                                Text(
-                                    model.quote == null
-                                        ? '—'
-                                        : money.format(model.quote!.total),
-                                    key: const Key('checkout-total'),
-                                    style: type.amount
-                                        .copyWith(color: Colors.white)),
-                              ],
+                            Expanded(
+                              child: Text('Total',
+                                  style: type.label
+                                      .copyWith(color: Colors.white70)),
                             ),
-                            Flexible(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  if (model.quoting)
-                                    Text('Calculando…',
-                                        key: const Key('checkout-quoting'),
-                                        style: type.caption
-                                            .copyWith(color: Colors.white70)),
-                                  if ((model.quote?.zoneSurcharge ?? 0) > 0)
-                                    Text(
-                                        'Recargo por zona ${money.format(model.quote!.zoneSurcharge)}',
-                                        key: const Key(
-                                            'checkout-zone-surcharge'),
-                                        textAlign: TextAlign.right,
-                                        style: type.caption
-                                            .copyWith(color: Colors.white70)),
-                                  if ((model.quote?.expressSurcharge ?? 0) > 0)
-                                    Text(
-                                        'Recargo express ${money.format(model.quote!.expressSurcharge)}',
-                                        key: const Key(
-                                            'checkout-express-surcharge'),
-                                        textAlign: TextAlign.right,
-                                        style: type.caption
-                                            .copyWith(color: Colors.white70)),
-                                  if ((model.quote?.paymentSurcharge ?? 0) > 0)
-                                    Text(
-                                        'Recargo por medio de pago ${money.format(model.quote!.paymentSurcharge)}',
-                                        key: const Key(
-                                            'checkout-payment-surcharge'),
-                                        textAlign: TextAlign.right,
-                                        style: type.caption
-                                            .copyWith(color: Colors.white70)),
-                                ],
-                              ),
-                            ),
+                            Text(
+                                model.quote == null
+                                    ? '—'
+                                    : money.format(model.quote!.total),
+                                key: const Key('checkout-total'),
+                                style:
+                                    type.amount.copyWith(color: Colors.white)),
                           ],
                         ),
                       ),

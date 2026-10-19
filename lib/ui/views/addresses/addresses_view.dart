@@ -36,7 +36,7 @@ class AddressesView extends StackedView<AddressesViewModel> {
               child: SplgMenuItem(
                 key: const Key('address-new'),
                 label: 'Nueva dirección',
-                icon: SplgIcons.house,
+                icon: SplgIcons.plus,
                 onTap: model.add,
               ),
             ),
@@ -122,7 +122,7 @@ class _AddressTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
             color: address.primary ? brasa.primaryStrong : brasa.outline,
-            width: address.primary ? 2 : 1),
+            width: 2),
       ),
       child: Row(
         children: [
