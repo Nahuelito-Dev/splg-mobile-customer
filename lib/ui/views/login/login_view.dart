@@ -107,7 +107,7 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
                           viewModel.isBusy ? null : viewModel.onForgotPassword,
                       child: Text(
                         loginViewForgotPassword,
-                        style: type.captionStrong.copyWith(
+                        style: type.action.copyWith(
                           fontSize: context.sp(10),
                         ),
                       ),
@@ -142,7 +142,8 @@ class LoginView extends StackedView<LoginViewModel> with $LoginView {
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
                             loginViewSignup,
-                            style: type.captionStrong.copyWith(
+                            style: type.action.copyWith(
+                              fontSize: context.sp(10),
                               fontWeight: FontWeight.w700,
                               decoration: TextDecoration.underline,
                             ),

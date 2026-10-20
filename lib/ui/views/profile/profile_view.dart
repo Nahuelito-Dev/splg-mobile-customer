@@ -37,7 +37,7 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       onLink: model.editProfile,
                     ),
                     _PhotoActions(model: model),
-                    Divider(color: brasa.primaryStrong, height: 16),
+                    Divider(color: brasa.outline, height: 16),
                     SplgMenuItem(
                       label: 'Información personal',
                       selected: model.selected == 0,
@@ -71,7 +71,7 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       icon: SplgIcons.userMinus,
                       onTap: () => _confirmDelete(context, model),
                     ),
-                    Divider(color: brasa.primaryStrong, height: 30),
+                    Divider(color: brasa.outline, height: 30),
                   ],
                 ),
               ),

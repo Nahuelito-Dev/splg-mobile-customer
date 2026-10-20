@@ -198,17 +198,16 @@ class _CatalogField extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: brasa.primaryStrong, width: 1.5),
+            border: Border.all(color: brasa.outlineStrong, width: 1.2),
           ),
           child: Row(
             children: [
-              Icon(SplgIcons.search, color: brasa.primaryStrong, size: 22),
+              Icon(SplgIcons.search, color: brasa.muted, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Text('¿Qué necesitás?',
-                    style: SplgType.of(context)
-                        .body
-                        .copyWith(color: brasa.primaryStrong)),
+                    style:
+                        SplgType.of(context).body.copyWith(color: brasa.muted)),
               ),
             ],
           ),
