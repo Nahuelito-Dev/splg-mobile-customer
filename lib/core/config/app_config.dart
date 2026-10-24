@@ -19,8 +19,8 @@ class AppConfig {
   static const bool pushEnabled =
       bool.fromEnvironment('PUSH_ENABLED', defaultValue: true);
 
-  /// URL completa de la API (con el `/api/` que espera el backend).
-  static String get apiUrl => '$apiBaseUrl/api/';
+  /// URL completa de la API v1 (`/api/v1/`; ver «Versiones de la API» en el back).
+  static String get apiUrl => '$apiBaseUrl/api/v1/';
 
   /// Namespace de Socket.IO del gateway de clientes (misma base que la API,
   /// sin `/api`).

@@ -8,8 +8,8 @@ void main() {
       expect(AppConfig.customersNamespace, isNot(contains('/api')));
     });
 
-    test('apiUrl cuelga de apiBaseUrl con /api/', () {
-      expect(AppConfig.apiUrl, '${AppConfig.apiBaseUrl}/api/');
+    test('apiUrl cuelga de apiBaseUrl con /api/v1/', () {
+      expect(AppConfig.apiUrl, '${AppConfig.apiBaseUrl}/api/v1/');
     });
   });
 }
