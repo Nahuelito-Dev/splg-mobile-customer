@@ -4,6 +4,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i20;
+import 'dart:typed_data' as _i50;
 import 'dart:ui' as _i21;
 
 import 'package:flutter/material.dart' as _i19;
@@ -36,6 +37,7 @@ import 'package:splg_customer/services/gas_cylinder_service.dart' as _i26;
 import 'package:splg_customer/services/history_service.dart' as _i22;
 import 'package:splg_customer/services/location_service.dart' as _i34;
 import 'package:splg_customer/services/notification_service.dart' as _i36;
+import 'package:splg_customer/services/order_document_service.dart' as _i49;
 import 'package:splg_customer/services/order_tracking_service.dart' as _i16;
 import 'package:splg_customer/services/photo_picker.dart' as _i46;
 import 'package:splg_customer/services/photo_service.dart' as _i45;
@@ -3062,4 +3064,85 @@ class MockProfilePhotoService extends _i1.Mock
         ),
         returnValueForMissingStub: null,
       );
+}
+
+/// A class which mocks [OrderDocumentService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockOrderDocumentService extends _i1.Mock
+    implements _i49.OrderDocumentService {
+  @override
+  _i20.Future<_i5.ApiResult<_i50.Uint8List>> download(
+    String? orderId,
+    _i49.OrderDocument? doc,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #download,
+          [
+            orderId,
+            doc,
+          ],
+        ),
+        returnValue: _i20.Future<_i5.ApiResult<_i50.Uint8List>>.value(
+            _FakeApiResult_3<_i50.Uint8List>(
+          this,
+          Invocation.method(
+            #download,
+            [
+              orderId,
+              doc,
+            ],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i20.Future<_i5.ApiResult<_i50.Uint8List>>.value(
+                _FakeApiResult_3<_i50.Uint8List>(
+          this,
+          Invocation.method(
+            #download,
+            [
+              orderId,
+              doc,
+            ],
+          ),
+        )),
+      ) as _i20.Future<_i5.ApiResult<_i50.Uint8List>>);
+
+  @override
+  _i20.Future<_i5.ApiResult<void>> open(
+    String? orderId,
+    _i49.OrderDocument? doc,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #open,
+          [
+            orderId,
+            doc,
+          ],
+        ),
+        returnValue:
+            _i20.Future<_i5.ApiResult<void>>.value(_FakeApiResult_3<void>(
+          this,
+          Invocation.method(
+            #open,
+            [
+              orderId,
+              doc,
+            ],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i20.Future<_i5.ApiResult<void>>.value(_FakeApiResult_3<void>(
+          this,
+          Invocation.method(
+            #open,
+            [
+              orderId,
+              doc,
+            ],
+          ),
+        )),
+      ) as _i20.Future<_i5.ApiResult<void>>);
 }

@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -56,6 +59,7 @@ import 'test_helpers.mocks.dart';
     MockSpec<SessionService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<PhotoService>(onMissingStub: OnMissingStub.returnDefault),
     MockSpec<ProfilePhotoService>(onMissingStub: OnMissingStub.returnDefault),
+    MockSpec<OrderDocumentService>(onMissingStub: OnMissingStub.returnDefault),
 // @stacked-mock-spec
   ],
 )
@@ -64,6 +68,7 @@ void registerServices() {
   provideDummy<ApiResult<void>>(const ApiResult.ok());
   provideDummy<ApiResult<String?>>(const ApiResult.ok());
   provideDummy<ApiResult<SignedUrl?>>(const ApiResult.ok());
+  provideDummy<ApiResult<Uint8List>>(ApiResult.ok(Uint8List(0)));
   provideDummy<ApiResult<Address?>>(const ApiResult.ok());
   provideDummy<Cart>(Cart.empty);
   provideDummy<ApiResult<Consumption>>(const ApiResult.ok(Consumption()));
@@ -107,7 +112,15 @@ void registerServices() {
   getAndRegisterSessionService();
   getAndRegisterPhotoService();
   getAndRegisterProfilePhotoService();
+  getAndRegisterOrderDocumentService();
 // @stacked-mock-register
+}
+
+MockOrderDocumentService getAndRegisterOrderDocumentService() {
+  _removeRegistrationIfExists<OrderDocumentService>();
+  final service = MockOrderDocumentService();
+  locator.registerSingleton<OrderDocumentService>(service);
+  return service;
 }
 
 MockNavigationService getAndRegisterNavigationService() {

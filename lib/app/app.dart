@@ -5,6 +5,7 @@ import 'package:splg_customer/ui/views/startup/startup_view.dart';
 import 'package:stacked/stacked_annotations.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -106,6 +107,7 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     LazySingleton(classType: SessionService),
     LazySingleton(classType: PhotoService),
     LazySingleton(classType: ProfilePhotoService),
+    LazySingleton(classType: OrderDocumentService),
 // @stacked-service
   ],
   bottomsheets: [

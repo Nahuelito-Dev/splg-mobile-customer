@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:splg_customer/core/network/api_result.dart';
@@ -11,6 +13,7 @@ import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/order_refund.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_viewmodel.dart';
 import 'package:splg_lib/domain/order.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -198,6 +201,62 @@ void main() {
       final m = await loaded(OrderStatus.pending);
 
       expect(m.canModify, isFalse);
+    });
+  });
+
+  group('documentos PDF', () {
+    test('el remito sale siempre; el recibo sólo con pago acreditado',
+        () async {
+      var m = await loaded(OrderStatus.pending);
+      expect((m.canDownloadRemito, m.canDownloadRecibo), (true, false));
+
+      breakdown = const OrderBreakdown(total: 1000, paymentStatus: 'pending');
+      m = await loaded(OrderStatus.accepted);
+      expect((m.canDownloadRemito, m.canDownloadRecibo), (true, false));
+
+      breakdown = const OrderBreakdown(total: 1000, paymentStatus: 'paid');
+      m = await loaded(OrderStatus.delivered);
+      expect((m.canDownloadRemito, m.canDownloadRecibo), (true, true));
+    });
+
+    test('cancelado aunque figure pagado: remito sí, recibo no', () async {
+      breakdown = const OrderBreakdown(total: 1000, paymentStatus: 'paid');
+      final m = await loaded(OrderStatus.cancelled);
+      expect((m.canDownloadRemito, m.canDownloadRecibo), (true, false));
+    });
+
+    test('mientras baja marca el documento y no lanza otra descarga', () async {
+      final docs = locator<OrderDocumentService>() as MockOrderDocumentService;
+      final gate = Completer<ApiResult<void>>();
+      when(docs.open('o1', OrderDocument.remito))
+          .thenAnswer((_) => gate.future);
+      final m = await loaded(OrderStatus.pending);
+
+      final first = m.openDocument(OrderDocument.remito);
+      expect(m.downloading, OrderDocument.remito);
+      await m.openDocument(OrderDocument.recibo);
+      verifyNever(docs.open('o1', OrderDocument.recibo));
+
+      gate.complete(const ApiResult.ok());
+      await first;
+      expect(m.downloading, isNull);
+      verifyZeroInteractions(locator<DialogService>());
+    });
+
+    test('si el back rechaza, muestra su mensaje y libera el botón', () async {
+      final docs = locator<OrderDocumentService>() as MockOrderDocumentService;
+      when(docs.open('o1', OrderDocument.recibo)).thenAnswer((_) async =>
+          const ApiResult.fail('El pedido está cancelado.', status: 409));
+      final m = await loaded(OrderStatus.delivered);
+
+      await m.openDocument(OrderDocument.recibo);
+
+      expect(m.downloading, isNull);
+      verify(locator<DialogService>().showDialog(
+              title: 'No pudimos abrir el recibo',
+              description: 'El pedido está cancelado.',
+              buttonTitle: 'Aceptar'))
+          .called(1);
     });
   });
 

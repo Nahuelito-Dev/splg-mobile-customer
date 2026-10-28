@@ -22,6 +22,10 @@ class AppConfig {
   /// URL completa de la API v1 (`/api/v1/`; ver «Versiones de la API» en el back).
   static String get apiUrl => '$apiBaseUrl/api/v1/';
 
+  /// URL completa de la API v2 (`/api/v2/`): sólo lo nuevo (PDFs); el resto de
+  /// la app sigue en la v1.
+  static String get apiV2Url => '$apiBaseUrl/api/v2/';
+
   /// Namespace de Socket.IO del gateway de clientes (misma base que la API,
   /// sin `/api`).
   static String get customersNamespace => '$apiBaseUrl/customers';

@@ -5,6 +5,7 @@ import 'package:stacked/stacked.dart';
 import 'package:splg_customer/ui/widgets/app_info.dart';
 
 import 'package:splg_customer/domain/pricing.dart';
+import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/widgets/load_scaffold.dart';
 import 'order_detail_viewmodel.dart';
@@ -58,6 +59,24 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                     : 'Cambiar quién recibe',
                 style: SplgButtonStyle.outlined,
                 onPressed: model.editReceiver),
+          if (model.canDownloadRemito)
+            SplgButton(
+                key: const Key('detail-remito'),
+                title: 'Remito (PDF)',
+                style: SplgButtonStyle.outlined,
+                loading: model.downloading == OrderDocument.remito,
+                onPressed: model.downloading == null
+                    ? () => model.openDocument(OrderDocument.remito)
+                    : null),
+          if (model.canDownloadRecibo)
+            SplgButton(
+                key: const Key('detail-recibo'),
+                title: 'Recibo (PDF)',
+                style: SplgButtonStyle.outlined,
+                loading: model.downloading == OrderDocument.recibo,
+                onPressed: model.downloading == null
+                    ? () => model.openDocument(OrderDocument.recibo)
+                    : null),
           if (model.canRepeat)
             SplgButton(
                 title: 'Repetir pedido',

@@ -11,6 +11,7 @@ import 'package:splg_customer/domain/order_refund.dart';
 import 'package:splg_lib/domain/address.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/common/load_view_model.dart';
 
@@ -28,6 +29,7 @@ class OrderDetailViewModel extends LoadViewModel {
   final _cart = locator<CartService>();
   final _sheets = locator<BottomSheetService>();
   final _dialogs = locator<DialogService>();
+  final _documents = locator<OrderDocumentService>();
 
   Order? order;
 
@@ -100,6 +102,19 @@ class OrderDetailViewModel extends LoadViewModel {
       order != null && !saving && canChangeOrderAddress(order!, breakdown);
   bool get canSetReceiver =>
       order != null && !saving && canSetOrderReceiver(order!);
+
+  /// El remito sale siempre que el pedido exista.
+  bool get canDownloadRemito => order != null;
+
+  /// El recibo sólo con el pago acreditado y el pedido sin cancelar (si no, el
+  /// back responde 409).
+  bool get canDownloadRecibo =>
+      order != null &&
+      order!.status != OrderStatus.cancelled &&
+      breakdown?.paymentStatus == 'paid';
+
+  /// Documento que se está bajando; null si no hay descarga en curso.
+  OrderDocument? downloading;
 
   /// El pedido es express, o lo fue y pasó al reparto común.
   bool get isExpress => breakdown?.isExpress ?? false;
@@ -189,6 +204,24 @@ class OrderDetailViewModel extends LoadViewModel {
     );
     // También tras un rechazo: el pedido pudo cambiar (ya se entregó).
     await _reload();
+  }
+
+  /// Baja el PDF y lo abre en la hoja nativa. Mientras baja no se lanza otra
+  /// descarga; un error del back se muestra tal cual.
+  Future<void> openDocument(OrderDocument doc) async {
+    if (downloading != null) return;
+    downloading = doc;
+    notifyListeners();
+    final result = await _documents.open(orderId, doc);
+    downloading = null;
+    notifyListeners();
+    if (!result.ok) {
+      await _dialogs.showDialog(
+        title: 'No pudimos abrir el ${doc.label.toLowerCase()}',
+        description: result.message,
+        buttonTitle: 'Aceptar',
+      );
+    }
   }
 
   Future<void> track() async {

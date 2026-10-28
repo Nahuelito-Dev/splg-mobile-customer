@@ -87,6 +87,37 @@ class ApiClient {
     }
   }
 
+  /// Baja un binario (p. ej. un PDF) de [url] absoluta, con las mismas
+  /// cabeceras y el token que el resto. Un error del back llega en JSON: se
+  /// decodifica para que `ApiErrorText` pueda leer su mensaje.
+  Future<Response<Uint8List>> getBytes(String url, String token) async {
+    try {
+      return await dio.get<Uint8List>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {
+            'Accept': 'application/pdf',
+            'X-Client-Source': 'customer-app',
+            'X-Distributor': AppConfig.distributorSlug,
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is List<int>) {
+        try {
+          e.response!.data = jsonDecode(utf8.decode(data));
+        } catch (_) {
+          e.response!.data = null;
+        }
+      }
+      rethrow;
+    }
+  }
+
   Future<Response> post(
     String path,
     Map<String, dynamic> body, [

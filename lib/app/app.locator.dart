@@ -21,6 +21,7 @@ import '../services/gas_cylinder_service.dart';
 import '../services/history_service.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
+import '../services/order_document_service.dart';
 import '../services/order_tracking_service.dart';
 import '../services/photo_service.dart';
 import '../services/profile_photo_service.dart';
@@ -57,4 +58,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => SessionService());
   locator.registerLazySingleton(() => PhotoService());
   locator.registerLazySingleton(() => ProfilePhotoService());
+  locator.registerLazySingleton(() => OrderDocumentService());
 }

@@ -62,6 +62,15 @@ class FakeAdapter implements HttpClientAdapter {
     if (reply.error != null) {
       throw DioException(requestOptions: options, type: reply.error!);
     }
+    if (reply.body is Uint8List) {
+      return ResponseBody.fromBytes(
+        reply.body as Uint8List,
+        reply.status!,
+        headers: {
+          Headers.contentTypeHeader: ['application/pdf'],
+        },
+      );
+    }
     return ResponseBody.fromString(
       jsonEncode(reply.body ?? {}),
       reply.status!,

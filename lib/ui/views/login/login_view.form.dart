@@ -80,10 +80,11 @@ mixin $LoginView {
   /// Updates the formData on the FormViewModel
   void _updateFormData(FormStateHelper model, {bool forceValidate = false}) {
     model.setData(
-      model.formValueMap..addAll({
-        EmailValueKey: emailController.text,
-        PasswordValueKey: passwordController.text,
-      }),
+      model.formValueMap
+        ..addAll({
+          EmailValueKey: emailController.text,
+          PasswordValueKey: passwordController.text,
+        }),
     );
 
     if (_autoTextFieldValidation || forceValidate) {
@@ -114,8 +115,8 @@ mixin $LoginView {
 
 extension ValueProperties on FormStateHelper {
   bool get hasAnyValidationMessage => this.fieldsValidationMessages.values.any(
-    (validation) => validation != null,
-  );
+        (validation) => validation != null,
+      );
 
   bool get isFormValid {
     if (!_autoTextFieldValidation) this.validateForm();
