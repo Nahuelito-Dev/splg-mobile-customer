@@ -28,6 +28,7 @@ import '../services/profile_photo_service.dart';
 import '../services/rating_service.dart';
 import '../services/session_service.dart';
 import '../services/time_slot_service.dart';
+import '../services/transfer_receipt_service.dart';
 
 final locator = StackedLocator.instance;
 
@@ -59,4 +60,5 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => PhotoService());
   locator.registerLazySingleton(() => ProfilePhotoService());
   locator.registerLazySingleton(() => OrderDocumentService());
+  locator.registerLazySingleton(() => TransferReceiptService());
 }

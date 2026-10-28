@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
+import 'package:splg_customer/ui/views/order_detail/widgets/transfer_card.dart';
 import 'package:splg_customer/ui/widgets/app_info.dart';
 
 import 'package:splg_customer/domain/pricing.dart';
@@ -113,6 +114,7 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                       amountKey: const Key('detail-total'),
                     ),
                     const SizedBox(height: 16),
+                    if (model.showTransferCard) TransferCard(model: model),
                     AppInfoSection(
                       icon: SplgIcons.cart,
                       title: 'Tu pedido',

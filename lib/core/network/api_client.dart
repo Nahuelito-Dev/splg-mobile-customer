@@ -218,15 +218,18 @@ class ApiClient {
   }
 
   /// Sube un archivo como multipart (campo `file`) al endpoint del back, con el
-  /// token. Nunca se sube directo al almacenamiento.
+  /// token. Nunca se sube directo al almacenamiento. [path] puede ser relativo
+  /// (v1) o una URL absoluta (v2). [extraHeaders] lleva, p. ej., la
+  /// `Idempotency-Key`.
   Future<Response> upload(
     String method,
     String path,
     Uint8List bytes,
     String filename,
     String contentType,
-    String token,
-  ) async {
+    String token, {
+    Map<String, String>? extraHeaders,
+  }) async {
     final form = FormData.fromMap({
       'file': MultipartFile.fromBytes(
         bytes,
@@ -246,6 +249,7 @@ class ApiClient {
           'X-Client-Source': 'customer-app',
           'X-Distributor': AppConfig.distributorSlug,
           'Authorization': 'Bearer $token',
+          if (extraHeaders != null) ...extraHeaders,
         },
       ),
     );

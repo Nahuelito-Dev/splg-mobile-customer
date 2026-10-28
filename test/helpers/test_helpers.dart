@@ -6,6 +6,8 @@ import 'package:splg_customer/app/app.locator.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_document_service.dart';
+import 'package:splg_customer/services/transfer_receipt_service.dart';
+import 'fake_transfer_receipt_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -113,6 +115,7 @@ void registerServices() {
   getAndRegisterPhotoService();
   getAndRegisterProfilePhotoService();
   getAndRegisterOrderDocumentService();
+  getAndRegisterTransferReceiptService();
 // @stacked-mock-register
 }
 
@@ -120,6 +123,13 @@ MockOrderDocumentService getAndRegisterOrderDocumentService() {
   _removeRegistrationIfExists<OrderDocumentService>();
   final service = MockOrderDocumentService();
   locator.registerSingleton<OrderDocumentService>(service);
+  return service;
+}
+
+FakeTransferReceiptService getAndRegisterTransferReceiptService() {
+  _removeRegistrationIfExists<TransferReceiptService>();
+  final service = FakeTransferReceiptService();
+  locator.registerSingleton<TransferReceiptService>(service);
   return service;
 }
 
