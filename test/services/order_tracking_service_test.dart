@@ -231,6 +231,20 @@ void main() {
       expect(avisos, 1);
     });
 
+    test(
+        'order:updated, payment-approved y payment-refunded piden releer el pedido',
+        () async {
+      var avisos = 0;
+      service.orderChanges.listen((_) => avisos++);
+
+      service.onOrderChanged({'orderId': 'o1', 'totalAmount': 100});
+      service.onOrderChanged({'orderId': 'o1', 'status': 'approved'});
+      service.onOrderChanged('basura');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(avisos, 2);
+    });
+
     test('la ubicación del chofer se lee de lat y lng', () async {
       final out = <DriverLocationUpdate>[];
       service.driverLocationUpdates.listen(out.add);
@@ -243,6 +257,36 @@ void main() {
 
       expect(out, hasLength(1));
       expect(out.single.lat, -27.3);
+    });
+  });
+
+  group('cortes del servidor', () {
+    late OrderTrackingService service;
+    setUp(() => service = OrderTrackingService());
+
+    test('con el token vencido reconecta una sola vez', () {
+      service.onSessionExpired({});
+      expect(
+          service.takeReconnectAfterDisconnect('io server disconnect'), isTrue);
+      expect(service.takeReconnectAfterDisconnect('io server disconnect'),
+          isFalse);
+    });
+
+    test('con el acceso revocado no reconecta', () {
+      service.onSessionExpired({});
+      service.onAccessRevoked({'motivo': 'bloqueo'});
+      expect(service.takeReconnectAfterDisconnect('io server disconnect'),
+          isFalse);
+    });
+
+    test('sin aviso, un corte del servidor no reconecta', () {
+      expect(service.takeReconnectAfterDisconnect('io server disconnect'),
+          isFalse);
+    });
+
+    test('los cortes de red los reintenta socket.io, no la app', () {
+      service.onSessionExpired({});
+      expect(service.takeReconnectAfterDisconnect('transport close'), isFalse);
     });
   });
 }

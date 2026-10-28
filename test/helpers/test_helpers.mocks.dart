@@ -2460,6 +2460,13 @@ class MockOrderTrackingService extends _i1.Mock
       ) as _i20.Stream<void>);
 
   @override
+  _i20.Stream<void> get orderChanges => (super.noSuchMethod(
+        Invocation.getter(#orderChanges),
+        returnValue: _i20.Stream<void>.empty(),
+        returnValueForMissingStub: _i20.Stream<void>.empty(),
+      ) as _i20.Stream<void>);
+
+  @override
   _i20.Future<_i16.DriverPhotoLookup> fetchDriverPhoto(
     String? orderId,
     String? token,

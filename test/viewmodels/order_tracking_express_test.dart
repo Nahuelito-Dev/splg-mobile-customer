@@ -19,6 +19,7 @@ void main() {
 
   late MockOrderTrackingService tracking;
   late StreamController<void> degraded;
+  late StreamController<void> changes;
   late StreamController<DriverInfo> drivers;
   late StreamController<String> statuses;
   late StreamController<DriverLocationUpdate> locations;
@@ -34,6 +35,8 @@ void main() {
     statuses = StreamController<String>.broadcast();
     degraded = StreamController<void>.broadcast();
     when(tracking.expressDegradedUpdates).thenAnswer((_) => degraded.stream);
+    changes = StreamController<void>.broadcast();
+    when(tracking.orderChanges).thenAnswer((_) => changes.stream);
     locations = StreamController<DriverLocationUpdate>.broadcast();
     when(tracking.driverUpdates).thenAnswer((_) => drivers.stream);
     when(tracking.orderStatusUpdates).thenAnswer((_) => statuses.stream);
@@ -48,6 +51,7 @@ void main() {
     drivers.close();
     statuses.close();
     degraded.close();
+    changes.close();
     locations.close();
     locator.reset();
   });
@@ -139,6 +143,21 @@ void main() {
       final model = await abrir();
 
       expect(model.expressNotice, isNot(contains('devuelve')));
+      model.dispose();
+    });
+  });
+
+  group('el pedido cambió sin cambiar de estado', () {
+    test('modificado, pago aprobado o reintegrado: vuelve a leer el pedido',
+        () async {
+      final model = await abrir();
+      clearInteractions(tracking);
+
+      changes.add(null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      verify(tracking.fetchOrderById('o1', 'tok')).called(1);
       model.dispose();
     });
   });

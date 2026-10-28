@@ -132,6 +132,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
   StreamSubscription<String>? _cancelledBySubscription;
   StreamSubscription<void>? _arrivedSubscription;
   StreamSubscription<void>? _expressDegradedSubscription;
+  StreamSubscription<void>? _orderChangedSubscription;
 
   RouteTracker? _tracker;
   Set<Polyline> _polylines = const {};
@@ -674,6 +675,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     _cancelledBySubscription?.cancel();
     _arrivedSubscription?.cancel();
     _expressDegradedSubscription?.cancel();
+    _orderChangedSubscription?.cancel();
 
     _driverLocationSubscription = _trackingService.driverLocationUpdates.listen(
       (update) {
@@ -709,6 +711,10 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
 
     _expressDegradedSubscription = _trackingService.expressDegradedUpdates
         .listen((_) => unawaited(poll()));
+
+    // Modificado, pago aprobado o reintegrado: se vuelve a leer el pedido.
+    _orderChangedSubscription =
+        _trackingService.orderChanges.listen((_) => unawaited(poll()));
 
     _arrivedSubscription = _trackingService.arrivedUpdates.listen((_) {
       if (_status != 'out_for_delivery') return;
@@ -1200,6 +1206,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     _cancelledBySubscription?.cancel();
     _arrivedSubscription?.cancel();
     _expressDegradedSubscription?.cancel();
+    _orderChangedSubscription?.cancel();
     _trackingService.disconnect();
     super.dispose();
   }

@@ -88,6 +88,11 @@ class OrderTrackingService {
   final _cancelledByController = StreamController<String>.broadcast();
   final _arrivedController = StreamController<void>.broadcast();
   final _expressDegradedController = StreamController<void>.broadcast();
+  final _orderChangedController = StreamController<void>.broadcast();
+
+  /// Si el back cortó la conexión por el token vencido (`server:session-expired`):
+  /// socket.io no reconecta solo cuando corta el servidor.
+  bool _reconnectOnServerCut = false;
 
   Stream<DriverLocationUpdate> get driverLocationUpdates =>
       _driverLocationController.stream;
@@ -107,6 +112,11 @@ class OrderTrackingService {
 
   /// Un pedido express pasó al reparto común (`order:express-degraded`).
   Stream<void> get expressDegradedUpdates => _expressDegradedController.stream;
+
+  /// El pedido cambió sin cambiar de estado: lo modificó el cliente
+  /// (`order:updated`), se aprobó el pago (`order:payment-approved`) o se
+  /// reintegró (`order:payment-refunded`). Hay que volver a leerlo.
+  Stream<void> get orderChanges => _orderChangedController.stream;
 
   /// Renueva la URL firmada de la foto del chofer. 409 (pedido fuera de
   /// aceptado/en camino) y 404 no son error: significan "sin foto".
@@ -275,8 +285,9 @@ class OrderTrackingService {
         .setTransports(['websocket'])
         .disableAutoConnect()
         .enableReconnection()
-        .setReconnectionAttempts(8)
-        .setReconnectionDelay(1000);
+        // Sin tope de intentos: el seguimiento dura lo que dura la entrega.
+        .setReconnectionDelay(1000)
+        .setReconnectionDelayMax(10000);
 
     _socket = io.io(AppConfig.customersNamespace, builder.build());
 
@@ -304,10 +315,19 @@ class OrderTrackingService {
     _socket?.on('order:searching-driver', onOrderStatusUpdate);
     _socket?.on('order:arrived', onArrived);
     _socket?.on('order:express-degraded', onExpressDegraded);
+    _socket?.on('order:updated', onOrderChanged);
+    _socket?.on('order:payment-approved', onOrderChanged);
+    _socket?.on('order:payment-refunded', onOrderChanged);
+    _socket?.on('server:session-expired', onSessionExpired);
+    _socket?.on('server:access-revoked', onAccessRevoked);
 
     _socket?.onConnectError((e) => log('socket order tracking connect error'));
     _socket?.onError((e) => log('socket order tracking error: $e'));
-    _socket?.onDisconnect((_) => log('socket order tracking disconnected'));
+    _socket?.onDisconnect((reason) {
+      log('socket order tracking disconnected ($reason)');
+      // Vuelve con un token nuevo: `auth` lo pide en cada conexión.
+      if (takeReconnectAfterDisconnect(reason)) _socket?.connect();
+    });
 
     _socket?.connect();
   }
@@ -321,6 +341,12 @@ class OrderTrackingService {
     _socket?.off('order:searching-driver');
     _socket?.off('order:arrived');
     _socket?.off('order:express-degraded');
+    _socket?.off('order:updated');
+    _socket?.off('order:payment-approved');
+    _socket?.off('order:payment-refunded');
+    _socket?.off('server:session-expired');
+    _socket?.off('server:access-revoked');
+    _reconnectOnServerCut = false;
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
@@ -361,6 +387,29 @@ class OrderTrackingService {
     final data = _toMap(payload);
     if (data == null || !_isForTrackedOrder(data)) return;
     _expressDegradedController.add(null);
+  }
+
+  @visibleForTesting
+  void onOrderChanged(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    _orderChangedController.add(null);
+  }
+
+  @visibleForTesting
+  void onSessionExpired(dynamic _) => _reconnectOnServerCut = true;
+
+  /// Bloqueo o baja de la cuenta: no se vuelve a conectar.
+  @visibleForTesting
+  void onAccessRevoked(dynamic _) => _reconnectOnServerCut = false;
+
+  /// Si hay que reconectar a mano tras este corte. Sólo una vez por aviso: un
+  /// handshake rechazado después no reintenta en bucle.
+  @visibleForTesting
+  bool takeReconnectAfterDisconnect(dynamic reason) {
+    final again = reason == 'io server disconnect' && _reconnectOnServerCut;
+    _reconnectOnServerCut = false;
+    return again;
   }
 
   @visibleForTesting

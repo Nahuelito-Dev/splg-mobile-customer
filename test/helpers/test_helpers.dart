@@ -267,6 +267,7 @@ MockOrderTrackingService getAndRegisterOrderTrackingService() {
   final service = MockOrderTrackingService();
   when(service.expressDegradedUpdates)
       .thenAnswer((_) => const Stream<void>.empty());
+  when(service.orderChanges).thenAnswer((_) => const Stream<void>.empty());
   locator.registerSingleton<OrderTrackingService>(service);
   return service;
 }
