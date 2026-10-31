@@ -32,6 +32,7 @@ import 'package:splg_customer/ui/bottom_sheets/rate_driver/rate_driver_sheet.dar
 import 'package:splg_customer/ui/bottom_sheets/claim/claim_sheet.dart';
 import 'package:splg_customer/ui/bottom_sheets/receiver/receiver_sheet.dart';
 import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart';
+import 'package:splg_customer/ui/bottom_sheets/delivery_code/delivery_code_sheet.dart';
 import 'package:splg_customer/ui/views/legal/legal_view.dart';
 import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart';
 import 'package:splg_customer/ui/views/welcome/welcome_view.dart';
@@ -118,6 +119,7 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     StackedBottomsheet(classType: RateDriverSheet),
     StackedBottomsheet(classType: ClaimSheet),
     StackedBottomsheet(classType: ReceiverSheet),
+    StackedBottomsheet(classType: DeliveryCodeSheet),
 // @stacked-bottom-sheet
   ],
   dialogs: [

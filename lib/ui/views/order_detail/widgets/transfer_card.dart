@@ -3,15 +3,15 @@ import 'package:splg_lib/splg_lib.dart';
 
 import 'package:splg_customer/ui/common/app_icons.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
-import 'package:splg_customer/ui/views/order_detail/order_detail_viewmodel.dart';
+import 'package:splg_customer/ui/common/transfer_payment.dart';
 import 'package:splg_customer/ui/widgets/receipt_source_sheet.dart';
 
-/// Pago por transferencia en el detalle del pedido: datos bancarios con copiar,
+/// Pago por transferencia en el detalle y el seguimiento del pedido: estado, datos bancarios con copiar,
 /// subir el comprobante y los ya subidos.
 class TransferCard extends StatelessWidget {
   const TransferCard({super.key, required this.model});
 
-  final OrderDetailViewModel model;
+  final TransferPayment model;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +30,10 @@ class TransferCard extends StatelessWidget {
                 child: Text('Pago por transferencia', style: type.subtitle)),
           ],
         ),
+        if (model.paymentStateLabel != null) ...[
+          const SizedBox(height: 6),
+          _StateChip(label: model.paymentStateLabel!),
+        ],
         const SizedBox(height: 10),
         if (model.canPayByTransfer) ...[
           if (model.bankError != null)
@@ -87,16 +91,65 @@ class TransferCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text('Comprobantes enviados', style: type.body),
           for (final r in model.receipts)
-            SplgOptionRow(
+            InkWell(
               key: Key('receipt-${r.id}'),
-              icon: r.isPdf ? AppIcons.filePdf : AppIcons.gallery,
-              title: r.name,
-              value: dateTimeLabel(r.uploadedAt),
+              borderRadius: BorderRadius.circular(14),
               onTap: () => model.openReceipt(r),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(r.isPdf ? AppIcons.filePdf : AppIcons.gallery,
+                        size: 24, color: brasa.ink2),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(r.name,
+                              style: type.body,
+                              overflow: TextOverflow.ellipsis),
+                          Text(dateTimeLabel(r.uploadedAt),
+                              style: type.caption),
+                        ],
+                      ),
+                    ),
+                    Icon(SplgIcons.next, size: 18, color: brasa.faint),
+                  ],
+                ),
+              ),
             ),
         ],
         Divider(color: brasa.outline, height: 28),
       ],
+    );
+  }
+}
+
+class _StateChip extends StatelessWidget {
+  const _StateChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final brasa = context.brasa;
+    final paid = label == 'Pagado';
+    final color = paid ? brasa.success : brasa.primaryStrong;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        key: const Key('transfer-payment-state'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withAlpha(30),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: SplgType.of(context)
+                .caption
+                .copyWith(color: color, fontWeight: FontWeight.w700)),
+      ),
     );
   }
 }

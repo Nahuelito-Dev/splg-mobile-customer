@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:splg_customer/ui/views/order_detail/widgets/transfer_card.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
@@ -283,6 +284,17 @@ class _ActiveContent extends StatelessWidget {
             title: 'Confirmar entrega (escanear QR)',
             onPressed: model.confirmDeliveryByScan,
           ),
+          const SizedBox(height: 8),
+          SplgButton(
+            key: const Key('tracking-confirm-code'),
+            title: 'Ingresar el código',
+            style: SplgButtonStyle.outlined,
+            onPressed: model.confirmDeliveryByCode,
+          ),
+        ],
+        if (model.showTransferCard) ...[
+          const SizedBox(height: 16),
+          TransferCard(model: model),
         ],
         const SizedBox(height: 12),
         Text(model.compactOrderDetail, style: type.body),

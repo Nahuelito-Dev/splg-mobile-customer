@@ -11,6 +11,7 @@ import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/core/network/api_result.dart' show LoadFailure;
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
+import 'package:splg_customer/ui/common/transfer_payment.dart';
 import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/ui/views/order_tracking/order_driver_reader.dart';
 import 'package:splg_lib/network/api_error_text.dart';
@@ -41,7 +42,8 @@ enum TrackingStage {
 /// avisar.
 const trackingPollInterval = Duration(seconds: 20);
 
-class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
+class OrderTrackingViewModel extends BaseViewModel
+    with WidgetsBindingObserver, TransferPayment {
   OrderTrackingViewModel({
     required this.orderId,
     this.pollInterval = trackingPollInterval,
@@ -197,10 +199,31 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
   bool _expressDegraded = false;
   double _expressSurcharge = 0;
   bool _paidOnline = false;
+  String _paymentStatus = 'pending';
+  String? _loadedPaymentStatus;
+
+  @override
+  String get transferOrderId => orderId;
+  @override
+  bool get transferIsOnline => _order?.paymentMethod == PaymentMethod.online;
+  @override
+  bool get transferCancelled => isCancelled;
+  @override
+  String get transferPaymentStatus => _paymentStatus;
+
+  /// Datos bancarios y comprobantes: se leen la primera vez y cada vez que el
+  /// pago cambia de estado (p. ej. la distribuidora lo confirma).
+  Future<void> _refreshTransfer() async {
+    if (!transferIsOnline || _loadedPaymentStatus == _paymentStatus) return;
+    _loadedPaymentStatus = _paymentStatus;
+    await loadTransfer();
+    if (!_closed) notifyListeners();
+  }
 
   void _readExpress(Map<String, dynamic> raw) {
     _isExpress = raw['deliveryMode'] == 'express';
     _expressDegraded = !_isExpress && raw['expressDegradedAt'] != null;
+    _paymentStatus = raw['paymentStatus']?.toString() ?? 'pending';
     _paidOnline = raw['paymentStatus'] == 'paid' &&
         raw['paymentMethod'] != null &&
         raw['paymentMethod'] != 'cash';
@@ -516,7 +539,26 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
     if (delivered != true) {
       return;
     }
+    await _finishDelivered();
+  }
 
+  /// Alternativa al escáner: el cliente tipea el código que muestra el chofer.
+  /// La hoja confirma contra el backend y muestra ahí sus rechazos.
+  Future<void> confirmDeliveryByCode() async {
+    final response = await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.deliveryCode,
+      isScrollControlled: true,
+      data: {'orderId': orderId},
+    );
+    if (response?.confirmed != true || _closed) return;
+    await _dialogService.showDialog(
+      title: '¡Entrega confirmada!',
+      description: 'Gracias por tu compra.',
+    );
+    await _finishDelivered();
+  }
+
+  Future<void> _finishDelivered() async {
     // El pedido ya quedo `delivered` en el backend: refrescamos el historial
     // (para que Home/History lo muestren al toque) y cerramos el tracking,
     // que no tiene mas nada que seguir.
@@ -617,6 +659,7 @@ class OrderTrackingViewModel extends BaseViewModel with WidgetsBindingObserver {
   void _applyOrder(Map<String, dynamic> raw, {bool fresh = true}) {
     _order = OrderApiMapper.parseOrder(raw);
     _readExpress(raw);
+    unawaited(_refreshTransfer());
     _cancellationReason =
         _readString(raw, const ['cancellation_reason']) ?? _cancellationReason;
     _cancelledBy = _readString(raw, const ['cancelledBy']) ?? _cancelledBy;

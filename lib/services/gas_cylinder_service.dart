@@ -27,11 +27,23 @@ class GasCylinderService {
   bool get hasExpiredPhotos =>
       _gascylinderRepository.photos.values.any((p) => !p.isValid);
 
+  /// Del más liviano al más pesado (5, 10, 15, 25, 45). El peso viene como
+  /// texto, que ordenado como tal pondría el 5 al final; los que no tienen un
+  /// peso numérico quedan al final.
+  static List<GasCylinder> sortedByWeight(List<GasCylinder> list) {
+    double key(GasCylinder g) =>
+        double.tryParse(g.weight.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+        double.infinity;
+    final sorted = [...list];
+    sorted.sort((a, b) => key(a).compareTo(key(b)));
+    return sorted;
+  }
+
   Future<List<GasCylinder>> getGasCylinders() async {
     final gasCylinders = await _fetchGasCylindersUseCase();
 
     _gasCylinder.clear();
-    _gasCylinder.addAll(gasCylinders);
+    _gasCylinder.addAll(sortedByWeight(gasCylinders));
 
     return _gasCylinder;
   }

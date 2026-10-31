@@ -78,6 +78,33 @@ void main() {
     return m;
   }
 
+  group('estado del pago', () {
+    test('sin comprobante: pendiente de pago', () async {
+      final m = await loaded();
+      expect(m.paymentStateLabel, 'Pendiente de pago');
+    });
+
+    test('con comprobante y sin acreditar: en revisión', () async {
+      transfer.list = ApiResult.ok([receipt('a1')]);
+      final m = await loaded();
+      expect(m.paymentStateLabel, 'Comprobante en revisión');
+    });
+
+    test('acreditado: pagado, aunque no haya comprobantes', () async {
+      final m = await loaded(paymentStatus: 'paid');
+      expect(m.paymentStateLabel, 'Pagado');
+      expect(m.showTransferCard, isTrue);
+      expect(m.canUploadReceipt, isFalse);
+    });
+
+    test('efectivo o cancelado: sin estado de transferencia', () async {
+      expect(
+          (await loaded(method: PaymentMethod.cash)).paymentStateLabel, isNull);
+      expect((await loaded(status: OrderStatus.cancelled)).paymentStateLabel,
+          isNull);
+    });
+  });
+
   group('visibilidad', () {
     test('transferencia con pago pendiente: datos bancarios y subida',
         () async {

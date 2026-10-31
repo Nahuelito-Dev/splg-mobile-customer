@@ -10,6 +10,7 @@ import 'package:stacked_services/stacked_services.dart';
 import 'app.locator.dart';
 import '../ui/bottom_sheets/address_list/address_list_sheet.dart';
 import '../ui/bottom_sheets/claim/claim_sheet.dart';
+import '../ui/bottom_sheets/delivery_code/delivery_code_sheet.dart';
 import '../ui/bottom_sheets/notice/notice_sheet.dart';
 import '../ui/bottom_sheets/rate_driver/rate_driver_sheet.dart';
 import '../ui/bottom_sheets/receiver/receiver_sheet.dart';
@@ -20,6 +21,7 @@ enum BottomSheetType {
   rateDriver,
   claim,
   receiver,
+  deliveryCode,
 }
 
 void setupBottomSheetUi() {
@@ -36,6 +38,8 @@ void setupBottomSheetUi() {
         ClaimSheet(request: request, completer: completer),
     BottomSheetType.receiver: (context, request, completer) =>
         ReceiverSheet(request: request, completer: completer),
+    BottomSheetType.deliveryCode: (context, request, completer) =>
+        DeliveryCodeSheet(request: request, completer: completer),
   };
 
   bottomsheetService.setCustomSheetBuilders(builders);

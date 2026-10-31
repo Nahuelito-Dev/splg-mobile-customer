@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
@@ -22,6 +23,7 @@ class QrScanViewModel extends BaseViewModel {
   final _trackingService = locator<OrderTrackingService>();
   final _dialogService = locator<DialogService>();
   final _navigationService = locator<NavigationService>();
+  final _bottomSheetService = locator<BottomSheetService>();
 
   final _permissions = locator<AppPermissions>();
 
@@ -143,6 +145,24 @@ class QrScanViewModel extends BaseViewModel {
     } else {
       await _requestCamera();
     }
+  }
+
+  /// Alternativa al QR (cámara rota, sin permiso, simulador): el cliente tipea
+  /// el código que el chofer muestra debajo del QR. La hoja confirma contra el
+  /// mismo endpoint y muestra ahí los rechazos del back.
+  Future<void> enterCodeManually() async {
+    if (_isProcessing) return;
+    final response = await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.deliveryCode,
+      isScrollControlled: true,
+      data: {'orderId': orderId},
+    );
+    if (response?.confirmed != true) return;
+    await _dialogService.showDialog(
+      title: '¡Entrega confirmada!',
+      description: 'Gracias por tu compra.',
+    );
+    _navigationService.back(result: true);
   }
 
   void cancel() {

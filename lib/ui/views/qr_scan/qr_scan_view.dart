@@ -47,24 +47,46 @@ class QrScanView extends StackedView<QrScanViewModel> {
                     error: error,
                     onRetry: viewModel.retryCamera,
                     onSettings: viewModel.openSettings,
+                    onManualCode: viewModel.enterCodeManually,
                   ),
                 ),
-                const _ScanWindowOverlay(),
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                          bottom: 40, left: 24, right: 24),
-                      child: Text(
-                        'Apuntá la cámara al código QR que te muestra el repartidor',
-                        textAlign: TextAlign.center,
-                        style: SplgType.of(context)
-                            .subtitle
-                            .copyWith(color: Colors.white),
-                      ),
-                    ),
-                  ),
+                // Con la cámara caída el aviso de error ya trae sus botones: el
+                // marco y la ayuda del QR sobrarían y se superponen.
+                ValueListenableBuilder<MobileScannerState>(
+                  valueListenable: viewModel.controller,
+                  builder: (context, state, _) => state.error != null
+                      ? const SizedBox.shrink()
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            const _ScanWindowOverlay(),
+                            SafeArea(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom: 24, left: 24, right: 24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Apuntá la cámara al código QR que te muestra el repartidor',
+                                        textAlign: TextAlign.center,
+                                        style: SplgType.of(context)
+                                            .subtitle
+                                            .copyWith(color: Colors.white),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _ManualCodeButton(
+                                          onPressed:
+                                              viewModel.enterCodeManually),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
                 if (viewModel.isProcessing)
                   Container(
@@ -146,6 +168,8 @@ class _CameraGate extends StatelessWidget {
                     ? viewModel.openSettings
                     : viewModel.retryCamera,
               ),
+              const SizedBox(height: 12),
+              _ManualCodeButton(onPressed: viewModel.enterCodeManually),
             ],
           ),
         ),
@@ -181,11 +205,13 @@ class _ScannerError extends StatelessWidget {
     required this.error,
     required this.onRetry,
     required this.onSettings,
+    required this.onManualCode,
   });
 
   final MobileScannerException error;
   final VoidCallback onRetry;
   final VoidCallback onSettings;
+  final VoidCallback onManualCode;
 
   @override
   Widget build(BuildContext context) {
@@ -216,10 +242,28 @@ class _ScannerError extends StatelessWidget {
                 expand: false,
                 onPressed: isPermissionDenied ? onSettings : onRetry,
               ),
+              const SizedBox(height: 12),
+              _ManualCodeButton(onPressed: onManualCode),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Salida cuando el QR no se puede leer: tipear el código que muestra el chofer.
+class _ManualCodeButton extends StatelessWidget {
+  const _ManualCodeButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => SplgButton(
+        key: const Key('qr-manual-code'),
+        title: 'Ingresar el código',
+        style: SplgButtonStyle.white,
+        expand: false,
+        onPressed: onPressed,
+      );
 }

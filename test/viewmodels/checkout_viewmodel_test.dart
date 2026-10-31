@@ -246,7 +246,7 @@ void main() {
       final model = await _ready(history);
       await model.confirmOrder();
 
-      verify(nav.replaceWith<dynamic>(
+      verify(nav.clearTillFirstAndShow<dynamic>(
         Routes.orderTrackingView,
         arguments: argThat(
             isA<OrderTrackingViewArguments>()
@@ -255,7 +255,6 @@ void main() {
         id: anyNamed('id'),
         preventDuplicates: anyNamed('preventDuplicates'),
         parameters: anyNamed('parameters'),
-        transition: anyNamed('transition'),
       )).called(1);
     });
 

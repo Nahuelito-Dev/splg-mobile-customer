@@ -547,8 +547,11 @@ class CheckoutViewModel extends ReactiveViewModel {
       unawaited(_notificationService.requestPermissionAndRegister());
 
       final trackedOrderId = result.order?.id ?? updatedOrder.id;
-      await _navigationService.replaceWithOrderTrackingView(
-        orderId: trackedOrderId,
+      // Se vuelve al inicio y se abre el seguimiento encima: «Volver» no cae
+      // en el carrito ni en el checkout.
+      await _navigationService.clearTillFirstAndShow(
+        Routes.orderTrackingView,
+        arguments: OrderTrackingViewArguments(orderId: trackedOrderId),
       );
     } else if (result.expressUnavailableReason != null) {
       // No se creó nada: el express dejó de estar disponible entre que se
