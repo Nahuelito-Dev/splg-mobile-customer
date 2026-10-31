@@ -66,7 +66,7 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                     Expanded(
                       child: SplgButton(
                         key: const Key('claim-photo-camera'),
-                        title: 'Sacar foto',
+                        title: 'Cámara',
                         style: SplgButtonStyle.outlined,
                         onPressed: viewModel.isBusy || viewModel.processingPhoto
                             ? null
@@ -77,7 +77,7 @@ class ClaimSheet extends StackedView<ClaimSheetModel> {
                     Expanded(
                       child: SplgButton(
                         key: const Key('claim-photo-gallery'),
-                        title: 'Elegir de la galería',
+                        title: 'Galería',
                         style: SplgButtonStyle.outlined,
                         onPressed: viewModel.isBusy || viewModel.processingPhoto
                             ? null

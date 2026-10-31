@@ -505,7 +505,7 @@ void main() {
       await settle(t);
       expect(find.text('Recargo por zona'), findsOneWidget);
       expect(find.text('\$900'), findsOneWidget);
-      expect(find.text('Recargo por medio de pago'), findsOneWidget);
+      expect(find.text('Recargo por pago'), findsOneWidget);
       expect(find.text('\$1.580'), findsOneWidget);
     });
 
@@ -515,7 +515,7 @@ void main() {
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.text('Recargo por zona'), findsNothing);
-      expect(find.text('Recargo por medio de pago'), findsNothing);
+      expect(find.text('Recargo por pago'), findsNothing);
     });
 
     phoneTest('detalle de un pedido entregado: calificar, reclamar, repetir',

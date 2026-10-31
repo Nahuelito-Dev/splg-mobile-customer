@@ -118,6 +118,7 @@ class OrderTrackingViewModel extends BaseViewModel
   String? _driverAvatarUrl;
   Timer? _photoTimer;
   bool _refreshingPhoto = false;
+  bool _pollAgain = false;
   bool _closed = false;
   String? _sessionCustomerId;
 
@@ -690,7 +691,13 @@ class OrderTrackingViewModel extends BaseViewModel
   /// Consulta el pedido por si el socket se cayó o no avisó un cambio. Si el
   /// estado cambió, hace lo mismo que si hubiera llegado por el socket.
   Future<void> poll() async {
-    if (_closed || _suspended || _gone || _polling || isFinished) return;
+    if (_closed || _suspended || _gone || isFinished) return;
+    if (_polling) {
+      // Hay una consulta en curso que pudo quedar vieja por un aviso del
+      // socket: se repite apenas termina.
+      _pollAgain = true;
+      return;
+    }
     _polling = true;
     try {
       final before = _status;
@@ -707,6 +714,10 @@ class OrderTrackingViewModel extends BaseViewModel
       log('e in poll tracking: ${e.runtimeType}');
     } finally {
       _polling = false;
+      if (_pollAgain) {
+        _pollAgain = false;
+        unawaited(poll());
+      }
     }
   }
 
@@ -770,6 +781,13 @@ class OrderTrackingViewModel extends BaseViewModel
         _eventVersion++;
         _setStatus(status);
         _afterStatusChange();
+        // El socket sólo trae el estado: el repartidor y su vehículo se leen
+        // del pedido.
+        if (_hasDriverAssigned) {
+          unawaited(poll().then((_) {
+            if (!_closed) rebuildUi();
+          }));
+        }
       },
     );
 

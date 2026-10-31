@@ -233,11 +233,9 @@ class _TrackingSheet extends StatelessWidget {
     return SplgBottomPanel(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxHeight),
-        child: SingleChildScrollView(
-          child: model.isFinished
-              ? _FinishedContent(model: model)
-              : _ActiveContent(model: model),
-        ),
+        child: model.isFinished
+            ? SingleChildScrollView(child: _FinishedContent(model: model))
+            : _ActiveContent(model: model),
       ),
     );
   }
@@ -252,70 +250,83 @@ class _ActiveContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = SplgType.of(context);
+    // El avance queda fijo arriba de la hoja; lo demás se desplaza debajo.
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _TrackingStepper(activeStep: model.currentStepIndex),
         const SizedBox(height: 12),
-        Text(
-          model.statusTitle,
-          key: const Key('tracking-status-title'),
-          style: type.subtitle,
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  model.statusTitle,
+                  key: const Key('tracking-status-title'),
+                  style: type.subtitle,
+                ),
+                if (model.expressNotice != null) ...[
+                  const SizedBox(height: 6),
+                  Text(model.expressNotice!,
+                      key: const Key('tracking-express-notice'),
+                      style: type.caption),
+                ],
+                if (model.showDriverCard ||
+                    model.stage == TrackingStage.pending) ...[
+                  const SizedBox(height: 4),
+                  Text(model.etaTitle,
+                      key: const Key('tracking-eta'), style: type.heading),
+                  Text(model.etaSubtitle, style: type.caption),
+                ],
+                if (model.showDriverCard) ...[
+                  const SizedBox(height: 12),
+                  _DriverCard(model: model),
+                ],
+                if (model.canConfirmDelivery) ...[
+                  const SizedBox(height: 12),
+                  SplgButton(
+                    key: const Key('tracking-confirm-qr'),
+                    title: 'Confirmar entrega (escanear QR)',
+                    onPressed: model.confirmDeliveryByScan,
+                  ),
+                  const SizedBox(height: 8),
+                  SplgButton(
+                    key: const Key('tracking-confirm-code'),
+                    title: 'Ingresar el código',
+                    style: SplgButtonStyle.outlined,
+                    onPressed: model.confirmDeliveryByCode,
+                  ),
+                ],
+                if (model.showTransferCard) ...[
+                  const SizedBox(height: 16),
+                  TransferCard(model: model),
+                ],
+                const SizedBox(height: 12),
+                Text(model.compactOrderDetail, style: type.body),
+                if (model.expandedOrderDetail.isNotEmpty)
+                  SplgAccordion(
+                    entries: [
+                      SplgAccordionEntry(
+                        title: 'Ver detalle',
+                        body: model.expandedOrderDetail.join('\n'),
+                      ),
+                    ],
+                  ),
+                if (model.canCancelOrder) ...[
+                  const SizedBox(height: 6),
+                  SplgButton(
+                    key: const Key('tracking-cancel'),
+                    title: 'Cancelar pedido',
+                    style: SplgButtonStyle.danger,
+                    onPressed: model.isBusy ? null : model.cancelOrder,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
-        if (model.expressNotice != null) ...[
-          const SizedBox(height: 6),
-          Text(model.expressNotice!,
-              key: const Key('tracking-express-notice'), style: type.caption),
-        ],
-        if (model.showDriverCard || model.stage == TrackingStage.pending) ...[
-          const SizedBox(height: 4),
-          Text(model.etaTitle,
-              key: const Key('tracking-eta'), style: type.heading),
-          Text(model.etaSubtitle, style: type.caption),
-        ],
-        if (model.showDriverCard) ...[
-          const SizedBox(height: 12),
-          _DriverCard(model: model),
-        ],
-        if (model.canConfirmDelivery) ...[
-          const SizedBox(height: 12),
-          SplgButton(
-            key: const Key('tracking-confirm-qr'),
-            title: 'Confirmar entrega (escanear QR)',
-            onPressed: model.confirmDeliveryByScan,
-          ),
-          const SizedBox(height: 8),
-          SplgButton(
-            key: const Key('tracking-confirm-code'),
-            title: 'Ingresar el código',
-            style: SplgButtonStyle.outlined,
-            onPressed: model.confirmDeliveryByCode,
-          ),
-        ],
-        if (model.showTransferCard) ...[
-          const SizedBox(height: 16),
-          TransferCard(model: model),
-        ],
-        const SizedBox(height: 12),
-        Text(model.compactOrderDetail, style: type.body),
-        if (model.expandedOrderDetail.isNotEmpty)
-          SplgAccordion(
-            entries: [
-              SplgAccordionEntry(
-                title: 'Ver detalle',
-                body: model.expandedOrderDetail.join('\n'),
-              ),
-            ],
-          ),
-        if (model.canCancelOrder) ...[
-          const SizedBox(height: 6),
-          SplgButton(
-            key: const Key('tracking-cancel'),
-            title: 'Cancelar pedido',
-            style: SplgButtonStyle.danger,
-            onPressed: model.isBusy ? null : model.cancelOrder,
-          ),
-        ],
       ],
     );
   }

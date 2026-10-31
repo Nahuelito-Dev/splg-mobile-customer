@@ -103,6 +103,41 @@ void main() {
       model.dispose();
     });
 
+    test('el aviso de aceptado trae del pedido el chofer y su vehículo',
+        () async {
+      final model = vm();
+      await model.initialize();
+      final slow = Completer<Map<String, dynamic>?>();
+      when(tracking.fetchOrderById('o1', 'tok')).thenAnswer((_) => slow.future);
+
+      final sondeo = model.poll();
+      await pump();
+      statuses.add('accepted');
+      await pump();
+      slow.complete({'status': 'pending'});
+      await sondeo;
+      server = {
+        'status': 'accepted',
+        'driver': {
+          'userId': 'u1',
+          'fullName': 'Ramón Villalba',
+          'ratingAverage': 4.1,
+          'ratingCount': 3,
+        },
+        'vehicle': {'patent': 'AF218KT', 'brand': 'Toyota', 'model': 'Hilux'},
+      };
+      when(tracking.fetchOrderById('o1', 'tok'))
+          .thenAnswer((_) async => server);
+      statuses.add('accepted');
+      await pump();
+      await pump();
+
+      expect(model.driverRating, 4.1);
+      expect(model.vehiclePlate, 'AF218KT');
+      expect(model.vehicleName, 'Toyota Hilux');
+      model.dispose();
+    });
+
     test('una vez terminado, ninguna respuesta lo reabre', () async {
       server = {'status': 'delivered'};
       final model = vm();
