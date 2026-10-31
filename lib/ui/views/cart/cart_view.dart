@@ -27,9 +27,14 @@ class CartView extends StackedView<CartViewModel> {
       builder: (context) {
         final cart = model.cart;
         if (cart.isEmpty) {
-          return const SplgEmptyState(
+          return SplgEmptyState(
             illustration: SplgIllustration.emptyList,
-            message: 'Tu carrito está vacío. Agregá garrafas desde el inicio.',
+            message: 'Tu carrito está vacío.',
+            action: SplgButton(
+              key: const Key('cart-add-more-empty'),
+              title: 'Agregar garrafas',
+              onPressed: model.addMore,
+            ),
           );
         }
         return Column(
@@ -96,6 +101,13 @@ class CartView extends StackedView<CartViewModel> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    SplgButton(
+                      key: const Key('cart-add-more'),
+                      title: 'Agregar garrafas',
+                      style: SplgButtonStyle.outlined,
+                      onPressed: model.isBusy ? null : model.addMore,
+                    ),
+                    const SizedBox(height: 8),
                     SplgButton(
                       key: const Key('cart-continue'),
                       title: 'Continuar',

@@ -1409,6 +1409,13 @@ class MockGasCylinderService extends _i1.Mock
       ) as List<_i27.GasCylinder>);
 
   @override
+  Set<String> get outOfStock => (super.noSuchMethod(
+        Invocation.getter(#outOfStock),
+        returnValue: <String>{},
+        returnValueForMissingStub: <String>{},
+      ) as Set<String>);
+
+  @override
   bool get hasExpiredPhotos => (super.noSuchMethod(
         Invocation.getter(#hasExpiredPhotos),
         returnValue: false,
@@ -1423,6 +1430,37 @@ class MockGasCylinderService extends _i1.Mock
         ),
         returnValueForMissingStub: null,
       ) as String?);
+
+  @override
+  void savePendingSelection(Map<String, int>? selection) => super.noSuchMethod(
+        Invocation.method(
+          #savePendingSelection,
+          [selection],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  Map<String, int> takePendingSelection() => (super.noSuchMethod(
+        Invocation.method(
+          #takePendingSelection,
+          [],
+        ),
+        returnValue: <String, int>{},
+        returnValueForMissingStub: <String, int>{},
+      ) as Map<String, int>);
+
+  @override
+  _i20.Future<List<_i27.GasCylinder>> getPublicCatalog() => (super.noSuchMethod(
+        Invocation.method(
+          #getPublicCatalog,
+          [],
+        ),
+        returnValue:
+            _i20.Future<List<_i27.GasCylinder>>.value(<_i27.GasCylinder>[]),
+        returnValueForMissingStub:
+            _i20.Future<List<_i27.GasCylinder>>.value(<_i27.GasCylinder>[]),
+      ) as _i20.Future<List<_i27.GasCylinder>>);
 
   @override
   _i20.Future<List<_i27.GasCylinder>> getGasCylinders() => (super.noSuchMethod(

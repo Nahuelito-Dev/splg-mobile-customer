@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/data/datasource/gascylinder_remote_datasource.dart';
+import 'package:splg_customer/data/repository/gascylinder_repository_imp.dart';
 
 import '../helpers/fake_http.dart';
 
@@ -48,5 +49,64 @@ void main() {
         (r) => ++n == 1 ? catalogo(130)(r) : const FakeReply.networkError());
 
     expect(GasCylinderRemoteDatasource().getGasCylinders(), throwsA(anything));
+  });
+
+  group('catálogo público', () {
+    Map<String, dynamic> producto(String id, {bool inStock = true}) => {
+          'id': id,
+          'type': 'Garrafa 10kg',
+          'weight': 10,
+          'price': 14900,
+          'description': null,
+          'photoUrl': null,
+          'promotions': [
+            {'quantity': 2, 'discountPercentage': 5},
+          ],
+          'inStock': inStock,
+        };
+
+    test('pide /api/v2/public/distributors/:slug/catalog sin token', () async {
+      final log = fakeHttp((_) => FakeReply(200, {
+            'slug': 'demo',
+            'name': 'Demo',
+            'products': [producto('g1')],
+          }));
+
+      await GasCylinderRemoteDatasource().getPublicCatalog();
+
+      expect(log.single.method, 'GET');
+      expect(log.single.options.uri.path,
+          '/api/v2/public/distributors/demo/catalog');
+      expect(log.single.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('un cuerpo ilegible o un error lanza', () async {
+      fakeHttp((_) => const FakeReply(200, {'slug': 'demo'}));
+      expect(
+          GasCylinderRemoteDatasource().getPublicCatalog(), throwsA(anything));
+      fakeHttp((_) => const FakeReply(404, {'message': 'no'}));
+      expect(
+          GasCylinderRemoteDatasource().getPublicCatalog(), throwsA(anything));
+    });
+
+    test('el repositorio lo pasa a garrafas con sus promociones y agotados',
+        () async {
+      fakeHttp((_) => FakeReply(200, {
+            'slug': 'demo',
+            'name': 'Demo',
+            'products': [producto('g1'), producto('g2', inStock: false)],
+          }));
+      final repo = GasCylinderRepositoryImp(GasCylinderRemoteDatasource());
+
+      final list = await repo.getPublicCatalog();
+
+      expect(list.map((g) => g.id), ['g1', 'g2']);
+      expect(list.first.price, 14900);
+      expect(list.first.weight, '10');
+      expect(list.first.active, isTrue);
+      expect(list.first.discounts!.single.quantity, 2);
+      expect(list.first.discounts!.single.percentage, 5);
+      expect(repo.outOfStock, {'g2'});
+    });
   });
 }

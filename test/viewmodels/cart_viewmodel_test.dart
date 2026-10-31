@@ -118,6 +118,11 @@ void main() {
       verify(nav.navigateToCheckoutView()).called(1);
     });
 
+    test('"Agregar garrafas" vuelve al Inicio pidiendo el catálogo', () {
+      CartViewModel().addMore();
+      verify(nav.back(result: CartViewModel.addMoreResult)).called(1);
+    });
+
     test('mientras una acción está en curso otra se ignora', () async {
       await cart.add('g1', 1);
       final m = CartViewModel();

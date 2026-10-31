@@ -1,3 +1,4 @@
+import 'package:splg_customer/ui/views/cart/cart_viewmodel.dart';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -81,11 +82,39 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
       // El carrito es el del back: al abrir la app se trae.
       final cart = await _cartService.refresh();
       cartError = cart.ok ? null : cart.message;
+      await _applyPendingSelection();
     }
     if (_closed) return;
     setBusy(false);
     _schedulePoll();
   }
+
+  /// Lo que eligió en el catálogo público antes de iniciar sesión pasa al
+  /// carrito del back. Si alguna no se pudo (tipo dado de baja, tope), se
+  /// avisa y el resto queda.
+  Future<void> _applyPendingSelection() async {
+    final pending = _gasCylinderService.takePendingSelection();
+    String? failure;
+    for (final entry in pending.entries) {
+      final result = await _cartService.add(entry.key, entry.value);
+      if (!result.ok) failure ??= result.message;
+    }
+    if (failure != null && !_closed) {
+      await _dialogService.showDialog(
+        title: 'No pudimos sumar todo al carrito',
+        description: failure,
+        buttonTitle: 'Aceptar',
+      );
+    }
+  }
+
+  /// La tira de garrafas a la vista del inicio: sólo con catálogo cargado.
+  bool get showFeatured =>
+      !isBusy && loadError == null && _cylinders.isNotEmpty;
+
+  /// Tocar una garrafa de la tira la suma al carrito (la hoja del catálogo
+  /// se abre desde la vista y se repinta sola cuando el back responde).
+  Future<void> addFeatured(GasCylinder cylinder) => addItem(cylinder, 1);
 
   String? cylinderPhoto(String id) => _gasCylinderService.photoUrl(id);
 
@@ -377,14 +406,28 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
 
   bool get canPlaceOrder => itemCount > 0;
 
-  void placeOrder() {
+  /// El carrito pidió volver con el catálogo abierto ([CartViewModel.addMore]).
+  bool catalogRequested = false;
+
+  Future<void> placeOrder() async {
     if (!canPlaceOrder) return;
 
     if (_customerService.isUserLoggedIn) {
-      _navigationService.navigateToCartView();
+      final result = await _navigationService.navigateToCartView();
+      if (result == CartViewModel.addMoreResult) {
+        catalogRequested = true;
+        notifyListeners();
+      }
     } else {
       _navigationService.navigateToLoginView();
     }
+  }
+
+  /// La vista abre el catálogo una sola vez por pedido del carrito.
+  bool takeCatalogRequest() {
+    final pedido = catalogRequested;
+    catalogRequested = false;
+    return pedido;
   }
 
   @override

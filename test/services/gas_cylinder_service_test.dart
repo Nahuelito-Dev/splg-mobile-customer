@@ -25,6 +25,13 @@ void main() {
     );
   });
 
+  test('la selección pendiente se entrega una sola vez', () {
+    final service = GasCylinderService();
+    service.savePendingSelection({'g1': 2});
+    expect(service.takePendingSelection(), {'g1': 2});
+    expect(service.takePendingSelection(), isEmpty);
+  });
+
   group('Catálogo de garrafas', () {
     test('un error del datasource se propaga, no es una lista vacía', () {
       final repo = GasCylinderRepositoryImp(

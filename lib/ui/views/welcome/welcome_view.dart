@@ -48,10 +48,21 @@ class WelcomeView extends StackedView<WelcomeViewModel> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: SplgButton(
-                    title: 'Comenzar',
-                    style: SplgButtonStyle.white,
-                    onPressed: model.goToLogin,
+                  child: Column(
+                    children: [
+                      SplgButton(
+                        title: 'Comenzar',
+                        style: SplgButtonStyle.white,
+                        onPressed: model.goToLogin,
+                      ),
+                      const SizedBox(height: 12),
+                      SplgButton(
+                        key: const Key('welcome-see-catalog'),
+                        title: 'Ver garrafas y precios',
+                        style: SplgButtonStyle.ghost,
+                        onPressed: model.goToCatalog,
+                      ),
+                    ],
                   ),
                 ),
               ),

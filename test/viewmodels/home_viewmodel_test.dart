@@ -1,3 +1,4 @@
+import 'package:splg_customer/ui/views/cart/cart_viewmodel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
@@ -123,6 +124,63 @@ void main() {
     model.dispose();
   });
 
+  test('al abrir pasa al carrito lo que eligió en el catálogo público',
+      () async {
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+    when(gas.takePendingSelection()).thenReturn({'g1': 2});
+    final model = HomeViewModel();
+    await model.initialize();
+    expect(model.getItemQuantity('g1'), 2);
+    expect(backend.calls, contains('POST cart/items'));
+    verify(gas.takePendingSelection()).called(1);
+    model.dispose();
+  });
+
+  test('si no eligió nada antes de entrar, no toca el carrito', () async {
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+    when(gas.takePendingSelection()).thenReturn(<String, int>{});
+    final model = HomeViewModel();
+    await model.initialize();
+    expect(model.itemCount, 0);
+    expect(backend.calls.where((c) => c.startsWith('POST')), isEmpty);
+    model.dispose();
+  });
+
+  test('si el back rechaza algo de lo elegido, se avisa', () async {
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+    when(gas.takePendingSelection()).thenReturn({'g1': 1});
+    backend.inactive.add('g1');
+    final model = HomeViewModel();
+    await model.initialize();
+    verify(locator<DialogService>().showDialog(
+      title: 'No pudimos sumar todo al carrito',
+      description: 'No encontramos lo que buscabas.',
+      buttonTitle: 'Aceptar',
+    )).called(1);
+    model.dispose();
+  });
+
+  test('la tira del inicio sólo se muestra con el catálogo cargado', () async {
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
+    final model = HomeViewModel();
+    expect(model.showFeatured, isFalse);
+    await model.initialize();
+    expect(model.showFeatured, isTrue);
+    await model.addFeatured(model.cylinders.first);
+    expect(model.getItemQuantity('g1'), 1);
+    model.dispose();
+
+    when(gas.getGasCylinders()).thenAnswer((_) async => throw Exception('x'));
+    final failed = HomeViewModel();
+    await failed.initialize();
+    expect(failed.showFeatured, isFalse);
+    failed.dispose();
+  });
+
   test('la dirección de entrega es la predeterminada, o la primera', () {
     when(customers.customer).thenReturn(customerWith(
         [addr('a', 'Calle 1'), addr('b', 'Calle 2', primary: true)]));
@@ -145,6 +203,26 @@ void main() {
     when(customers.isUserLoggedIn).thenReturn(false);
     model.placeOrder();
     verify(nav.navigateToLoginView()).called(1);
+  });
+
+  test('si el carrito vuelve con "Agregar garrafas", el Inicio abre el catálogo una vez',
+      () async {
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
+    when(nav.navigateToCartView())
+        .thenAnswer((_) async => CartViewModel.addMoreResult);
+    await model.placeOrder();
+    expect(model.catalogRequested, isTrue);
+    expect(model.takeCatalogRequest(), isTrue);
+    expect(model.takeCatalogRequest(), isFalse);
+  });
+
+  test('si el carrito vuelve sin pedir el catálogo, no se abre', () async {
+    final model = HomeViewModel();
+    await model.addItem(cylinder(), 1);
+    when(nav.navigateToCartView()).thenAnswer((_) async => null);
+    await model.placeOrder();
+    expect(model.catalogRequested, isFalse);
   });
 
   test('sin garrafas elegidas no deja continuar', () {

@@ -26,6 +26,7 @@ import 'package:splg_customer/ui/views/edit_order/edit_order_viewmodel.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
 import 'package:splg_customer/ui/views/help/help_view.dart';
 import 'package:splg_customer/ui/views/home/home_view.dart';
+import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
 import 'package:splg_customer/ui/views/login/login_view.dart';
 import 'package:splg_customer/ui/views/notifications/notifications_view.dart';
 import 'package:splg_customer/ui/views/order_detail/order_detail_view.dart';
@@ -107,6 +108,22 @@ void main() {
     await loadAppFonts();
     await pumpScreen(t, const WelcomeView());
     await check(t, 'welcome');
+  });
+
+  testGoldens('Catálogo público', (t) async {
+    await loadAppFonts();
+    when(customers.isUserLoggedIn).thenReturn(false);
+    final gas = locator<GasCylinderService>() as MockGasCylinderService;
+    when(gas.getPublicCatalog()).thenAnswer((_) async => [
+          cylinder(price: 14900, discounts: [
+            Discount(quantity: 2, percentage: 5),
+            Discount(quantity: 4, percentage: 12),
+          ]),
+          cylinder(id: 'g2', type: 'Garrafa 15kg', price: 21500),
+        ]);
+    when(gas.outOfStock).thenReturn({'g2'});
+    await pumpScreen(t, const PublicCatalogView());
+    await check(t, 'public_catalog');
   });
 
   testGoldens('Arranque', (t) async {

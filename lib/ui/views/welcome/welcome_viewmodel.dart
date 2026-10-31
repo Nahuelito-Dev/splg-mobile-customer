@@ -8,4 +8,7 @@ class WelcomeViewModel extends BaseViewModel {
   final _nav = locator<NavigationService>();
 
   Future<void> goToLogin() => _nav.navigateToLoginView();
+
+  /// El catálogo con precios, sin iniciar sesión.
+  Future<void> goToCatalog() => _nav.navigateToPublicCatalogView();
 }

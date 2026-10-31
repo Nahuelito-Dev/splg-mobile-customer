@@ -5,6 +5,7 @@ import 'package:stacked/stacked.dart';
 import 'package:splg_customer/ui/widgets/app_drawer/app_drawer.dart';
 import 'home_viewmodel.dart';
 import 'widgets/catalog_sheet.dart';
+import 'widgets/featured_strip.dart';
 import 'widgets/home_map.dart';
 
 class HomeView extends StackedView<HomeViewModel> {
@@ -18,6 +19,13 @@ class HomeView extends StackedView<HomeViewModel> {
 
   @override
   Widget builder(BuildContext context, HomeViewModel model, Widget? child) {
+    if (model.catalogRequested) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted && model.takeCatalogRequest()) {
+          showCatalogSheet(context, model);
+        }
+      });
+    }
     final brasa = context.brasa;
     return Scaffold(
       drawer: const AppDrawer(),
@@ -102,6 +110,16 @@ class HomeView extends StackedView<HomeViewModel> {
                                   .copyWith(color: brasa.danger)),
                         ),
                       const SizedBox(height: 12),
+                      if (model.showFeatured) ...[
+                        FeaturedStrip(
+                          model: model,
+                          onTap: (c) {
+                            model.addFeatured(c);
+                            showCatalogSheet(context, model);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Row(
                         children: [
                           Expanded(

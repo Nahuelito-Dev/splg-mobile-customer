@@ -1,3 +1,4 @@
+import 'package:splg_customer/core/config/app_config.dart';
 import 'package:splg_customer/core/network/api_client.dart';
 
 class GasCylinderRemoteDatasource {
@@ -30,5 +31,19 @@ class GasCylinderRemoteDatasource {
       if (items.isEmpty || all.length >= total) break;
     }
     return {'gasCylinders': all, 'total': total};
+  }
+
+  /// Cuerpo de `GET /api/v2/public/distributors/:slug/catalog`: el catálogo que
+  /// ve un visitante, sin sesión. Lanza ante cualquier falla.
+  Future<Map<String, dynamic>> getPublicCatalog() async {
+    final response = await _apiClient.get(
+        '${AppConfig.apiV2Url}public/distributors/${AppConfig.distributorSlug}/catalog');
+    final body = response.data;
+    if (response.statusCode != 200 ||
+        body is! Map<String, dynamic> ||
+        body['products'] is! List) {
+      throw const FormatException('Catálogo ilegible');
+    }
+    return body;
   }
 }

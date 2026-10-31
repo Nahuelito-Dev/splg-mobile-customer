@@ -39,6 +39,33 @@ class GasCylinderService {
     return sorted;
   }
 
+  /// Sin stock en el último catálogo público.
+  Set<String> get outOfStock => _gascylinderRepository.outOfStock;
+
+  /// Lo que eligió en el catálogo público (id de garrafa -> cantidad) antes de
+  /// iniciar sesión; el inicio lo pasa al carrito al abrir y lo vacía.
+  final Map<String, int> _pendingSelection = {};
+
+  void savePendingSelection(Map<String, int> selection) => _pendingSelection
+    ..clear()
+    ..addAll(selection);
+
+  /// Entrega lo guardado y lo vacía.
+  Map<String, int> takePendingSelection() {
+    final taken = Map<String, int>.of(_pendingSelection);
+    _pendingSelection.clear();
+    return taken;
+  }
+
+  /// Catálogo de la distribuidora sin sesión.
+  Future<List<GasCylinder>> getPublicCatalog() async {
+    final gasCylinders = await _gascylinderRepository.getPublicCatalog();
+    _gasCylinder
+      ..clear()
+      ..addAll(sortedByWeight(gasCylinders));
+    return _gasCylinder;
+  }
+
   Future<List<GasCylinder>> getGasCylinders() async {
     final gasCylinders = await _fetchGasCylindersUseCase();
 

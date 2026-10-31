@@ -46,6 +46,8 @@ import 'package:splg_customer/ui/views/personal_info/personal_info_view.dart'
     as _i29;
 import 'package:splg_customer/ui/views/profile/profile_view.dart' as _i8;
 import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart' as _i13;
+import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart'
+    as _i37;
 import 'package:splg_customer/ui/views/recover_password/recover_password_view.dart'
     as _i17;
 import 'package:splg_customer/ui/views/signup/signup_view.dart' as _i6;
@@ -118,6 +120,8 @@ class Routes {
 
   static const changePasswordView = '/change-password-view';
 
+  static const publicCatalogView = '/public-catalog-view';
+
   static const all = <String>{
     homeView,
     startupView,
@@ -149,6 +153,7 @@ class Routes {
     personalInfoView,
     editProfileView,
     changePasswordView,
+    publicCatalogView,
   };
 }
 
@@ -184,6 +189,7 @@ class StackedRouter extends _i1.RouterBase {
     _i1.RouteDef(Routes.personalInfoView, page: _i29.PersonalInfoView),
     _i1.RouteDef(Routes.editProfileView, page: _i30.EditProfileView),
     _i1.RouteDef(Routes.changePasswordView, page: _i31.ChangePasswordView),
+    _i1.RouteDef(Routes.publicCatalogView, page: _i37.PublicCatalogView),
   ];
 
   final _pagesMap = <Type, _i1.StackedRouteFactory>{
@@ -454,6 +460,15 @@ class StackedRouter extends _i1.RouterBase {
       );
       return _i32.MaterialPageRoute<dynamic>(
         builder: (context) => _i31.ChangePasswordView(key: args.key),
+        settings: data,
+      );
+    },
+    _i37.PublicCatalogView: (data) {
+      final args = data.getArgs<PublicCatalogViewArguments>(
+        orElse: () => const PublicCatalogViewArguments(),
+      );
+      return _i32.MaterialPageRoute<dynamic>(
+        builder: (context) => _i37.PublicCatalogView(key: args.key),
         settings: data,
       );
     },
@@ -1152,6 +1167,28 @@ class ChangePasswordViewArguments {
   }
 }
 
+class PublicCatalogViewArguments {
+  const PublicCatalogViewArguments({this.key});
+
+  final _i32.Key? key;
+
+  @override
+  String toString() {
+    return '{"key": "$key"}';
+  }
+
+  @override
+  bool operator ==(covariant PublicCatalogViewArguments other) {
+    if (identical(this, other)) return true;
+    return other.key == key;
+  }
+
+  @override
+  int get hashCode {
+    return key.hashCode;
+  }
+}
+
 extension NavigatorStateExtension on _i36.NavigationService {
   Future<dynamic> navigateToHomeView({
     _i32.Key? key,
@@ -1713,6 +1750,24 @@ extension NavigatorStateExtension on _i36.NavigationService {
     );
   }
 
+  Future<dynamic> navigateToPublicCatalogView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return navigateTo<dynamic>(
+      Routes.publicCatalogView,
+      arguments: PublicCatalogViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
   Future<dynamic> replaceWithHomeView({
     _i32.Key? key,
     int? routerId,
@@ -2266,6 +2321,24 @@ extension NavigatorStateExtension on _i36.NavigationService {
     return replaceWith<dynamic>(
       Routes.changePasswordView,
       arguments: ChangePasswordViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
+  Future<dynamic> replaceWithPublicCatalogView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return replaceWith<dynamic>(
+      Routes.publicCatalogView,
+      arguments: PublicCatalogViewArguments(key: key),
       id: routerId,
       preventDuplicates: preventDuplicates,
       parameters: parameters,

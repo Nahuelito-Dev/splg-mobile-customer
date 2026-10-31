@@ -54,6 +54,7 @@ import 'package:splg_customer/ui/views/home/widgets/home_map.dart';
 import 'package:splg_customer/services/session_service.dart';
 import 'package:splg_lib/domain/discount.dart';
 import 'package:splg_lib/splg_lib.dart';
+import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 import '../helpers/fixtures.dart';
@@ -117,6 +118,35 @@ void main() {
       await t.pumpWidget(app(const WelcomeView()));
       expect(find.textContaining('sin salir de casa'), findsOneWidget);
       await t.tap(find.text('Comenzar'));
+      verify(nav.navigateToLoginView()).called(1);
+    });
+
+    phoneTest('bienvenida: "Ver garrafas y precios" abre el catálogo público',
+        (t) async {
+      await t.pumpWidget(app(const WelcomeView()));
+      await t.tap(find.text('Ver garrafas y precios'));
+      verify(nav.navigateToPublicCatalogView()).called(1);
+    });
+
+    phoneTest('catálogo público: se ve sin sesión y "Pedir" va al login',
+        (t) async {
+      when(customers.isUserLoggedIn).thenReturn(false);
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getPublicCatalog()).thenAnswer((_) async => [
+            cylinder(price: 14900),
+            cylinder(id: 'g2', type: 'Garrafa 15kg', price: 21500),
+          ]);
+      when(gas.outOfStock).thenReturn({'g2'});
+      await t.pumpWidget(app(const PublicCatalogView()));
+      await settle(t);
+      expect(find.text('Garrafa 10kg'), findsOneWidget);
+      expect(find.text('Sin stock'), findsOneWidget);
+      expect(find.text('Iniciar sesión o registrarme'), findsOneWidget);
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await settle(t);
+      expect(find.text('Pedir · 1 garrafa'), findsOneWidget);
+      await t.tap(find.byKey(const Key('public-catalog-action')));
+      verify(gas.savePendingSelection({'g1': 1})).called(1);
       verify(nav.navigateToLoginView()).called(1);
     });
 
@@ -410,8 +440,58 @@ void main() {
       when(gas.getGasCylinders()).thenAnswer((_) async => [cylinder()]);
       await t.tap(find.byKey(const Key('home-catalog-field')));
       await t.pumpAndSettle();
-      expect(find.text('Garrafa 10kg'), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byType(SplgProductCard),
+              matching: find.text('Garrafa 10kg')),
+          findsOneWidget);
       expect(find.text('No pudimos cargar'), findsNothing);
+    });
+
+    phoneTest(
+        'la tira del inicio muestra foto, nombre y precio; tocar suma y abre',
+        (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenAnswer((_) async => [
+            cylinder(price: 14900),
+            cylinder(id: 'g2', type: 'Garrafa 15kg', price: 21500),
+          ]);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      final strip = find.byKey(const Key('home-featured-strip'));
+      expect(strip, findsOneWidget);
+      expect(find.descendant(of: strip, matching: find.text('Garrafa 15kg')),
+          findsOneWidget);
+      expect(
+          find.descendant(of: strip, matching: find.textContaining('21.500')),
+          findsOneWidget);
+      await t.tap(find.byKey(const Key('home-featured-g2')));
+      await t.pumpAndSettle();
+      expect(find.text('Elegí tus garrafas'), findsWidgets);
+      expect(find.textContaining('Continuar · 1 garrafa'), findsWidgets);
+    });
+
+    phoneTest('sin catálogo no hay tira', (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenThrow(Exception('x'));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(find.byKey(const Key('home-featured-strip')), findsNothing);
+    });
+
+    testWidgets('la tira entra en un Android de 1080x2400 sin desbordar',
+        (t) async {
+      t.view.physicalSize = const Size(1080, 2400);
+      t.view.devicePixelRatio = 2.625;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders()).thenAnswer(
+          (_) async => [cylinder(), cylinder(id: 'g2'), cylinder(id: 'g3')]);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(find.byKey(const Key('home-featured-strip')), findsOneWidget);
+      expect(t.takeException(), isNull);
     });
 
     phoneTest('el inicio tiene un solo botón de menú y no el de pedidos',

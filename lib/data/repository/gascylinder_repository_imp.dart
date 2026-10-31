@@ -25,4 +25,36 @@ class GasCylinderRepositoryImp implements GasCylinderRepository {
     }
     return jsonList.map((e) => GasCylinder.fromJson(e)).toList();
   }
+
+  @override
+  final Set<String> outOfStock = {};
+
+  /// Lanza ante cualquier error. El catálogo público nombra distinto los
+  /// campos (`id`, `inStock`, `promotions` siempre lista): se pasan al formato
+  /// de [GasCylinder] y se guardan las fotos y los agotados.
+  @override
+  Future<List<GasCylinder>> getPublicCatalog() async {
+    final data = await _remoteDatasource.getPublicCatalog();
+    final products = data['products'] as List;
+    photos.clear();
+    outOfStock.clear();
+    final out = <GasCylinder>[];
+    for (final e in products) {
+      final p = e as Map<String, dynamic>;
+      final id = p['id'].toString();
+      final photo = SignedUrl.fromPresigned(p['photoUrl']);
+      if (photo != null) photos[id] = photo;
+      if (p['inStock'] != true) outOfStock.add(id);
+      out.add(GasCylinder.fromJson({
+        'gas_cylinder_id': id,
+        'type': p['type'],
+        'weight': p['weight'],
+        'price': p['price'],
+        'description': p['description'] ?? '',
+        'isActive': true,
+        'promotions': p['promotions'],
+      }));
+    }
+    return out;
+  }
 }

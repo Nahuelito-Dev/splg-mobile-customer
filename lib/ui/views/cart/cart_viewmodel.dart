@@ -13,6 +13,12 @@ class CartViewModel extends LoadViewModel {
   final _cartService = locator<CartService>();
   final _nav = locator<NavigationService>();
 
+  /// Lo que devuelve el carrito al Inicio para que abra el catálogo.
+  static const addMoreResult = 'agregar-garrafas';
+
+  /// Vuelve al Inicio con el catálogo abierto para sumar garrafas.
+  void addMore() => _nav.back(result: addMoreResult);
+
   Cart get cart => _cartService.cart;
 
   /// Error de la última acción (cambiar cantidad, quitar, vaciar).

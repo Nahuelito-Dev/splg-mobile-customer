@@ -54,6 +54,7 @@ import 'package:splg_customer/ui/views/change_password/change_password_view.dart
 import 'package:splg_customer/services/session_service.dart';
 import 'package:splg_customer/services/photo_service.dart';
 import 'package:splg_customer/services/profile_photo_service.dart';
+import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
 // @stacked-import
 
 @StackedApp(
@@ -88,6 +89,7 @@ import 'package:splg_customer/services/profile_photo_service.dart';
     MaterialRoute(page: PersonalInfoView),
     MaterialRoute(page: EditProfileView),
     MaterialRoute(page: ChangePasswordView),
+    MaterialRoute(page: PublicCatalogView),
 // @stacked-route
   ],
   dependencies: [
