@@ -122,6 +122,19 @@ class CheckoutViewModel extends ReactiveViewModel {
 
   /// La dirección vigente con ese id en `customer.addresses`, o null si ya no
   /// existe.
+  /// La cotización depende de la zona de cobertura: sale de dónde se entrega
+  /// (calle, ciudad y coordenadas), no del texto armado ni de las indicaciones.
+  @visibleForTesting
+  static bool mueveElPrecio(Address antes, Address ahora) =>
+      antes.addressId != ahora.addressId ||
+      antes.streetName != ahora.streetName ||
+      antes.city != ahora.city ||
+      antes.latitude != ahora.latitude ||
+      antes.longitude != ahora.longitude;
+
+  bool _mueveElPrecio(Address antes, Address ahora) =>
+      mueveElPrecio(antes, ahora);
+
   Address? _current(Address? a) {
     if (a == null) return null;
     for (final s in _customerService.customer.addresses) {
@@ -438,7 +451,14 @@ class CheckoutViewModel extends ReactiveViewModel {
     final chosen = _cartService.address;
     final current = _current(chosen);
     if (current != null) {
-      if (current != chosen) _setOrderAddress(current);
+      // Sólo vuelve a cotizar si cambió algo que mueve el precio (dónde se
+      // entrega). Releer la lista trae la misma dirección con otros datos
+      // (texto, indicaciones): eso no invalida la cotización mostrada.
+      if (_mueveElPrecio(chosen!, current)) {
+        _setOrderAddress(current);
+      } else if (current != chosen) {
+        _cartService.setAddress(current);
+      }
       return true;
     }
     addressController.clear();

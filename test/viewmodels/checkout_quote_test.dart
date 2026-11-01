@@ -234,6 +234,33 @@ void main() {
       return model;
     }
 
+    test('si al releer la dirección sólo cambia el texto armado, el pedido se envía',
+        () async {
+      // El perfil del login trae la dirección sin texto armado ni indicaciones;
+      // la lista releída al confirmar sí los trae. No es otra dirección: no
+      // tiene que recotizar (antes quedaba en un bucle y nunca enviaba).
+      when(customers.refreshAddresses()).thenAnswer((_) async {
+        when(customers.customer).thenReturn(customerWith([
+          addr('a1', 'Mitre 100', primary: true).copyWith(
+            formattedAddress: 'Mitre 100, Posadas, Misiones',
+            additionalInstructions: 'Portón verde',
+          ),
+        ]));
+      });
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
+          .thenAnswer((_) async => const CreateOrderResult(success: false));
+      final model = await listo();
+
+      await model.confirmOrder();
+
+      verify(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), fromCart: true))
+          .called(1);
+      model.dispose();
+    });
+
     test('mientras confirma no se puede cambiar el medio de pago ni la franja',
         () async {
       final gate = Completer<void>();
