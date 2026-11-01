@@ -58,7 +58,7 @@ void main() {
     await loadAppFonts();
     (locator<RepurchaseService>() as FakeRepurchaseService).forecastResult =
         ApiResult.ok(RepurchaseForecast(
-      estimatedAt: DateTime.now().add(const Duration(days: 9)),
+      estimatedAt: DateTime(2026, 11, 9),
       daysLeft: 9,
       notice: const RepurchaseNotice(
           enabled: true, days: 5, distributorDays: 3, effectiveDays: 5),
