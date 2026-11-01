@@ -4,6 +4,7 @@ import 'package:stacked/stacked.dart';
 
 import 'package:splg_customer/ui/widgets/app_drawer/app_drawer.dart';
 import 'home_viewmodel.dart';
+import 'widgets/repurchase_card.dart';
 import 'widgets/catalog_sheet.dart';
 import 'widgets/featured_strip.dart';
 import 'widgets/home_map.dart';
@@ -82,6 +83,16 @@ class HomeView extends StackedView<HomeViewModel> {
                     ),
                   ),
                 ),
+                if (model.showRepurchase)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: RepurchaseCard(
+                      invitation: model.invitation!,
+                      busy: model.repurchaseBusy,
+                      onAccept: model.acceptInvitation,
+                      onDismiss: model.dismissInvitation,
+                    ),
+                  ),
                 if (model.hasActiveOrder)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

@@ -8,6 +8,10 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/services/transfer_receipt_service.dart';
 import 'fake_transfer_receipt_service.dart';
+import 'fake_m3_m5_services.dart';
+import 'package:splg_customer/services/repurchase_service.dart';
+import 'package:splg_customer/services/cylinder_recovery_service.dart';
+import 'package:splg_customer/services/customer_events_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
@@ -116,6 +120,9 @@ void registerServices() {
   getAndRegisterProfilePhotoService();
   getAndRegisterOrderDocumentService();
   getAndRegisterTransferReceiptService();
+  getAndRegisterRepurchaseService();
+  getAndRegisterCylinderRecoveryService();
+  getAndRegisterCustomerEventsService();
 // @stacked-mock-register
 }
 
@@ -123,6 +130,27 @@ MockOrderDocumentService getAndRegisterOrderDocumentService() {
   _removeRegistrationIfExists<OrderDocumentService>();
   final service = MockOrderDocumentService();
   locator.registerSingleton<OrderDocumentService>(service);
+  return service;
+}
+
+FakeRepurchaseService getAndRegisterRepurchaseService() {
+  _removeRegistrationIfExists<RepurchaseService>();
+  final service = FakeRepurchaseService();
+  locator.registerSingleton<RepurchaseService>(service);
+  return service;
+}
+
+FakeCylinderRecoveryService getAndRegisterCylinderRecoveryService() {
+  _removeRegistrationIfExists<CylinderRecoveryService>();
+  final service = FakeCylinderRecoveryService();
+  locator.registerSingleton<CylinderRecoveryService>(service);
+  return service;
+}
+
+FakeCustomerEventsService getAndRegisterCustomerEventsService() {
+  _removeRegistrationIfExists<CustomerEventsService>();
+  final service = FakeCustomerEventsService();
+  locator.registerSingleton<CustomerEventsService>(service);
   return service;
 }
 

@@ -63,6 +63,13 @@ class ProfileView extends StackedView<ProfileViewModel> {
                       icon: SplgIcons.flame,
                       onTap: model.openConsumption,
                     ),
+                    SplgMenuItem(
+                      key: const Key('profile-repurchase'),
+                      label: 'Aviso de recompra',
+                      selected: model.selected == 5,
+                      icon: SplgIcons.bell,
+                      onTap: model.openRepurchaseNotice,
+                    ),
                     Divider(color: brasa.outline, height: 24),
                     SplgMenuItem(
                       key: const Key('profile-delete'),

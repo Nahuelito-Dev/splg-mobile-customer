@@ -256,7 +256,6 @@ class OrderTrackingService {
   /// conexión (también en las reconexiones). El token de Firebase vence en una
   /// hora; uno tomado una sola vez al abrir el seguimiento deja de valer y el
   /// back rechaza la reconexión.
-  @visibleForTesting
   static void Function(void Function(Map<String, dynamic>) done) authFor(
     Future<String?> Function() tokenProvider,
   ) {

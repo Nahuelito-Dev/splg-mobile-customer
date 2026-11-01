@@ -14,7 +14,10 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
       AppDrawerViewModel();
 
   @override
-  void onViewModelReady(AppDrawerViewModel viewModel) => viewModel.loadPhoto();
+  void onViewModelReady(AppDrawerViewModel viewModel) {
+    viewModel.loadPhoto();
+    viewModel.loadRecovery();
+  }
 
   @override
   Widget builder(
@@ -107,6 +110,9 @@ class AppDrawer extends StackedView<AppDrawerViewModel> {
                   item('Mi perfil', SplgIcons.user, model.openProfile),
                   item('Mis direcciones', SplgIcons.location,
                       model.openAddresses),
+                  if (model.hasRecoveryCases)
+                    item('Envases para devolver', SplgIcons.flame,
+                        model.openCylinderRecovery),
                 ]),
                 line(),
                 group([

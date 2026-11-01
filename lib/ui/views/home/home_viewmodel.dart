@@ -13,8 +13,11 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_customer/domain/repurchase.dart';
 import 'package:splg_customer/services/cart_service.dart';
+import 'package:splg_customer/services/customer_events_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/repurchase_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/location_service.dart';
@@ -36,6 +39,11 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   final _historyService = locator<HistoryService>();
   final _dialogService = locator<DialogService>();
   final _locationService = locator<LocationService>();
+  final _repurchaseService = locator<RepurchaseService>();
+  final _events = locator<CustomerEventsService>();
+
+  StreamSubscription<RepurchaseInvitationEvent>? _invitationSubscription;
+  StreamSubscription<RepurchaseClosedEvent>? _closedSubscription;
 
   Timer? _poll;
   bool _closed = false;
@@ -83,10 +91,120 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
       final cart = await _cartService.refresh();
       cartError = cart.ok ? null : cart.message;
       await _applyPendingSelection();
+      await _startRepurchase();
     }
     if (_closed) return;
     setBusy(false);
     _schedulePoll();
+  }
+
+  // ─── Recompra anticipada (M3) ───
+  /// Invitación abierta a reponer, con el pedido precargado; null si no hay
+  /// (con el módulo apagado nunca la hay).
+  RepurchaseInvitation? invitation;
+
+  /// Aceptando o descartando: la tarjeta no admite otro toque.
+  bool repurchaseBusy = false;
+
+  /// La tarjeta se muestra con una invitación abierta y vigente.
+  bool get showRepurchase {
+    final i = invitation;
+    return !isBusy && i != null && i.isOpenAt(DateTime.now());
+  }
+
+  /// Engancha los avisos en vivo y lee la invitación. Todo es de apoyo: si
+  /// falla, el Inicio sigue sin tarjeta.
+  Future<void> _startRepurchase() async {
+    _invitationSubscription ??=
+        _events.repurchaseInvitations.listen((_) => refreshInvitation());
+    _closedSubscription ??= _events.repurchaseClosed.listen(_onInvitationClosed);
+    _events.connect();
+    await refreshInvitation();
+  }
+
+  /// Vuelve a leer la invitación abierta en silencio.
+  Future<void> refreshInvitation() async {
+    if (_closed || !_customerService.isUserLoggedIn) return;
+    final r = await _repurchaseService.openInvitations();
+    if (_closed || !r.ok) return;
+    final now = DateTime.now();
+    invitation = r.data!.where((i) => i.isOpenAt(now)).firstOrNull;
+    rebuildUi();
+  }
+
+  void _onInvitationClosed(RepurchaseClosedEvent event) {
+    final current = invitation;
+    if (current == null) return;
+    if (event.invitationId != null &&
+        event.invitationId != current.invitationId) {
+      return;
+    }
+    invitation = null;
+    if (!_closed) rebuildUi();
+  }
+
+  /// «Pedir»: el back crea el pedido con lo precargado y se sigue al
+  /// seguimiento. Un rechazo se muestra tal cual; nunca se da por hecho.
+  Future<void> acceptInvitation() async {
+    final current = invitation;
+    if (current == null || repurchaseBusy) return;
+    if (current.hasUnavailable) {
+      await _dialogService.showDialog(
+        title: 'Algo ya no está disponible',
+        description: 'Alguna de tus garrafas habituales no tiene stock. '
+            'Armá tu pedido desde el catálogo.',
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    repurchaseBusy = true;
+    rebuildUi();
+    final r = await _repurchaseService.accept(current.invitationId);
+    repurchaseBusy = false;
+    if (_closed) return;
+    if (!r.ok) {
+      // 409: ya se resolvió o venció; deja de ofrecerse.
+      if (r.status == 409) invitation = null;
+      rebuildUi();
+      await _dialogService.showDialog(
+        title: 'No pudimos crear tu pedido',
+        description: r.message,
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    invitation = null;
+    rebuildUi();
+    final accepted = r.data!;
+    await _historyService.tryRefreshHistory(limit: 10);
+    final paymentUrl = accepted.paymentUrl;
+    if (paymentUrl != null && paymentUrl.isNotEmpty) {
+      await _navigationService.navigateToPaymentWebViewView(
+          paymentUrl: paymentUrl);
+    }
+    if (_closed) return;
+    await _navigationService.navigateToOrderTrackingView(
+        orderId: accepted.orderId);
+  }
+
+  /// «Ahora no»: descarta la invitación.
+  Future<void> dismissInvitation() async {
+    final current = invitation;
+    if (current == null || repurchaseBusy) return;
+    repurchaseBusy = true;
+    rebuildUi();
+    final r = await _repurchaseService.dismiss(current.invitationId);
+    repurchaseBusy = false;
+    if (_closed) return;
+    if (r.ok || r.status == 409) invitation = null;
+    rebuildUi();
+    if (!r.ok && r.status != 409) {
+      await _dialogService.showDialog(
+        title: 'No pudimos descartar el aviso',
+        description: r.message,
+        buttonTitle: 'Aceptar',
+      );
+    }
   }
 
   /// Lo que eligió en el catálogo público antes de iniciar sesión pasa al
@@ -160,6 +278,11 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     }
     _poll = Timer(pollInterval, () async {
       await _historyService.tryRefreshHistory(limit: 10);
+      final i = invitation;
+      if (i != null && !i.isOpenAt(DateTime.now()) && !_closed) {
+        invitation = null;
+        rebuildUi();
+      }
       _schedulePoll();
     });
   }
@@ -178,10 +301,12 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     _inBackground = background;
     if (background) {
       stopPolling();
+      _events.disconnect();
     } else if (!_closed) {
       _stopped = false;
       // Al volver se pone al día enseguida y retoma el ritmo.
       _historyService.tryRefreshHistory(limit: 10).then((_) => _schedulePoll());
+      if (_customerService.isUserLoggedIn) unawaited(_startRepurchase());
     }
   }
 
@@ -191,6 +316,9 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     _customerService.removeListener(reconcileAddress);
     WidgetsBinding.instance.removeObserver(this);
     stopPolling();
+    _invitationSubscription?.cancel();
+    _closedSubscription?.cancel();
+    _events.disconnect();
     super.dispose();
   }
 

@@ -50,6 +50,10 @@ import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart'
     as _i37;
 import 'package:splg_customer/ui/views/recover_password/recover_password_view.dart'
     as _i17;
+import 'package:splg_customer/ui/views/repurchase_notice/repurchase_notice_view.dart'
+    as _i38;
+import 'package:splg_customer/ui/views/cylinder_recovery/cylinder_recovery_view.dart'
+    as _i39;
 import 'package:splg_customer/ui/views/signup/signup_view.dart' as _i6;
 import 'package:splg_customer/ui/views/signup_done/signup_done_view.dart'
     as _i18;
@@ -122,6 +126,10 @@ class Routes {
 
   static const publicCatalogView = '/public-catalog-view';
 
+  static const repurchaseNoticeView = '/repurchase-notice-view';
+
+  static const cylinderRecoveryView = '/cylinder-recovery-view';
+
   static const all = <String>{
     homeView,
     startupView,
@@ -154,6 +162,8 @@ class Routes {
     editProfileView,
     changePasswordView,
     publicCatalogView,
+    repurchaseNoticeView,
+    cylinderRecoveryView,
   };
 }
 
@@ -190,6 +200,8 @@ class StackedRouter extends _i1.RouterBase {
     _i1.RouteDef(Routes.editProfileView, page: _i30.EditProfileView),
     _i1.RouteDef(Routes.changePasswordView, page: _i31.ChangePasswordView),
     _i1.RouteDef(Routes.publicCatalogView, page: _i37.PublicCatalogView),
+    _i1.RouteDef(Routes.repurchaseNoticeView, page: _i38.RepurchaseNoticeView),
+    _i1.RouteDef(Routes.cylinderRecoveryView, page: _i39.CylinderRecoveryView),
   ];
 
   final _pagesMap = <Type, _i1.StackedRouteFactory>{
@@ -469,6 +481,24 @@ class StackedRouter extends _i1.RouterBase {
       );
       return _i32.MaterialPageRoute<dynamic>(
         builder: (context) => _i37.PublicCatalogView(key: args.key),
+        settings: data,
+      );
+    },
+    _i38.RepurchaseNoticeView: (data) {
+      final args = data.getArgs<RepurchaseNoticeViewArguments>(
+        orElse: () => const RepurchaseNoticeViewArguments(),
+      );
+      return _i32.MaterialPageRoute<dynamic>(
+        builder: (context) => _i38.RepurchaseNoticeView(key: args.key),
+        settings: data,
+      );
+    },
+    _i39.CylinderRecoveryView: (data) {
+      final args = data.getArgs<CylinderRecoveryViewArguments>(
+        orElse: () => const CylinderRecoveryViewArguments(),
+      );
+      return _i32.MaterialPageRoute<dynamic>(
+        builder: (context) => _i39.CylinderRecoveryView(key: args.key),
         settings: data,
       );
     },
@@ -1189,6 +1219,50 @@ class PublicCatalogViewArguments {
   }
 }
 
+class RepurchaseNoticeViewArguments {
+  const RepurchaseNoticeViewArguments({this.key});
+
+  final _i32.Key? key;
+
+  @override
+  String toString() {
+    return '{"key": "$key"}';
+  }
+
+  @override
+  bool operator ==(covariant RepurchaseNoticeViewArguments other) {
+    if (identical(this, other)) return true;
+    return other.key == key;
+  }
+
+  @override
+  int get hashCode {
+    return key.hashCode;
+  }
+}
+
+class CylinderRecoveryViewArguments {
+  const CylinderRecoveryViewArguments({this.key});
+
+  final _i32.Key? key;
+
+  @override
+  String toString() {
+    return '{"key": "$key"}';
+  }
+
+  @override
+  bool operator ==(covariant CylinderRecoveryViewArguments other) {
+    if (identical(this, other)) return true;
+    return other.key == key;
+  }
+
+  @override
+  int get hashCode {
+    return key.hashCode;
+  }
+}
+
 extension NavigatorStateExtension on _i36.NavigationService {
   Future<dynamic> navigateToHomeView({
     _i32.Key? key,
@@ -1768,6 +1842,42 @@ extension NavigatorStateExtension on _i36.NavigationService {
     );
   }
 
+  Future<dynamic> navigateToRepurchaseNoticeView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return navigateTo<dynamic>(
+      Routes.repurchaseNoticeView,
+      arguments: RepurchaseNoticeViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
+  Future<dynamic> navigateToCylinderRecoveryView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return navigateTo<dynamic>(
+      Routes.cylinderRecoveryView,
+      arguments: CylinderRecoveryViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
   Future<dynamic> replaceWithHomeView({
     _i32.Key? key,
     int? routerId,
@@ -2339,6 +2449,42 @@ extension NavigatorStateExtension on _i36.NavigationService {
     return replaceWith<dynamic>(
       Routes.publicCatalogView,
       arguments: PublicCatalogViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
+  Future<dynamic> replaceWithRepurchaseNoticeView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return replaceWith<dynamic>(
+      Routes.repurchaseNoticeView,
+      arguments: RepurchaseNoticeViewArguments(key: key),
+      id: routerId,
+      preventDuplicates: preventDuplicates,
+      parameters: parameters,
+      transition: transition,
+    );
+  }
+
+  Future<dynamic> replaceWithCylinderRecoveryView({
+    _i32.Key? key,
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  }) async {
+    return replaceWith<dynamic>(
+      Routes.cylinderRecoveryView,
+      arguments: CylinderRecoveryViewArguments(key: key),
       id: routerId,
       preventDuplicates: preventDuplicates,
       parameters: parameters,

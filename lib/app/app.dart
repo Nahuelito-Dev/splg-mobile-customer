@@ -11,8 +11,13 @@ import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/consumption_service.dart';
+import 'package:splg_customer/services/repurchase_service.dart';
+import 'package:splg_customer/services/cylinder_recovery_service.dart';
+import 'package:splg_customer/services/customer_events_service.dart';
 import 'package:splg_customer/ui/views/cart/cart_view.dart';
 import 'package:splg_customer/ui/views/consumption/consumption_view.dart';
+import 'package:splg_customer/ui/views/repurchase_notice/repurchase_notice_view.dart';
+import 'package:splg_customer/ui/views/cylinder_recovery/cylinder_recovery_view.dart';
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
 import 'package:splg_customer/ui/views/login/login_view.dart';
 import 'package:splg_customer/ui/views/signup/signup_view.dart';
@@ -90,6 +95,8 @@ import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
     MaterialRoute(page: EditProfileView),
     MaterialRoute(page: ChangePasswordView),
     MaterialRoute(page: PublicCatalogView),
+    MaterialRoute(page: RepurchaseNoticeView),
+    MaterialRoute(page: CylinderRecoveryView),
 // @stacked-route
   ],
   dependencies: [
@@ -101,6 +108,9 @@ import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
     LazySingleton(classType: CustomerService),
     LazySingleton(classType: CartService),
     LazySingleton(classType: ConsumptionService),
+    LazySingleton(classType: RepurchaseService),
+    LazySingleton(classType: CylinderRecoveryService),
+    LazySingleton(classType: CustomerEventsService),
     LazySingleton(classType: LocationService),
     LazySingleton(classType: OrderTrackingService),
     LazySingleton(classType: TimeSlotService),

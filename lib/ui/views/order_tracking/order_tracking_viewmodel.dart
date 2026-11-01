@@ -15,7 +15,9 @@ import 'package:splg_customer/ui/common/transfer_payment.dart';
 import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/ui/views/order_tracking/order_driver_reader.dart';
 import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/domain/cylinder_recovery.dart';
 import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/cylinder_recovery_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
 import 'package:splg_customer/services/tracking_routes.dart';
@@ -70,6 +72,32 @@ class OrderTrackingViewModel extends BaseViewModel
   final _dialogService = locator<DialogService>();
   final _bottomSheetService = locator<BottomSheetService>();
   final _navigationService = locator<NavigationService>();
+  final _recoveryService = locator<CylinderRecoveryService>();
+
+  /// Envase que el repartidor retira con este pedido (M5), si el cliente
+  /// aceptó la oferta.
+  RecoveryCase? _pickupCase;
+
+  /// Aviso del retiro de un envase; null si este pedido no lleva ninguno.
+  String? get pickupNotice {
+    final c = _pickupCase;
+    if (c == null || stage == TrackingStage.cancelled) return null;
+    return 'Tené listo el envase ${c.serial}: el repartidor lo retira con '
+        'esta entrega.';
+  }
+
+  /// Busca en silencio si este pedido lleva un retiro de envase. Con el módulo
+  /// apagado, o si falla, no hay aviso.
+  Future<void> _loadPickup() async {
+    try {
+      final r = await _recoveryService.mine();
+      if (_closed) return;
+      _pickupCase = r.ok ? pickupForOrder(r.data!, orderId) : null;
+    } catch (_) {
+      _pickupCase = null;
+    }
+    if (!_closed) notifyListeners();
+  }
 
   /// La ruta por calles la da el back y sólo con el pedido en camino.
   RouteTracker _newTracker(LatLng destination) =>
@@ -425,6 +453,7 @@ class OrderTrackingViewModel extends BaseViewModel
     await _startRealtimeTracking();
     if (_closed) return;
     unawaited(_loadVehicleIcon());
+    unawaited(_loadPickup());
     await refreshDriverPhoto();
     if (_closed) return;
     _syncRadarState();
