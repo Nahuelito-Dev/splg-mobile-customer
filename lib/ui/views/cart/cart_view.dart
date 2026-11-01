@@ -1,3 +1,4 @@
+import 'package:splg_customer/domain/pricing.dart';
 import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
@@ -108,6 +109,11 @@ class CartView extends StackedView<CartViewModel> {
                         key: const Key('cart-total-note'),
                         style: type.caption,
                       ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(Pricing.ivaIncluido,
+                          key: const Key('cart-iva'), style: type.caption),
                     ),
                     const SizedBox(height: 10),
                     SplgButton(

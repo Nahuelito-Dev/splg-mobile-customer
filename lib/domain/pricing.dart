@@ -7,6 +7,9 @@ import 'package:splg_lib/domain/gas_cylinder.dart';
 class Pricing {
   Pricing._();
 
+  /// Los precios que cobra el sistema son finales: el IVA ya está incluido.
+  static const ivaIncluido = 'Precios finales con IVA incluido.';
+
   /// Promociones ordenadas de menor a mayor cantidad.
   static List<Discount> sortedDiscounts(GasCylinder cylinder) => [
         ...?cylinder.discounts

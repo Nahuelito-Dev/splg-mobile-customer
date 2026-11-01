@@ -1,3 +1,4 @@
+import 'package:splg_customer/domain/pricing.dart';
 import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
@@ -131,6 +132,13 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                                     type.amount.copyWith(color: Colors.white)),
                           ],
                         ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
+                        child: Text(Pricing.ivaIncluido,
+                            key: const Key('checkout-iva'),
+                            style: type.caption
+                                .copyWith(color: Colors.white70)),
                       ),
                       if (model.quoteError != null)
                         Padding(

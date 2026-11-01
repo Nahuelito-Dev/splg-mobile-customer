@@ -1080,6 +1080,7 @@ void main() {
           .toPlainText();
       expect(sinPromo.trim(), '\$8.500 c/u');
       expect(find.byKey(const Key('cart-total-note')), findsOneWidget);
+      expect(find.text('Precios finales con IVA incluido.'), findsOneWidget);
     });
   });
 
