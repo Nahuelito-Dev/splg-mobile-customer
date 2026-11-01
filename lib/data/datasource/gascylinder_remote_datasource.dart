@@ -33,6 +33,18 @@ class GasCylinderRemoteDatasource {
     return {'gasCylinders': all, 'total': total};
   }
 
+  /// Cuerpo de `GET /api/v2/public/distributors/:slug/payment-methods`: los
+  /// medios de pago con su recargo vigente. Lanza ante cualquier falla.
+  Future<List<dynamic>> getPaymentMethods() async {
+    final response = await _apiClient.get(
+        '${AppConfig.apiV2Url}public/distributors/${AppConfig.distributorSlug}/payment-methods');
+    final body = response.data;
+    if (response.statusCode != 200 || body is! List) {
+      throw const FormatException('Medios de pago ilegibles');
+    }
+    return body;
+  }
+
   /// Cuerpo de `GET /api/v2/public/distributors/:slug/catalog`: el catálogo que
   /// ve un visitante, sin sesión. Lanza ante cualquier falla.
   Future<Map<String, dynamic>> getPublicCatalog() async {

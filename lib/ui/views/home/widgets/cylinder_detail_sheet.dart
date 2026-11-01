@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 
+import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/domain/payment_term.dart';
 import 'package:splg_customer/domain/pricing.dart';
+import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/widgets/signed_image.dart';
 
 /// Detalle de una garrafa: imagen, precio, promociones con el precio unitario
 /// por tramo, métodos de pago y botón para agregar.
-class CylinderDetailSheet extends StatelessWidget {
+class CylinderDetailSheet extends StatefulWidget {
   const CylinderDetailSheet({
     super.key,
     required this.cylinder,
@@ -22,6 +25,34 @@ class CylinderDetailSheet extends StatelessWidget {
   final String? photoUrl;
 
   @override
+  State<CylinderDetailSheet> createState() => _CylinderDetailSheetState();
+}
+
+class _CylinderDetailSheetState extends State<CylinderDetailSheet> {
+  /// Los recargos vigentes por medio de pago; hasta que el back responde (o si
+  /// no responde) no se menciona ninguno.
+  List<PaymentTerm> _terms = const [];
+
+  GasCylinder get cylinder => widget.cylinder;
+  VoidCallback get onAdd => widget.onAdd;
+  String? get photoUrl => widget.photoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    locator<GasCylinderService>().paymentTerms().then((terms) {
+      if (mounted) setState(() => _terms = terms);
+    });
+  }
+
+  String _payNote(String key, String base) {
+    final term = PaymentTerm.of(_terms, key);
+    return term != null && term.hasSurcharge
+        ? 'Recargo del ${term.percentageLabel}'
+        : base;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final type = SplgType.of(context);
     final brasa = context.brasa;
@@ -33,12 +64,14 @@ class CylinderDetailSheet extends StatelessWidget {
             children: [
               Icon(icon, size: 22, color: brasa.primaryStrong),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: type.value),
-                  Text(subtitle, style: type.caption),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: type.value),
+                    Text(subtitle, style: type.caption),
+                  ],
+                ),
               ),
             ],
           ),
@@ -93,9 +126,12 @@ class CylinderDetailSheet extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Métodos de pago', style: type.subtitle),
             const SizedBox(height: 10),
-            pay(SplgIcons.cash, 'Efectivo', 'Pagás al recibir el pedido'),
-            pay(SplgIcons.bank, 'Transferencia', 'Recargo del 10%'),
-            pay(SplgIcons.card, 'Mercado Pago', 'Tarjeta de crédito o débito'),
+            pay(SplgIcons.cash, 'Efectivo',
+                _payNote('CASH', 'Pagás al recibir el pedido')),
+            pay(SplgIcons.bank, 'Transferencia',
+                _payNote('TRANSFER', 'Pagás por transferencia bancaria')),
+            pay(SplgIcons.card, 'Mercado Pago',
+                _payNote('MERCADOPAGO', 'Tarjeta de crédito o débito')),
             const SizedBox(height: 16),
             SplgButton(
               title: 'Agregar al pedido',

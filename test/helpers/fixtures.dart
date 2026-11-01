@@ -39,13 +39,14 @@ Order order({
   Address? address,
   List<OrderItem>? items,
   double total = 1000,
+  PaymentMethod paymentMethod = PaymentMethod.cash,
 }) =>
     Order(
       id: id,
       address: address ?? addr('a1', 'Mitre 123', city: 'Posadas'),
       items: items ?? [OrderItem(cylinder: cylinder(), quantity: 1)],
       total: total,
-      paymentMethod: PaymentMethod.cash,
+      paymentMethod: paymentMethod,
       status: status,
       createdAt: DateTime(2026, 10, 10, 18, 30),
     );
@@ -126,6 +127,8 @@ QuoteOutcome backQuote({
   double paymentSurcharge = 0,
   double zoneSurcharge = 0,
   String? zoneName,
+  String? paymentMethod,
+  double? paymentSurchargePercentage,
 }) {
   final subtotal = unit * qty;
   final total = subtotal + zoneSurcharge + paymentSurcharge;
@@ -141,5 +144,7 @@ QuoteOutcome backQuote({
     deposit: 0,
     total: total,
     balance: total,
+    paymentMethod: paymentMethod,
+    paymentSurchargePercentage: paymentSurchargePercentage,
   ));
 }

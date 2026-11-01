@@ -540,6 +540,7 @@ class CheckoutViewModel extends ReactiveViewModel {
       fromCart: true,
       deliveryMode: mode,
       receiver: receiver,
+      expectedTotal: quoted.total,
     );
 
     if (result.success) {
@@ -573,6 +574,16 @@ class CheckoutViewModel extends ReactiveViewModel {
         Routes.orderTrackingView,
         arguments: OrderTrackingViewArguments(orderId: trackedOrderId),
       );
+    } else if (result.priceChanged) {
+      // No se creó nada: el total ya no es el que se mostró. Se vuelve a
+      // cotizar y el cliente confirma de nuevo con el precio vigente.
+      await _dialogService.showDialog(
+        title: 'Cambió el precio',
+        description: '${result.message ?? ''}\n\nVolvimos a calcular tu '
+            'pedido: revisá el total y confirmá de nuevo.',
+        buttonTitle: 'Aceptar',
+      );
+      scheduleQuote(immediate: true);
     } else if (result.expressUnavailableReason != null) {
       // No se creó nada: el express dejó de estar disponible entre que se
       // eligió y se confirmó. Se vuelve al reparto común, que pide franja.

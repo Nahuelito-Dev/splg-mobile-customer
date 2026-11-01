@@ -234,7 +234,8 @@ void main() {
               timeSlotId: anyNamed('timeSlotId'),
               fromCart: anyNamed('fromCart'),
               deliveryMode: anyNamed('deliveryMode'),
-              receiver: anyNamed('receiver')))
+              receiver: anyNamed('receiver'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(
               success: false,
               retryable: false,
@@ -275,7 +276,8 @@ void main() {
               timeSlotId: anyNamed('timeSlotId'),
               fromCart: anyNamed('fromCart'),
               deliveryMode: anyNamed('deliveryMode'),
-              receiver: anyNamed('receiver')))
+              receiver: anyNamed('receiver'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async =>
               CreateOrderResult(success: true, order: order(total: 4350)));
     }
@@ -292,7 +294,8 @@ void main() {
           timeSlotId: captureAnyNamed('timeSlotId'),
           fromCart: true,
           deliveryMode: captureAnyNamed('deliveryMode'),
-          receiver: captureAnyNamed('receiver')));
+          receiver: captureAnyNamed('receiver'),
+          expectedTotal: anyNamed('expectedTotal')));
       expect(call.captured[1], isNull);
       expect(call.captured[2], DeliveryMode.express);
       expect(call.captured[3], isNull);
@@ -312,7 +315,8 @@ void main() {
           timeSlotId: captureAnyNamed('timeSlotId'),
           fromCart: true,
           deliveryMode: captureAnyNamed('deliveryMode'),
-          receiver: anyNamed('receiver')));
+          receiver: anyNamed('receiver'),
+          expectedTotal: anyNamed('expectedTotal')));
       expect(call.captured, ['s1', DeliveryMode.standard]);
       model.dispose();
     });
@@ -341,7 +345,8 @@ void main() {
           timeSlotId: anyNamed('timeSlotId'),
           fromCart: true,
           deliveryMode: anyNamed('deliveryMode'),
-          receiver: captureAnyNamed('receiver')));
+          receiver: captureAnyNamed('receiver'),
+          expectedTotal: anyNamed('expectedTotal')));
       expect(call.captured.single, receptor);
       model.dispose();
     });

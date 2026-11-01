@@ -31,6 +31,8 @@ class OrderQuote {
     this.zoneName,
     this.deliveryMode = DeliveryMode.standard,
     this.expressSurcharge = 0,
+    this.paymentMethod,
+    this.paymentSurchargePercentage,
   });
 
   final List<QuoteLine> lines;
@@ -38,6 +40,14 @@ class OrderQuote {
   final double zoneSurcharge;
   final String? zoneName;
   final double paymentSurcharge;
+
+  /// Medio de pago cotizado (`cash`, `transfer`, `mercadopago`), como lo devuelve el back.
+  final String? paymentMethod;
+
+  /// Porcentaje con que el back calculó [paymentSurcharge]: lo define la
+  /// distribuidora por medio de pago. La app sólo lo muestra, nunca lo usa para
+  /// calcular.
+  final double? paymentSurchargePercentage;
   final double deposit;
   final double total;
   final double balance;
@@ -68,6 +78,8 @@ class OrderQuote {
       balance: _num(raw['balance']) ?? total,
       deliveryMode: DeliveryMode.fromWire(raw['deliveryMode']),
       expressSurcharge: _num(raw['expressSurcharge']) ?? 0,
+      paymentMethod: raw['paymentMethod']?.toString(),
+      paymentSurchargePercentage: _num(raw['paymentSurchargePercentage']),
     );
   }
 

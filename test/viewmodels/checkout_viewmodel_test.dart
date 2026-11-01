@@ -216,7 +216,9 @@ void main() {
       await model.confirmOrder();
 
       verifyNever(history.createOrder(any,
-          timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')));
+          timeSlotId: anyNamed('timeSlotId'),
+          fromCart: anyNamed('fromCart'),
+          expectedTotal: anyNamed('expectedTotal')));
       verify(locator<DialogService>().showDialog(
         title: 'Dirección no disponible',
         description: anyNamed('description'),
@@ -238,7 +240,8 @@ void main() {
           .thenReturn([_orderWithout(null).copyWith(id: 'viejo')]);
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => CreateOrderResult(
               success: true, order: _orderWithout(null).copyWith(id: 'nuevo')));
       final nav = locator<NavigationService>() as MockNavigationService;
@@ -270,7 +273,8 @@ void main() {
       final history = locator<HistoryService>() as MockHistoryService;
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => CreateOrderResult(
               success: true, order: _orderWithout(null).copyWith(id: 'nuevo')));
 
@@ -278,7 +282,9 @@ void main() {
       await model.confirmOrder();
 
       verify(history.createOrder(any,
-              timeSlotId: anyNamed('timeSlotId'), fromCart: true))
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: true,
+              expectedTotal: anyNamed('expectedTotal')))
           .called(1);
       verify(history.quoteOrder(any,
               timeSlotId: anyNamed('timeSlotId'), fromCart: true))
@@ -300,7 +306,8 @@ void main() {
       final history = locator<HistoryService>() as MockHistoryService;
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(
                 success: false,
                 message: 'El carrito está vacío',
@@ -328,7 +335,8 @@ void main() {
       final history = locator<HistoryService>() as MockHistoryService;
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(
                 success: false,
                 message: 'La dirección está fuera de la zona de cobertura',

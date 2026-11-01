@@ -6,8 +6,9 @@ import 'package:splg_customer/domain/order_receiver.dart';
 /// `Order`: el desglose del total (renglones, recargo de zona y por medio de
 /// pago) y el estado del cobro.
 ///
-/// El back no manda el recargo del medio de pago como campo: es lo que sobra
-/// del total una vez descontados los renglones y la zona.
+/// El recargo del medio de pago lo informa el back (`paymentSurchargeAmount` y
+/// su porcentaje); con un back que no lo manda, es lo que sobra del total una
+/// vez descontados los renglones y la zona.
 class OrderBreakdown {
   const OrderBreakdown({
     required this.total,
@@ -21,9 +22,19 @@ class OrderBreakdown {
     this.expressSurchargeAmount = 0,
     this.expressDegradedAt,
     this.receiver,
+    this.paymentSurchargeAmount,
+    this.paymentSurchargePercentage,
   });
 
   final double total;
+
+  /// Recargo por medio de pago que informa el back (`paymentSurchargeAmount`);
+  /// null si el back no lo trae y hay que deducirlo del total.
+  final double? paymentSurchargeAmount;
+
+  /// Porcentaje con que se calculó; null en pedidos anteriores a que fuera
+  /// configurable.
+  final double? paymentSurchargePercentage;
 
   /// Suma de los renglones con la promoción por volumen aplicada; null si el
   /// back no la informó.
@@ -64,6 +75,8 @@ class OrderBreakdown {
 
   /// Recargo por el medio de pago; 0 si no hay con qué calcularlo.
   double get paymentSurcharge {
+    final informed = paymentSurchargeAmount;
+    if (informed != null) return informed;
     final items = itemsSubtotal;
     if (items == null) return 0;
     final rest =
@@ -93,6 +106,8 @@ class OrderBreakdown {
           ? null
           : DateTime.tryParse(raw['expressDegradedAt'].toString()),
       receiver: OrderReceiver.fromJson(raw['receiver']),
+      paymentSurchargeAmount: _num(raw['paymentSurchargeAmount']),
+      paymentSurchargePercentage: _num(raw['paymentSurchargePercentage']),
     );
   }
 

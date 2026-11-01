@@ -15,6 +15,7 @@ class CreateOrderResult {
     this.retryable = true,
     this.idempotencyConflict = false,
     this.expressUnavailableReason,
+    this.priceChanged = false,
   });
 
   final bool success;
@@ -35,6 +36,11 @@ class CreateOrderResult {
   /// express dejó de estar disponible entre que se eligió y se creó el pedido.
   /// No se creó nada: el cliente puede elegir el reparto común.
   final String? expressUnavailableReason;
+
+  /// 409 `PRICE_CHANGED`: el total ya no es el que se cotizó (cambió una
+  /// promoción, el recargo, la zona…). No se creó nada: hay que volver a
+  /// cotizar y confirmar de nuevo.
+  final bool priceChanged;
 
   final Order? order;
   final String? paymentUrl;

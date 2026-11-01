@@ -58,6 +58,25 @@ String paymentLabel(PaymentMethod m) => switch (m) {
       PaymentMethod.mercadoPago => 'Mercado Pago',
     };
 
+/// Porcentaje para mostrar: "10", "7,5", "12,34" (hasta 2 decimales, coma).
+String percentLabel(double value) {
+  final text = value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+  return text.replaceFirst(RegExp(r'\.$'), '').replaceFirst('.', ',');
+}
+
+/// "Recargo por transferencia (10 %)": el medio sale de la cotización o del
+/// pedido (`transfer`, `mercadopago`, `cash`) y el porcentaje lo informa el back.
+String paymentSurchargeLabel(String? method, double? percentage) {
+  final medio = switch (method) {
+    'transfer' => ' por transferencia',
+    'mercadopago' => ' por Mercado Pago',
+    'cash' => ' por efectivo',
+    _ => ' por medio de pago',
+  };
+  final pct = percentage == null ? '' : ' (${percentLabel(percentage)} %)';
+  return 'Recargo$medio$pct';
+}
+
 /// "2x Garrafa 10kg" para un renglón del pedido.
 String itemLabel(OrderItem item) {
   final type = item.cylinder.type.trim();

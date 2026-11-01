@@ -62,9 +62,15 @@ class TransferCard extends StatelessWidget {
                   value: bank.alias!,
                   copied: model.copied == 'alias',
                   onCopy: () => model.copy('alias', bank.alias!)),
+            if (model.transferAmount != null)
+              _Line(
+                  key: const Key('transfer-amount'),
+                  title: 'Monto a transferir',
+                  value: money.format(model.transferAmount!)),
             const SizedBox(height: 4),
             Text(
-                'Transferí el total del pedido y subí el comprobante para que '
+                'Transferí exactamente ese monto (el total del pedido con el '
+                'recargo por transferencia) y subí el comprobante para que '
                 'la distribuidora confirme tu pago.',
                 style: type.caption),
           ],
@@ -156,6 +162,7 @@ class _StateChip extends StatelessWidget {
 
 class _Line extends StatelessWidget {
   const _Line({
+    super.key,
     required this.title,
     required this.value,
     this.onCopy,

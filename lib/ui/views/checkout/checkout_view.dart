@@ -106,7 +106,8 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                       if ((model.quote?.paymentSurcharge ?? 0) > 0)
                         surcharge(
                             const Key('checkout-payment-surcharge'),
-                            'Recargo por medio de pago',
+                            paymentSurchargeLabel(model.quote!.paymentMethod,
+                                model.quote!.paymentSurchargePercentage),
                             model.quote!.paymentSurcharge),
                       const SizedBox(height: 8),
                       divider(),

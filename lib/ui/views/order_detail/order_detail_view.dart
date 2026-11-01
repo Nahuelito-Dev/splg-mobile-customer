@@ -135,7 +135,19 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                                   model.breakdown!.expressSurchargeInTotal)),
                         if ((model.breakdown?.paymentSurcharge ?? 0) > 0)
                           AppInfoRow(
-                              title: 'Recargo por pago',
+                              title:
+                                  model.breakdown!.paymentSurchargePercentage ==
+                                          null
+                                      ? 'Recargo por pago'
+                                      : paymentSurchargeLabel(
+                                          switch (o.paymentMethod) {
+                                            PaymentMethod.cash => 'cash',
+                                            PaymentMethod.online => 'transfer',
+                                            PaymentMethod.mercadoPago =>
+                                              'mercadopago',
+                                          },
+                                          model.breakdown!
+                                              .paymentSurchargePercentage),
                               value: money
                                   .format(model.breakdown!.paymentSurcharge)),
                       ],

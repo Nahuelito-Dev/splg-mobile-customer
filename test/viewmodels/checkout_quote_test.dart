@@ -234,7 +234,8 @@ void main() {
       return model;
     }
 
-    test('si al releer la dirección sólo cambia el texto armado, el pedido se envía',
+    test(
+        'si al releer la dirección sólo cambia el texto armado, el pedido se envía',
         () async {
       // El perfil del login trae la dirección sin texto armado ni indicaciones;
       // la lista releída al confirmar sí los trae. No es otra dirección: no
@@ -249,14 +250,17 @@ void main() {
       });
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(success: false));
       final model = await listo();
 
       await model.confirmOrder();
 
       verify(history.createOrder(any,
-              timeSlotId: anyNamed('timeSlotId'), fromCart: true))
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: true,
+              expectedTotal: anyNamed('expectedTotal')))
           .called(1);
       model.dispose();
     });
@@ -267,7 +271,8 @@ void main() {
       when(customers.refreshAddresses()).thenAnswer((_) => gate.future);
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(success: false));
       final model = await listo();
 
@@ -278,10 +283,69 @@ void main() {
       await f;
 
       final sent = verify(history.createOrder(captureAny,
-              timeSlotId: captureAnyNamed('timeSlotId'), fromCart: true))
+              timeSlotId: captureAnyNamed('timeSlotId'),
+              fromCart: true,
+              expectedTotal: anyNamed('expectedTotal')))
           .captured;
       expect((sent[0] as Order).paymentMethod, PaymentMethod.cash);
       expect(sent[1], 's1');
+      model.dispose();
+    });
+
+    test('manda como expectedTotal el total de la cotización que se mostró',
+        () async {
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
+          .thenAnswer((_) async => const CreateOrderResult(success: false));
+      final model = await listo();
+      final mostrado = model.quote!.total;
+
+      await model.confirmOrder();
+
+      final sent = verify(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: captureAnyNamed('expectedTotal')))
+          .captured
+          .single as double;
+      expect(sent, mostrado);
+      expect(sent, 1850);
+      model.dispose();
+    });
+
+    test(
+        '409 «Cambió el precio»: no se crea nada, avisa y vuelve a cotizar para confirmar de nuevo',
+        () async {
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
+          .thenAnswer((_) async => const CreateOrderResult(
+              success: false,
+              priceChanged: true,
+              retryable: false,
+              message:
+                  'Cambió el precio: revisá el total y confirmá de nuevo'));
+      final model = await listo();
+      final cotizacionesAntes = asked.length;
+
+      await model.confirmOrder();
+      await wait(60);
+
+      final dialogs = locator<DialogService>() as MockDialogService;
+      verify(dialogs.showDialog(
+        title: 'Cambió el precio',
+        description: anyNamed('description'),
+        buttonTitle: anyNamed('buttonTitle'),
+      )).called(1);
+      // vuelve a cotizar y no sigue al pago ni al seguimiento
+      expect(asked.length, greaterThan(cotizacionesAntes));
+      verifyNever(locator<NavigationService>().clearTillFirstAndShow(
+        Routes.orderTrackingView,
+        arguments: anyNamed('arguments'),
+      ));
       model.dispose();
     });
 
@@ -291,7 +355,8 @@ void main() {
       when(customers.refreshAddresses()).thenAnswer((_) => gate.future);
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(success: false));
       final model = await listo();
       model.deliveryDetailsController.text = 'timbre';
@@ -303,7 +368,8 @@ void main() {
 
       final sent = verify(history.createOrder(captureAny,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .captured
           .single as Order;
       expect(sent.customerNotes, 'timbre');
@@ -329,7 +395,9 @@ void main() {
       await wait();
 
       verifyNever(history.createOrder(any,
-          timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')));
+          timeSlotId: anyNamed('timeSlotId'),
+          fromCart: anyNamed('fromCart'),
+          expectedTotal: anyNamed('expectedTotal')));
       expect(model.isBusy, isFalse);
       expect(
           verify(history.quoteOrder(any,
@@ -348,7 +416,9 @@ void main() {
       await model.confirmOrder();
 
       verifyNever(history.createOrder(any,
-          timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')));
+          timeSlotId: anyNamed('timeSlotId'),
+          fromCart: anyNamed('fromCart'),
+          expectedTotal: anyNamed('expectedTotal')));
       await wait();
       model.dispose();
     });
@@ -357,7 +427,8 @@ void main() {
         () async {
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => CreateOrderResult(
               success: true, order: order(id: 'n', total: 2000)));
       final model = await listo();
@@ -376,7 +447,8 @@ void main() {
     test('si el total real coincide no avisa', () async {
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => CreateOrderResult(
               success: true, order: order(id: 'n', total: 1850)));
       final model = await listo();
@@ -396,7 +468,8 @@ void main() {
         'pedidos', () async {
       when(history.createOrder(any,
               timeSlotId: anyNamed('timeSlotId'),
-              fromCart: anyNamed('fromCart')))
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
           .thenAnswer((_) async => const CreateOrderResult(
                 success: false,
                 message: kOrderMaybeCreatedText,

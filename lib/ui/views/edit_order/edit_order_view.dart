@@ -132,7 +132,7 @@ class EditOrderView extends StackedView<EditOrderViewModel> {
                                   type.caption.copyWith(color: Colors.white70)),
                         if ((model.quote?.paymentSurcharge ?? 0) > 0)
                           Text(
-                              'Recargo por medio de pago ${money.format(model.quote!.paymentSurcharge)}',
+                              '${paymentSurchargeLabel(model.quote!.paymentMethod, model.quote!.paymentSurchargePercentage)} ${money.format(model.quote!.paymentSurcharge)}',
                               key: const Key('edit-payment-surcharge'),
                               textAlign: TextAlign.right,
                               style:

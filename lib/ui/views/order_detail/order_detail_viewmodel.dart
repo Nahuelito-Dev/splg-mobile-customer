@@ -33,6 +33,8 @@ class OrderDetailViewModel extends LoadViewModel with TransferPayment {
   bool get transferCancelled => order?.status == OrderStatus.cancelled;
   @override
   String get transferPaymentStatus => breakdown?.paymentStatus ?? 'pending';
+  @override
+  double? get transferAmount => breakdown?.total ?? order?.total;
 
   final _history = locator<HistoryService>();
   final _nav = locator<NavigationService>();

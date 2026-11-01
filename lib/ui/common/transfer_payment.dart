@@ -21,6 +21,10 @@ mixin TransferPayment on BaseViewModel {
   /// `paymentStatus` del back (`pending`, `failed`, `paid`...).
   String get transferPaymentStatus;
 
+  /// Monto exacto que el cliente tiene que transferir: el total del pedido con
+  /// el recargo por transferencia ya incluido, tal como lo guardó el back.
+  double? get transferAmount;
+
   final _transfer = locator<TransferReceiptService>();
   final _dialogs = locator<DialogService>();
 

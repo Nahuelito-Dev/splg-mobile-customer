@@ -105,6 +105,21 @@ void main() {
     });
   });
 
+  group('monto exacto a transferir', () {
+    for (final total in [18000.0, 19800.0, 19350.0]) {
+      test('es el total del pedido que guardó el back: $total', () async {
+        when(history.fetchOrderDetail('o1')).thenAnswer((_) async =>
+            OrderDetail(
+                order(total: total)
+                    .copyWith(paymentMethod: PaymentMethod.online),
+                OrderBreakdown(total: total, paymentStatus: 'pending')));
+        final m = OrderDetailViewModel(orderId: 'o1');
+        await m.load();
+        expect(m.transferAmount, total);
+      });
+    }
+  });
+
   group('visibilidad', () {
     test('transferencia con pago pendiente: datos bancarios y subida',
         () async {

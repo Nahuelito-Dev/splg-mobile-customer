@@ -1,4 +1,5 @@
 import 'package:splg_lib/domain/gas_cylinder.dart';
+import 'package:splg_customer/domain/payment_term.dart';
 import 'package:splg_customer/domain/usecases/fetch_gascylinders_usecases.dart';
 import 'package:splg_customer/data/repository/gascylinder_repository_imp.dart';
 import 'package:splg_customer/data/datasource/gascylinder_remote_datasource.dart';
@@ -55,6 +56,18 @@ class GasCylinderService {
     final taken = Map<String, int>.of(_pendingSelection);
     _pendingSelection.clear();
     return taken;
+  }
+
+  /// Los medios de pago con el recargo que cobra hoy la distribuidora (lo
+  /// informa el back). Si no se puede leer, devuelve una lista vacía: la app no
+  /// menciona ningún recargo que no pueda confirmar.
+  Future<List<PaymentTerm>> paymentTerms() async {
+    try {
+      return PaymentTerm.listFromJson(
+          await _gasCylinderDatasource.getPaymentMethods());
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Catálogo de la distribuidora sin sesión.

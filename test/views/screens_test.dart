@@ -34,6 +34,8 @@ import 'package:splg_customer/ui/views/edit_order/edit_order_view.dart';
 import 'package:splg_customer/ui/views/edit_order/edit_order_viewmodel.dart';
 import 'package:splg_customer/ui/views/edit_profile/edit_profile_view.dart';
 import 'package:splg_customer/ui/views/help/help_view.dart';
+import 'package:splg_customer/ui/views/home/widgets/cylinder_detail_sheet.dart';
+import 'package:splg_customer/domain/payment_term.dart';
 import 'package:splg_customer/ui/views/home/home_view.dart';
 import 'package:splg_customer/ui/views/login/login_view.dart';
 import 'package:splg_customer/ui/views/notifications/notifications_view.dart';
@@ -577,18 +579,41 @@ void main() {
         'detalle: el total se explica con los renglones y los recargos de zona '
         'y de medio de pago', (t) async {
       when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
-          order(total: 17380),
+          order(total: 17380, paymentMethod: PaymentMethod.online),
           const OrderBreakdown(
               total: 17380,
               itemsSubtotal: 14900,
               zoneSurcharge: 900,
-              zoneName: 'Villa Cabello')));
+              zoneName: 'Villa Cabello',
+              paymentSurchargeAmount: 1580,
+              paymentSurchargePercentage: 10)));
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.text('Recargo por zona'), findsOneWidget);
       expect(find.text('\$900'), findsOneWidget);
-      expect(find.text('Recargo por pago'), findsOneWidget);
+      expect(find.text('Recargo por transferencia (10 %)'), findsOneWidget);
       expect(find.text('\$1.580'), findsOneWidget);
+    });
+
+    phoneTest('detalle por transferencia: muestra el monto exacto a transferir',
+        (t) async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order(total: 19350, paymentMethod: PaymentMethod.online),
+          const OrderBreakdown(
+              total: 19350,
+              itemsSubtotal: 18000,
+              paymentStatus: 'pending',
+              paymentSurchargeAmount: 1350,
+              paymentSurchargePercentage: 7.5)));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.text('Recargo por transferencia (7,5 %)'), findsOneWidget);
+      expect(find.byKey(const Key('transfer-amount')), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('transfer-amount')),
+              matching: find.text('\$19.350')),
+          findsOneWidget);
     });
 
     phoneTest('detalle sin recargos no muestra renglones de más', (t) async {
@@ -597,7 +622,7 @@ void main() {
       await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
       await settle(t);
       expect(find.text('Recargo por zona'), findsNothing);
-      expect(find.text('Recargo por pago'), findsNothing);
+      expect(find.textContaining('Recargo por'), findsNothing);
     });
 
     phoneTest('detalle de un pedido entregado: calificar, reclamar, repetir',
@@ -900,6 +925,58 @@ void main() {
   });
 
   group('Contenido', () {
+    phoneTest('ayuda: el recargo de cada medio sale de lo que informa el back',
+        (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.paymentTerms()).thenAnswer((_) async => [
+            const PaymentTerm(key: 'CASH', name: 'Efectivo', percentage: 0),
+            const PaymentTerm(
+                key: 'TRANSFER', name: 'Transferencia', percentage: 7.5),
+            const PaymentTerm(
+                key: 'MERCADOPAGO', name: 'Mercado Pago', percentage: 0),
+          ]);
+      await t.pumpWidget(app(const HelpView()));
+      await settle(t);
+      await t.tap(find.text('¿Qué formas de pago hay?'));
+      await settle(t);
+      expect(
+          find.text(
+              'Efectivo al recibir, transferencia (con un 7,5 % de recargo) y Mercado Pago.'),
+          findsOneWidget);
+      expect(find.textContaining('10 %'), findsNothing);
+    });
+
+    phoneTest(
+        'detalle de una garrafa: los recargos son los del back, o ninguno',
+        (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.paymentTerms()).thenAnswer((_) async => [
+            const PaymentTerm(key: 'CASH', name: 'Efectivo', percentage: 0),
+            const PaymentTerm(
+                key: 'TRANSFER', name: 'Transferencia', percentage: 7.5),
+            const PaymentTerm(
+                key: 'MERCADOPAGO', name: 'Mercado Pago', percentage: 12),
+          ]);
+      await t.pumpWidget(app(Scaffold(
+          body: CylinderDetailSheet(cylinder: cylinder(), onAdd: () {}))));
+      await settle(t);
+      expect(find.text('Recargo del 7,5 %'), findsOneWidget);
+      expect(find.text('Recargo del 12 %'), findsOneWidget);
+      expect(find.text('Pagás al recibir el pedido'), findsOneWidget);
+      expect(find.textContaining('10 %'), findsNothing);
+    });
+
+    phoneTest(
+        'detalle de una garrafa: sin respuesta del back no menciona recargos',
+        (t) async {
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.paymentTerms()).thenAnswer((_) async => const []);
+      await t.pumpWidget(app(Scaffold(
+          body: CylinderDetailSheet(cylinder: cylinder(), onAdd: () {}))));
+      await settle(t);
+      expect(find.textContaining('Recargo'), findsNothing);
+    });
+
     phoneTest('ayuda: busca y filtra', (t) async {
       await t.pumpWidget(app(const HelpView()));
       expect(find.text('¿Cómo hago un pedido?'), findsOneWidget);
@@ -1034,7 +1111,17 @@ void main() {
                   (i.positionalArguments.first as Order).paymentMethod ==
                           PaymentMethod.cash
                       ? 0
-                      : 180));
+                      : 180,
+              paymentMethod:
+                  (i.positionalArguments.first as Order).paymentMethod ==
+                          PaymentMethod.cash
+                      ? 'cash'
+                      : 'transfer',
+              paymentSurchargePercentage:
+                  (i.positionalArguments.first as Order).paymentMethod ==
+                          PaymentMethod.cash
+                      ? 0
+                      : 10));
       final slots = locator<TimeSlotService>() as MockTimeSlotService;
       when(slots.availabilityFor(any)).thenAnswer((_) async => const [
             TimeSlotAvailability(
@@ -1089,7 +1176,44 @@ void main() {
       expect(find.text('\$1.980'), findsWidgets);
       expect(
           find.byKey(const Key('checkout-payment-surcharge')), findsOneWidget);
+      expect(find.text('Recargo por transferencia (10 %)'), findsOneWidget);
     });
+
+    // El % y el monto salen de la cotización del back: la app no calcula nada.
+    for (final c in [
+      (0.0, 0.0, '\$1.800'),
+      (7.5, 135.0, '\$1.935'),
+      (10.0, 180.0, '\$1.980'),
+    ]) {
+      phoneTest(
+          'con recargo de transferencia en ${c.$1} %: lo que dice la cotización',
+          (t) async {
+        final history = locator<HistoryService>() as MockHistoryService;
+        when(history.quoteOrder(any,
+                timeSlotId: anyNamed('timeSlotId'),
+                fromCart: anyNamed('fromCart')))
+            .thenAnswer((_) async => backQuote(
+                paymentSurcharge: c.$2,
+                paymentMethod: 'transfer',
+                paymentSurchargePercentage: c.$1));
+        await t.pumpWidget(app(const CheckoutView()));
+        await settle(t);
+        await t.tap(find.byKey(const Key('checkout-payment')));
+        await settle(t);
+        await t.tap(find.byKey(const Key('pay-online')));
+        await settle(t);
+        expect(find.text(c.$3), findsWidgets);
+        if (c.$2 == 0) {
+          expect(find.byKey(const Key('checkout-payment-surcharge')),
+              findsNothing);
+        } else {
+          expect(
+              find.text(
+                  'Recargo por transferencia (${c.$1 == 7.5 ? '7,5' : '10'} %)'),
+              findsOneWidget);
+        }
+      });
+    }
   });
   group('Modificar pedido', () {
     setUp(() {

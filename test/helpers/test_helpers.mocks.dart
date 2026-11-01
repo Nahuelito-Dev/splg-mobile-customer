@@ -7,6 +7,7 @@ import 'dart:async' as _i20;
 import 'dart:typed_data' as _i50;
 import 'dart:ui' as _i21;
 
+import 'package:splg_customer/domain/payment_term.dart' as _ipt;
 import 'package:flutter/material.dart' as _i19;
 import 'package:geocoding/geocoding.dart' as _i35;
 import 'package:geolocator/geolocator.dart' as _i13;
@@ -946,6 +947,7 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
     bool? fromCart = false,
     _i23.DeliveryMode? deliveryMode = _i23.DeliveryMode.standard,
     _i24.OrderReceiver? receiver,
+    double? expectedTotal,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -956,6 +958,7 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
             #fromCart: fromCart,
             #deliveryMode: deliveryMode,
             #receiver: receiver,
+            #expectedTotal: expectedTotal,
           },
         ),
         returnValue:
@@ -969,6 +972,7 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #fromCart: fromCart,
               #deliveryMode: deliveryMode,
               #receiver: receiver,
+              #expectedTotal: expectedTotal,
             },
           ),
         )),
@@ -983,6 +987,7 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #fromCart: fromCart,
               #deliveryMode: deliveryMode,
               #receiver: receiver,
+              #expectedTotal: expectedTotal,
             },
           ),
         )),
@@ -1421,6 +1426,18 @@ class MockGasCylinderService extends _i1.Mock
         returnValue: false,
         returnValueForMissingStub: false,
       ) as bool);
+
+  @override
+  _i20.Future<List<_ipt.PaymentTerm>> paymentTerms() => (super.noSuchMethod(
+        Invocation.method(
+          #paymentTerms,
+          [],
+        ),
+        returnValue:
+            _i20.Future<List<_ipt.PaymentTerm>>.value(<_ipt.PaymentTerm>[]),
+        returnValueForMissingStub:
+            _i20.Future<List<_ipt.PaymentTerm>>.value(<_ipt.PaymentTerm>[]),
+      ) as _i20.Future<List<_ipt.PaymentTerm>>);
 
   @override
   String? photoUrl(String? id) => (super.noSuchMethod(

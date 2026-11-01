@@ -84,6 +84,7 @@ class HistoryService with ListenableServiceMixin {
     bool fromCart = false,
     DeliveryMode deliveryMode = DeliveryMode.standard,
     OrderReceiver? receiver,
+    double? expectedTotal,
   }) async {
     final session = _session;
     final token = await _customerService.token;
@@ -101,6 +102,9 @@ class HistoryService with ListenableServiceMixin {
         ..._toCreateOrderPayload(
             order, timeSlotId, notificationToken, fromCart, deliveryMode),
         if (receiver != null) 'receiver': receiver.toJson(),
+        // Lo cotizado es lo cobrado: si el total ya es otro, el back responde
+        // 409 y no crea nada.
+        if (expectedTotal != null) 'expectedTotal': expectedTotal,
       },
       token,
     );
@@ -113,6 +117,7 @@ class HistoryService with ListenableServiceMixin {
         retryable: result.retryable,
         idempotencyConflict: result.idempotencyConflict,
         expressUnavailableReason: result.expressUnavailableReason,
+        priceChanged: result.priceChanged,
       );
     }
 

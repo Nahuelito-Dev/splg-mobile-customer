@@ -239,6 +239,8 @@ class OrderTrackingViewModel extends BaseViewModel
   bool get transferCancelled => isCancelled;
   @override
   String get transferPaymentStatus => _paymentStatus;
+  @override
+  double? get transferAmount => _order?.total;
 
   /// Datos bancarios y comprobantes: se leen la primera vez y cada vez que el
   /// pago cambia de estado (p. ej. la distribuidora lo confirma).

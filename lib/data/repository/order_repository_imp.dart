@@ -44,6 +44,7 @@ class OrderRepositoryImp implements OrderRepository {
                   ? expressUnavailableText(expressReason)
                   : result.message,
           expressUnavailableReason: expressReason,
+          priceChanged: _priceChanged(result),
           // Se reintenta con la misma clave si la primera llamada pudo haber
           // llegado: sin respuesta, 5xx, 429, el 409 técnico "en curso" o el
           // 422 de clave ya usada. Un rechazo de negocio (400, 409 de stock)
@@ -121,6 +122,14 @@ class OrderRepositoryImp implements OrderRepository {
     // llama lo relee.
     return UpdateOrderResult(
         success: true, order: OrderApiMapper.parseOrder(result.data));
+  }
+
+  /// 409 `PRICE_CHANGED`: lo cotizado ya no es lo que cobraría el alta.
+  bool _priceChanged(ApiResult<dynamic> result) {
+    final body = result.body;
+    return result.status == 409 &&
+        body is Map &&
+        body['code'] == 'PRICE_CHANGED';
   }
 
   /// El `reason` de un 409 `EXPRESS_NOT_AVAILABLE`, o null si el error es otro.

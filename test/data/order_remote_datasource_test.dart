@@ -48,6 +48,32 @@ void main() {
       expect(result.retryable, isFalse);
     });
 
+    test('409 PRICE_CHANGED: lo cotizado ya no es lo cobrado, no se creó nada',
+        () async {
+      fakeHttp((_) => const FakeReply(409, {
+            'statusCode': 409,
+            'code': 'PRICE_CHANGED',
+            'message': 'Cambió el precio: revisá el total y confirmá de nuevo',
+            'total': 19350,
+          }));
+      final repo = OrderRepositoryImp(OrderRemoteDatasource());
+
+      final result = await repo.createOrder(pedido, 'tok', 'k');
+
+      expect(result.success, isFalse);
+      expect(result.priceChanged, isTrue);
+      expect(result.message,
+          'Cambió el precio: revisá el total y confirmá de nuevo');
+      expect(result.retryable, isFalse);
+    });
+
+    test('otro 409 no es un cambio de precio', () async {
+      fakeHttp((_) => const FakeReply(409, {'message': 'Sin stock'}));
+      final result = await OrderRepositoryImp(OrderRemoteDatasource())
+          .createOrder(pedido, 'tok', 'k');
+      expect(result.priceChanged, isFalse);
+    });
+
     test('sin conexión se dice como tal y se puede reintentar', () async {
       fakeHttp((_) => const FakeReply.networkError());
       final repo = OrderRepositoryImp(OrderRemoteDatasource());
