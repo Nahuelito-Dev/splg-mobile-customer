@@ -7,11 +7,13 @@ class CartLine {
     required this.quantity,
     required this.savedUnitPrice,
     required this.currentUnitPrice,
+    double? listUnitPrice,
+    this.discountPercentage = 0,
     required this.priceDifference,
     required this.subtotal,
     required this.available,
     required this.hasEnoughStock,
-  });
+  }) : listUnitPrice = listUnitPrice ?? currentUnitPrice;
 
   final String cartItemId;
   final String gasCylinderId;
@@ -21,10 +23,17 @@ class CartLine {
   /// Lo que vio el cliente al agregarlo.
   final double savedUnitPrice;
 
-  /// Lo que cuesta hoy en el catálogo: es lo que se cobra.
+  /// Lo que cuesta hoy cada unidad con la promoción por cantidad ya aplicada:
+  /// es lo que se cobra (el back lo calcula igual que la cotización).
   final double currentUnitPrice;
 
-  /// Vigente menos guardado.
+  /// Precio de lista de hoy, sin promoción.
+  final double listUnitPrice;
+
+  /// % de descuento por cantidad que alcanza el renglón (0 si no hay).
+  final double discountPercentage;
+
+  /// Precio de lista menos guardado.
   final double priceDifference;
   final double subtotal;
 
@@ -35,6 +44,10 @@ class CartLine {
   final bool hasEnoughStock;
 
   bool get priceChanged => priceDifference.abs() > 0.004;
+
+  /// El renglón tiene una promoción por cantidad aplicada.
+  bool get hasPromo =>
+      discountPercentage > 0 && listUnitPrice > currentUnitPrice;
 
   static CartLine? fromJson(dynamic json) {
     if (json is! Map) return null;
@@ -48,6 +61,9 @@ class CartLine {
       quantity: _int(json['quantity']),
       savedUnitPrice: _num(json['savedUnitPrice']),
       currentUnitPrice: _num(json['currentUnitPrice']),
+      listUnitPrice:
+          json['listUnitPrice'] == null ? null : _num(json['listUnitPrice']),
+      discountPercentage: _num(json['discountPercentage']),
       priceDifference: _num(json['priceDifference']),
       subtotal: _num(json['subtotal']),
       available: json['available'] != false,
@@ -72,6 +88,9 @@ class Cart {
   final String? cartId;
   final List<CartLine> items;
   final int totalUnits;
+
+  /// Suma de los subtotales con promoción; sin recargos de zona ni de pago
+  /// (esos los da la cotización).
   final double total;
   final bool hasPriceChanges;
   final bool hasUnavailableItems;

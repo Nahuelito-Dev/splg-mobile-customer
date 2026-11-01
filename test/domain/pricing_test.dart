@@ -26,6 +26,27 @@ void main() {
         closeTo(3200, 0.001));
   });
 
+  test('el precio unitario se redondea a centavos como el back', () {
+    final g = cylinder(price: 21350.5, discounts: [
+      Discount(quantity: 3, percentage: 7.5),
+    ]);
+    // 21350.5 x 0,925 = 19749,2125 -> 19749,21 por unidad
+    expect(Pricing.unitPrice(g, 3), 19749.21);
+    expect(Pricing.subtotal(OrderItem(cylinder: g, quantity: 3)), 59247.63);
+    expect(Pricing.unitPrice(g, 2), 21350.5);
+  });
+
+  test(
+      'un renglón de pedido ya trae el precio con promoción: no se descuenta dos veces',
+      () {
+    final item = OrderItem(
+        cylinder: cylinder(price: 14155, discounts: [
+          Discount(quantity: 2, percentage: 5),
+        ]),
+        quantity: 2);
+    expect(Pricing.charged(item), 28310);
+  });
+
   test('las promociones se muestran de menor a mayor', () {
     expect(Pricing.sortedDiscounts(c).map((d) => d.quantity), [2, 4, 6]);
     expect(Pricing.badge(Pricing.sortedDiscounts(c).first), '−10% x2');

@@ -122,7 +122,7 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                         for (final i in o.items)
                           AppInfoRow(
                               title: itemLabel(i),
-                              value: money.format(Pricing.subtotal(i))),
+                              value: money.format(Pricing.charged(i))),
                         if ((model.breakdown?.zoneSurcharge ?? 0) > 0)
                           AppInfoRow(
                               title: 'Recargo por zona',

@@ -100,6 +100,15 @@ class CartView extends StackedView<CartViewModel> {
                             key: const Key('cart-total'), style: type.amount),
                       ],
                     ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Con promociones. Los recargos de zona y de pago se '
+                        'suman al continuar.',
+                        key: const Key('cart-total-note'),
+                        style: type.caption,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     SplgButton(
                       key: const Key('cart-add-more'),
@@ -267,9 +276,32 @@ class _LineTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(money.format(line.subtotal), style: type.heading),
-                        Text('${money.format(line.currentUnitPrice)} c/u',
-                            style: type.caption),
+                        Text(money.format(line.subtotal),
+                            key: Key('cart-subtotal-${line.gasCylinderId}'),
+                            style: type.heading),
+                        Text.rich(
+                          TextSpan(children: [
+                            if (line.hasPromo)
+                              TextSpan(
+                                text: '${money.format(line.listUnitPrice)} ',
+                                style: const TextStyle(
+                                    decoration: TextDecoration.lineThrough),
+                              ),
+                            TextSpan(
+                                text: '${money.format(line.currentUnitPrice)} '
+                                    'c/u'),
+                            if (line.hasPromo)
+                              TextSpan(
+                                text:
+                                    '  −${_percent(line.discountPercentage)}%',
+                                style: TextStyle(
+                                    color: brasa.success,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                          ]),
+                          key: Key('cart-unit-${line.gasCylinderId}'),
+                          style: type.caption,
+                        ),
                       ],
                     ),
                   ),
@@ -283,3 +315,9 @@ class _LineTile extends StatelessWidget {
     );
   }
 }
+
+/// 5 → "5", 7.5 → "7,5".
+String _percent(double p) => (p == p.roundToDouble()
+        ? p.toStringAsFixed(0)
+        : p.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), ''))
+    .replaceAll('.', ',');

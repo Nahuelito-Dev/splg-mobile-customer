@@ -21,6 +21,10 @@ class FakeCartBackend {
   final Map<String, Map<String, Object>> _items = {};
   int _seq = 0;
 
+  /// Promociones por cantidad de cada tipo: (desde cuántas unidades, % de
+  /// descuento). Las carga el panel; acá se cambian entre llamadas.
+  final Map<String, List<({int quantity, double percent})>> promos = {};
+
   /// Tipos dados de baja después de agregarlos.
   final Set<String> inactive = {};
 
@@ -51,7 +55,19 @@ class FakeCartBackend {
       final saved = e.value['savedUnitPrice']! as double;
       final c = catalog[id]!;
       final available = !inactive.contains(id);
-      final subtotal = available ? c.price * qty : 0.0;
+      // Misma regla que el back: promo de mayor umbral alcanzado, precio
+      // unitario redondeado a centavos y subtotal = unitario x cantidad.
+      var percent = 0.0;
+      var from = 0;
+      for (final p
+          in promos[id] ?? const <({int quantity, double percent})>[]) {
+        if (qty >= p.quantity && p.quantity > from) {
+          from = p.quantity;
+          percent = p.percent;
+        }
+      }
+      final unit = (c.price * (100 - percent)).round() / 100;
+      final subtotal = available ? unit * qty : 0.0;
       total += subtotal;
       if (available) units += qty;
       if (c.price != saved) changes = true;
@@ -62,7 +78,10 @@ class FakeCartBackend {
         'type': c.type,
         'quantity': qty,
         'savedUnitPrice': saved,
-        'currentUnitPrice': c.price,
+        'currentUnitPrice': unit,
+        'listUnitPrice': c.price,
+        'discountPercentage': percent,
+        'promoUnitPrice': unit,
         'priceDifference': c.price - saved,
         'subtotal': subtotal,
         'available': available,

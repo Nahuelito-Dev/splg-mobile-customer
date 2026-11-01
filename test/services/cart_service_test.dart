@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/domain/cart.dart';
+import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_lib/network/api_error_text.dart';
@@ -124,6 +126,71 @@ void main() {
       expect(backend.log.last.path, 'cart');
       expect(cart.cart.isEmpty, isTrue);
       expect((await cart.clear()).ok, isTrue);
+    });
+
+    test('el carrito aplica las promociones por cantidad que cargó el panel',
+        () async {
+      backend.promos['g1'] = [
+        (quantity: 2, percent: 5),
+        (quantity: 4, percent: 12),
+      ];
+      backend.setPrice('g1', 14900);
+      await cart.add('g1', 1);
+      expect(cart.cart.lineFor('g1')!.hasPromo, isFalse);
+      expect(cart.cart.total, 14900);
+
+      await cart.add('g1', 1);
+      var line = cart.cart.lineFor('g1')!;
+      expect(line.quantity, 2);
+      expect(line.listUnitPrice, 14900);
+      expect(line.currentUnitPrice, 14155);
+      expect(line.discountPercentage, 5);
+      expect(line.hasPromo, isTrue);
+      expect(line.subtotal, 28310);
+      expect(cart.cart.total, 28310);
+
+      await cart.add('g1', 2);
+      line = cart.cart.lineFor('g1')!;
+      expect(line.currentUnitPrice, 13112);
+      expect(line.discountPercentage, 12);
+      expect(cart.cart.total, 52448);
+      // La promoción no es un cambio de precio de lista.
+      expect(line.priceChanged, isFalse);
+      expect(cart.cart.hasPriceChanges, isFalse);
+    });
+
+    test('si el panel cambia la promoción, el próximo refresh ya la usa',
+        () async {
+      backend.promos['g1'] = [(quantity: 2, percent: 5)];
+      await cart.add('g1', 2);
+      expect(cart.cart.total, 1900);
+      backend.promos['g1'] = [(quantity: 2, percent: 20)];
+      await cart.refresh();
+      expect(cart.cart.total, 1600);
+      backend.promos['g1'] = [];
+      await cart.refresh();
+      expect(cart.cart.total, 2000);
+      expect(cart.cart.lineFor('g1')!.hasPromo, isFalse);
+    });
+
+    test('el pedido armado desde el carrito lleva el precio con promoción',
+        () async {
+      backend.promos['g1'] = [(quantity: 2, percent: 10)];
+      await cart.add('g1', 3);
+      final item = cart.order!.items.single;
+      expect(item.cylinder.price, 900);
+      expect(Pricing.charged(item), cart.cart.total);
+    });
+
+    test('un back viejo sin listUnitPrice no rompe: lista = vigente', () {
+      final line = CartLine.fromJson({
+        'cartItemId': 'i',
+        'gasCylinderId': 'g',
+        'currentUnitPrice': 500,
+        'quantity': 2,
+      })!;
+      expect(line.listUnitPrice, 500);
+      expect(line.hasPromo, isFalse);
     });
 
     test('muestra el cambio de precio, el ítem dado de baja y el stock',

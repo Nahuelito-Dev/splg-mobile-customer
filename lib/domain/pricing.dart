@@ -21,11 +21,27 @@ class Pricing {
     return best;
   }
 
-  static double subtotal(OrderItem item) {
-    final base = item.cylinder.price * item.quantity;
-    final d = applied(item.cylinder, item.quantity);
-    return d == null ? base : base * (1 - d.percentage / 100);
+  /// Precio unitario con la promoción, redondeado a centavos como el back
+  /// (`OrderPricingService.priceItem`): el subtotal sale de este precio.
+  static double unitPrice(GasCylinder cylinder, int quantity) {
+    final d = applied(cylinder, quantity);
+    final cents = (cylinder.price * 100).round();
+    final unit =
+        d == null ? cents : (cents * (100 - d.percentage) / 100).round();
+    return unit / 100;
   }
+
+  /// Subtotal de un renglón sobre el PRECIO DE LISTA del producto. Para
+  /// mostrar lo que cobra el pedido usá [charged].
+  static double subtotal(OrderItem item) =>
+      (unitPrice(item.cylinder, item.quantity) * 100).round() *
+      item.quantity /
+      100;
+
+  /// Subtotal de un renglón de un pedido ya armado: su precio unitario es el
+  /// que guardó el back (promoción incluida), así que no se descuenta de nuevo.
+  static double charged(OrderItem item) =>
+      (item.cylinder.price * 100).round() * item.quantity / 100;
 
   /// "−12% x4" para las insignias del catálogo.
   static String badge(Discount d) =>

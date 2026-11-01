@@ -6,6 +6,7 @@ import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cancel_result.dart';
+import 'package:splg_customer/domain/cart.dart';
 import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/signed_url.dart';
@@ -25,6 +26,7 @@ import 'package:splg_customer/ui/views/address_form/address_form_view.dart';
 import 'package:splg_customer/ui/views/addresses/addresses_view.dart';
 import 'package:splg_customer/ui/views/cancel_order/cancel_order_view.dart';
 import 'package:splg_customer/ui/views/change_password/change_password_view.dart';
+import 'package:splg_customer/ui/views/cart/cart_view.dart';
 import 'package:splg_customer/ui/views/checkout/checkout_view.dart';
 import 'package:splg_customer/ui/views/claim_detail/claim_detail_view.dart';
 import 'package:splg_customer/ui/views/claims/claims_view.dart';
@@ -932,6 +934,75 @@ void main() {
       )));
       expect(find.text('Hoy'), findsOneWidget);
       expect(find.text('Ayer'), findsWidgets);
+    });
+  });
+
+  group('Mi carrito', () {
+    setUp(() {
+      locator.unregister<CartService>();
+      final cart = FakeCart();
+      cart.seed(
+          cart: const Cart(
+        cartId: 'c1',
+        items: [
+          CartLine(
+            cartItemId: 'ci-g1',
+            gasCylinderId: 'g1',
+            type: 'Garrafa 10kg',
+            quantity: 2,
+            savedUnitPrice: 14900,
+            currentUnitPrice: 14155,
+            listUnitPrice: 14900,
+            discountPercentage: 5,
+            priceDifference: 0,
+            subtotal: 28310,
+            available: true,
+            hasEnoughStock: true,
+          ),
+          CartLine(
+            cartItemId: 'ci-g2',
+            gasCylinderId: 'g2',
+            type: 'Garrafa 5kg',
+            quantity: 1,
+            savedUnitPrice: 8500,
+            currentUnitPrice: 8500,
+            priceDifference: 0,
+            subtotal: 8500,
+            available: true,
+            hasEnoughStock: true,
+          ),
+        ],
+        totalUnits: 3,
+        total: 36810,
+      ));
+      locator.registerSingleton<CartService>(cart);
+    });
+
+    phoneTest(
+        'muestra precio con promoción, lista tachada, % y el total del back',
+        (t) async {
+      // Con la fuente de prueba (Ahem) el importe grande no entra en 393 px.
+      t.view.physicalSize = const Size(600, 852);
+      await t.pumpWidget(app(const CartView()));
+      await settle(t);
+      expect(find.byKey(const Key('cart-total')), findsOneWidget);
+      expect(
+          t.widget<Text>(find.byKey(const Key('cart-total'))).data, '\$36.810');
+      expect(t.widget<Text>(find.byKey(const Key('cart-subtotal-g1'))).data,
+          '\$28.310');
+      final promo = t
+          .widget<Text>(find.byKey(const Key('cart-unit-g1')))
+          .textSpan!
+          .toPlainText();
+      expect(promo, contains('\$14.900'));
+      expect(promo, contains('\$14.155 c/u'));
+      expect(promo, contains('−5%'));
+      final sinPromo = t
+          .widget<Text>(find.byKey(const Key('cart-unit-g2')))
+          .textSpan!
+          .toPlainText();
+      expect(sinPromo.trim(), '\$8.500 c/u');
+      expect(find.byKey(const Key('cart-total-note')), findsOneWidget);
     });
   });
 
