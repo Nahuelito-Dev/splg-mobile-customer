@@ -13,9 +13,11 @@ import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import '../helpers/fake_mercado_pago_checkout_service.dart';
 import '../helpers/fixtures.dart';
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
@@ -258,6 +260,86 @@ void main() {
         id: anyNamed('id'),
         preventDuplicates: anyNamed('preventDuplicates'),
         parameters: anyNamed('parameters'),
+      )).called(1);
+    });
+
+    Future<MockDialogService> payWithMp(String? paymentUrl,
+        {required FakeMercadoPagoCheckoutService mp}) async {
+      final order = withItems(_addr('a', 'Calle 1', primary: true));
+      when(cart.order).thenReturn(order);
+      when(cart.address).thenReturn(order.address);
+      when(customers.isUserLoggedIn).thenReturn(true);
+      when(customers.customer)
+          .thenReturn(withAddresses([_addr('a', 'Calle 1', primary: true)]));
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.history).thenReturn([]);
+      when(history.createOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              expectedTotal: anyNamed('expectedTotal')))
+          .thenAnswer((_) async => CreateOrderResult(
+              success: true,
+              order: _orderWithout(null).copyWith(id: 'nuevo', total: 1000),
+              paymentUrl: paymentUrl));
+      final model = await _ready(history);
+      model.setPaymentMethod(PaymentMethod.mercadoPago);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await model.confirmOrder();
+      return locator<DialogService>() as MockDialogService;
+    }
+
+    test(
+        'con Mercado Pago abre el payment_url en el navegador y sigue al '
+        'seguimiento sin avisos', () async {
+      final mp = locator<MercadoPagoCheckoutService>()
+          as FakeMercadoPagoCheckoutService;
+      final dialogs = await payWithMp('https://mp/pay', mp: mp);
+      final nav = locator<NavigationService>() as MockNavigationService;
+
+      expect(mp.opened, ['https://mp/pay']);
+      verifyNever(dialogs.showDialog(
+          title: anyNamed('title'),
+          description: anyNamed('description'),
+          buttonTitle: anyNamed('buttonTitle')));
+      verify(nav.clearTillFirstAndShow<dynamic>(
+        Routes.orderTrackingView,
+        arguments: anyNamed('arguments'),
+        id: anyNamed('id'),
+        preventDuplicates: anyNamed('preventDuplicates'),
+        parameters: anyNamed('parameters'),
+      )).called(1);
+    });
+
+    test('si no se puede abrir el pago avisa y el pedido sigue creado',
+        () async {
+      final mp = locator<MercadoPagoCheckoutService>()
+          as FakeMercadoPagoCheckoutService
+        ..canOpen = false;
+      final dialogs = await payWithMp('https://mp/pay', mp: mp);
+
+      // Con enlace, el seguimiento ofrece «Pagar con Mercado Pago»: la promesa es cierta.
+      verify(dialogs.showDialog(
+        title: 'No se pudo iniciar el pago',
+        description:
+            argThat(contains('desde el seguimiento'), named: 'description'),
+        buttonTitle: 'Aceptar',
+      )).called(1);
+    });
+
+    test('sin payment_url no abre nada y avisa', () async {
+      final mp = locator<MercadoPagoCheckoutService>()
+          as FakeMercadoPagoCheckoutService;
+      final dialogs = await payWithMp(null, mp: mp);
+
+      expect(mp.opened, isEmpty);
+      // Sin enlace no hay con qué reintentar: no se promete un reintento.
+      verify(dialogs.showDialog(
+        title: 'No se pudo iniciar el pago',
+        description: argThat(
+            allOf(contains('no nos dio el enlace'),
+                isNot(contains('desde el seguimiento'))),
+            named: 'description'),
+        buttonTitle: 'Aceptar',
       )).called(1);
     });
 

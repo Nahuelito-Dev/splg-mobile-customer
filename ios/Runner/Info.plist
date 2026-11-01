@@ -38,6 +38,21 @@
 	<string>SPLG usa tu ubicación, sólo mientras la app está abierta, para ubicar en el mapa la dirección de entrega de tu pedido.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>SPLG usa la cámara para escanear el código QR de entrega y para sacar fotos al reportar un problema con tu pedido.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.nahuelwagner.splg.customer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>splg</string>
+			</array>
+		</dict>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

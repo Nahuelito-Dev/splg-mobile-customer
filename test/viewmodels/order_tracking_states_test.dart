@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mockito/mockito.dart';
 import 'package:splg_customer/app/app.locator.dart';
+import 'package:splg_customer/domain/payment_outcome.dart';
 import 'package:splg_customer/services/customer_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
+import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
 import 'package:splg_customer/services/tracking_routes.dart';
@@ -12,6 +15,7 @@ import 'package:splg_customer/ui/views/order_tracking/order_tracking_viewmodel.d
 import 'package:splg_lib/maps/route_service.dart';
 import 'package:splg_lib/maps/route_tracker.dart';
 
+import '../helpers/fake_mercado_pago_checkout_service.dart';
 import '../helpers/fixtures.dart';
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
@@ -355,6 +359,152 @@ void main() {
 
       expect(model.polylines, isEmpty);
       model.dispose();
+    });
+  });
+
+  group('vuelta de Mercado Pago', () {
+    late FakeMercadoPagoCheckoutService mp;
+    late MockDialogService dialogs;
+
+    setUp(() {
+      mp = locator<MercadoPagoCheckoutService>()
+          as FakeMercadoPagoCheckoutService;
+      dialogs = locator<DialogService>() as MockDialogService;
+    });
+
+    void verifyShown(String title, {int times = 1}) =>
+        verify(dialogs.showDialog(
+          title: title,
+          description: anyNamed('description'),
+          buttonTitle: 'Aceptar',
+        )).called(times);
+
+    void verifyNothingShown() => verifyNever(dialogs.showDialog(
+        title: anyNamed('title'),
+        description: anyNamed('description'),
+        buttonTitle: anyNamed('buttonTitle')));
+
+    test(
+        'al volver con éxito relee el pedido y, si el back lo da por pagado, avisa',
+        () async {
+      final model = await abrir();
+      clearInteractions(tracking);
+      server = {'status': 'pending', 'paymentStatus': 'paid'};
+      when(tracking.fetchOrderById('o1', 'tok'))
+          .thenAnswer((_) async => server);
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.success, orderId: 'o1'));
+      await pump();
+      await pump();
+
+      verify(tracking.fetchOrderById('o1', 'tok')).called(greaterThan(0));
+      verifyShown('Pago realizado');
+      model.dispose();
+    });
+
+    test(
+        'éxito sin external_reference y el back sin pago: no dice «Pago realizado»',
+        () async {
+      final model = await abrir();
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.success));
+      await pump();
+      await pump();
+
+      verifyShown('Estamos confirmando tu pago');
+      verifyNever(dialogs.showDialog(
+          title: 'Pago realizado',
+          description: anyNamed('description'),
+          buttonTitle: anyNamed('buttonTitle')));
+      model.dispose();
+    });
+
+    test(
+        'éxito sin external_reference pero el back lo da por pagado: lo dice el back',
+        () async {
+      final model = await abrir();
+      server = {'status': 'pending', 'paymentStatus': 'paid'};
+      when(tracking.fetchOrderById('o1', 'tok'))
+          .thenAnswer((_) async => server);
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.success));
+      await pump();
+      await pump();
+
+      verifyShown('Pago realizado');
+      model.dispose();
+    });
+
+    test(
+        'un link de otro pedido no muestra ningún aviso en éste (ni «Pago realizado» ni «Estamos confirmando»), aunque éste figure pagado',
+        () async {
+      final model = await abrir();
+      server = {'status': 'pending', 'paymentStatus': 'paid'};
+      when(tracking.fetchOrderById('o1', 'tok'))
+          .thenAnswer((_) async => server);
+      clearInteractions(tracking);
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.success, orderId: 'o2'));
+      await pump();
+      await pump();
+
+      // Se relee este pedido, pero el aviso era de aquel otro.
+      verify(tracking.fetchOrderById('o1', 'tok')).called(greaterThan(0));
+      verifyNothingShown();
+      model.dispose();
+    });
+
+    test('pendiente y error tienen su propio aviso', () async {
+      final model = await abrir();
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.pending));
+      await pump();
+      await pump();
+      mp.comeBack(const PaymentReturn(PaymentOutcome.failure));
+      await pump();
+      await pump();
+
+      verifyShown('Pago pendiente');
+      verifyShown('El pago no se completó');
+      model.dispose();
+    });
+
+    test(
+        'arranque en frío: la vuelta pendiente se muestra al abrir el seguimiento',
+        () async {
+      mp.pending = const PaymentReturn(PaymentOutcome.pending, orderId: 'o1');
+
+      final model = await abrir();
+      await pump();
+      await pump();
+
+      verifyShown('Pago pendiente');
+      expect(mp.pending, isNull);
+      model.dispose();
+    });
+
+    test('la vuelta pendiente de otro pedido queda para ese pedido', () async {
+      mp.pending = const PaymentReturn(PaymentOutcome.success, orderId: 'o2');
+
+      final model = await abrir();
+      await pump();
+
+      verifyNothingShown();
+      expect(mp.pending, isNotNull);
+      model.dispose();
+    });
+
+    test('cerrado el seguimiento ya no escucha', () async {
+      final model = await abrir();
+      model.dispose();
+
+      mp.comeBack(const PaymentReturn(PaymentOutcome.success));
+      await pump();
+
+      verifyNever(dialogs.showDialog(
+          title: anyNamed('title'),
+          description: anyNamed('description'),
+          buttonTitle: anyNamed('buttonTitle')));
     });
   });
 }

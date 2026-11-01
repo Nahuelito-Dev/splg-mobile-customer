@@ -19,6 +19,10 @@ import 'package:splg_customer/domain/cylinder_recovery.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cylinder_recovery_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
+import 'package:splg_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/domain/payment_state.dart';
+import 'package:splg_customer/ui/views/order_tracking/payment_state_reader.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
 import 'package:splg_customer/services/tracking_routes.dart';
 import 'package:splg_lib/domain/order.dart';
@@ -51,13 +55,16 @@ class OrderTrackingViewModel extends BaseViewModel
     this.pollInterval = trackingPollInterval,
     RouteTrackerFactory? routeTracker,
     Future<BitmapDescriptor?> Function()? iconLoader,
+    PaymentStateLoader? paymentStateLoader,
   })  : _customTracker = routeTracker,
-        _iconLoader = iconLoader;
+        _iconLoader = iconLoader,
+        _paymentStateLoader = paymentStateLoader ?? loadPaymentState;
 
   final String orderId;
   final Duration pollInterval;
   final RouteTrackerFactory? _customTracker;
   final Future<BitmapDescriptor?> Function()? _iconLoader;
+  final PaymentStateLoader _paymentStateLoader;
 
   /// Cuánto antes de `expiresAt` se renueva la foto firmada del chofer.
   static const photoRenewMargin = Duration(seconds: 30);
@@ -68,6 +75,8 @@ class OrderTrackingViewModel extends BaseViewModel
 
   final _trackingService = locator<OrderTrackingService>();
   final _customerService = locator<CustomerService>();
+  final _mercadoPago = locator<MercadoPagoCheckoutService>();
+  StreamSubscription<PaymentReturn>? _paymentReturnSubscription;
   final _historyService = locator<HistoryService>();
   final _dialogService = locator<DialogService>();
   final _bottomSheetService = locator<BottomSheetService>();
@@ -228,6 +237,9 @@ class OrderTrackingViewModel extends BaseViewModel
   bool _expressDegraded = false;
   double _expressSurcharge = 0;
   bool _paidOnline = false;
+  bool _paysWithMercadoPago = false;
+  bool _depositPaid = false;
+  PaymentState? _paymentState;
   String _paymentStatus = 'pending';
   String? _loadedPaymentStatus;
 
@@ -251,6 +263,56 @@ class OrderTrackingViewModel extends BaseViewModel
     if (!_closed) notifyListeners();
   }
 
+  /// El estado del pago de Mercado Pago que informa el back (texto, motivo, si
+  /// se puede reintentar). Null mientras no se sepa o si el pedido no es de
+  /// Mercado Pago, ya está pago o cerrado.
+  PaymentState? get mercadoPagoState => _paysWithMercadoPago &&
+          _paymentStatus != 'paid' &&
+          !_depositPaid &&
+          !isFinished
+      ? _paymentState
+      : null;
+
+  /// El texto del estado del pago, tal cual lo arma el back.
+  String? get mercadoPagoLabel {
+    final state = mercadoPagoState;
+    return state != null && state.hasPayment ? state.label : null;
+  }
+
+  /// El back permite pagar (o reintentar) con el enlace de Mercado Pago.
+  bool get canPayWithMercadoPago => mercadoPagoState?.canPay ?? false;
+
+  /// «Reintentar pago» tras un rechazo; «Pagar con Mercado Pago» si todavía no
+  /// se intentó o no se completó.
+  String get payButtonTitle => (mercadoPagoState?.wasRejected ?? false)
+      ? 'Reintentar pago'
+      : 'Pagar con Mercado Pago';
+
+  /// Abre otra vez el checkout de Mercado Pago con el enlace que da el back.
+  /// El resultado llega por el mismo camino de siempre (deep link + sondeo).
+  Future<void> payWithMercadoPago() async {
+    final url = mercadoPagoState?.paymentUrl;
+    if (!canPayWithMercadoPago || url == null) return;
+    final opened = await _mercadoPago.open(url);
+    if (opened || _closed) return;
+    await _dialogService.showDialog(
+      title: 'No se pudo abrir el pago',
+      description: 'No pudimos abrir Mercado Pago. Probá de nuevo en un rato.',
+      buttonTitle: 'Aceptar',
+    );
+  }
+
+  /// Lee del back el estado del pago mientras el pedido es de Mercado Pago y
+  /// no está pago. Una falla no borra lo último que se supo.
+  Future<void> _refreshPaymentState(String token) async {
+    if (!_paysWithMercadoPago || _paymentStatus == 'paid' || _depositPaid) {
+      return;
+    }
+    final state = await _paymentStateLoader(orderId, token);
+    if (state == null || _closed) return;
+    _paymentState = state;
+  }
+
   void _readExpress(Map<String, dynamic> raw) {
     _isExpress = raw['deliveryMode'] == 'express';
     _expressDegraded = !_isExpress && raw['expressDegradedAt'] != null;
@@ -258,6 +320,8 @@ class OrderTrackingViewModel extends BaseViewModel
     _paidOnline = raw['paymentStatus'] == 'paid' &&
         raw['paymentMethod'] != null &&
         raw['paymentMethod'] != 'cash';
+    _paysWithMercadoPago = raw['paymentMethodDetail'] == 'mercadopago';
+    _depositPaid = raw['depositPaid'] == true;
     final amount = raw['expressSurchargeAmount'];
     _expressSurcharge = amount is num
         ? amount.toDouble()
@@ -445,6 +509,8 @@ class OrderTrackingViewModel extends BaseViewModel
     _sessionCustomerId = _customerService.customer.customerId;
     _customerService.addListener(_onSessionChanged);
     WidgetsBinding.instance.addObserver(this);
+    _paymentReturnSubscription =
+        _mercadoPago.returns.listen((r) => unawaited(_onPaymentReturn(r)));
     await _loadTrackingData();
     if (_closed) return;
     if (_gone) {
@@ -461,6 +527,83 @@ class OrderTrackingViewModel extends BaseViewModel
     _syncRadarState();
     _startPolling();
     setBusy(false);
+    // La app se abrió desde la vuelta de Mercado Pago (arranque en frío).
+    final pending = _mercadoPago.takePending(orderId: orderId);
+    if (pending != null) unawaited(_onPaymentReturn(pending));
+  }
+
+  /// El cliente volvió de Mercado Pago por deep link: se relee el pedido y el
+  /// aviso sale de lo que diga el back, no del link. El que confirma el pago es
+  /// el webhook; el link (`splg://pago/exito`) lo puede abrir cualquiera y MP
+  /// no siempre trae el `external_reference`, así que «Pago realizado» sólo se
+  /// muestra si el pedido figura pagado. Un link sin pedido se mira contra éste;
+  /// uno que nombra otro pedido no muestra ningún aviso en éste.
+  Future<void> _onPaymentReturn(PaymentReturn back) async {
+    if (_closed) return;
+    await poll();
+    if (_closed) return;
+    // El link nombra OTRO pedido: acá se relee (por si es el mismo cliente) pero no
+    // se avisa nada, ni «Pago realizado» ni «Estamos confirmando»: ese aviso es de
+    // aquel pedido y mostrarlo sobre éste confundiría.
+    if (back.orderId != null && back.orderId != orderId) return;
+    final (title, description) = _paymentNotice(back.outcome);
+    await _dialogService.showDialog(
+      title: title,
+      description: description,
+      buttonTitle: 'Aceptar',
+    );
+  }
+
+  /// Qué dice el aviso de un pago que no se completó: el motivo, tal cual lo
+  /// informa el back, y si se puede reintentar desde esta pantalla.
+  String _failureDescription() {
+    final reason = mercadoPagoLabel;
+    final retry = canPayWithMercadoPago
+        ? 'Podés reintentar el pago desde esta pantalla.'
+        : 'Tu pedido sigue creado, pero el pago no se confirmó.';
+    return reason == null ? retry : '$reason. $retry';
+  }
+
+  /// El aviso al volver de Mercado Pago. Lo decide el back: el pedido (pago o
+  /// seña pagos, cancelado) y el estado del pago que informa. El deep link
+  /// (`splg://pago/exito|pendiente|error`) lo puede abrir cualquiera y sólo se usa
+  /// de último recurso, cuando el back todavía no dice nada del pago.
+  (String, String) _paymentNotice(PaymentOutcome linkOutcome) {
+    if (_paymentStatus == 'paid' || _depositPaid) {
+      return (
+        'Pago realizado',
+        'Recibimos tu pago. Tu pedido ya está confirmado.',
+      );
+    }
+    if (isCancelled) {
+      return (
+        'El pedido está cancelado',
+        'El pedido se canceló antes de acreditarse el pago. Si Mercado Pago '
+            'te cobró, el importe se te devuelve.',
+      );
+    }
+    final fromBack = switch (mercadoPagoState?.status) {
+      'rejected' || 'cancelled' => PaymentOutcome.failure,
+      'in_process' || 'authorized' => PaymentOutcome.pending,
+      'pending' => PaymentOutcome.success,
+      _ => null,
+    };
+    return switch (fromBack ?? linkOutcome) {
+      PaymentOutcome.failure => (
+          'El pago no se completó',
+          _failureDescription(),
+        ),
+      PaymentOutcome.pending => (
+          'Pago pendiente',
+          'Tu pago quedó pendiente de confirmación de Mercado Pago. '
+              'Te avisamos cuando se acredite.',
+        ),
+      PaymentOutcome.success => (
+          'Estamos confirmando tu pago',
+          'Mercado Pago nos avisó que volviste, pero todavía no vemos el pago '
+              'acreditado. Tu pedido se actualiza solo ni bien se confirme.',
+        ),
+    };
   }
 
   /// Vuelve a pedir el pedido cuando la primera carga falló, y retoma lo que
@@ -655,6 +798,8 @@ class OrderTrackingViewModel extends BaseViewModel
     _loadError = null;
     _loaded = true;
     _applyOrder(raw, fresh: version == _eventVersion);
+    await _refreshPaymentState(token);
+    if (_closed) return false;
     _updateEta();
     return true;
   }
@@ -1299,6 +1444,7 @@ class OrderTrackingViewModel extends BaseViewModel
     _arrivedSubscription?.cancel();
     _expressDegradedSubscription?.cancel();
     _orderChangedSubscription?.cancel();
+    _paymentReturnSubscription?.cancel();
     _trackingService.disconnect();
     super.dispose();
   }

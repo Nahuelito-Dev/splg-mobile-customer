@@ -49,8 +49,10 @@ dependencies:
   uuid: ^4.5.3
   # render de Términos y Condiciones / Política de Privacidad en markdown
   flutter_markdown_plus: ^1.0.12
-  # WebView embebido para el pago de MercadoPago (Checkout Pro) sin salir de la app
-  webview_flutter: ^4.14.1
+  # Checkout Pro de MercadoPago en Custom Tabs (Android) / SFSafariViewController (iOS)
+  flutter_custom_tabs: ^2.4.0
+  # vuelta del pago a la app por deep link (splg://pago/...)
+  app_links: ^6.3.3
   # notificaciones push (registro de token + mensajes en foreground/background)
   firebase_messaging: ^16.4.3
   # notificaciones locales (aviso in-app cuando llega un push con la app abierta)

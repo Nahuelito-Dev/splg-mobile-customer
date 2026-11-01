@@ -9,12 +9,14 @@ import 'package:splg_customer/services/customer_events_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/history_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/services/repurchase_service.dart';
 import 'package:splg_customer/ui/views/home/home_viewmodel.dart';
 import 'package:splg_lib/domain/order.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 import '../helpers/fake_m3_m5_services.dart';
+import '../helpers/fake_mercado_pago_checkout_service.dart';
 import '../helpers/fixtures.dart';
 import '../helpers/m3_m5_fixtures.dart';
 import '../helpers/test_helpers.dart';
@@ -26,6 +28,7 @@ void main() {
   late FakeCustomerEventsService events;
   late MockNavigationService nav;
   late MockDialogService dialogs;
+  late FakeMercadoPagoCheckoutService mercadoPago;
 
   setUp(() {
     registerServices();
@@ -35,6 +38,8 @@ void main() {
     events = locator<CustomerEventsService>() as FakeCustomerEventsService;
     nav = locator<NavigationService>() as MockNavigationService;
     dialogs = locator<DialogService>() as MockDialogService;
+    mercadoPago =
+        locator<MercadoPagoCheckoutService>() as FakeMercadoPagoCheckoutService;
     final customers = locator<CustomerService>() as MockCustomerService;
     when(customers.customer).thenReturn(customerWith());
     when(customers.isUserLoggedIn).thenReturn(true);
@@ -147,10 +152,8 @@ void main() {
           RepurchaseAccepted(orderId: 'o77', paymentUrl: 'https://mp/pay'));
       final m = await opened(open: [invitation()]);
       await m.acceptInvitation();
-      verifyInOrder([
-        nav.navigateToPaymentWebViewView(paymentUrl: 'https://mp/pay'),
-        nav.navigateToOrderTrackingView(orderId: 'o77'),
-      ]);
+      expect(mercadoPago.opened, ['https://mp/pay']);
+      verify(nav.navigateToOrderTrackingView(orderId: 'o77')).called(1);
       m.dispose();
     });
 

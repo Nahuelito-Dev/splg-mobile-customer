@@ -22,7 +22,7 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
 import 'package:splg_customer/domain/time_slot_availability.dart';
-import 'package:splg_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
 
 class CheckoutViewModel extends ReactiveViewModel {
@@ -34,6 +34,7 @@ class CheckoutViewModel extends ReactiveViewModel {
   final _dialogService = locator<DialogService>();
   final _timeSlotService = locator<TimeSlotService>();
   final _notificationService = locator<NotificationService>();
+  final _mercadoPago = locator<MercadoPagoCheckoutService>();
 
   Order? get order => _cartService.order;
 
@@ -622,64 +623,29 @@ class CheckoutViewModel extends ReactiveViewModel {
     setBusy(false);
   }
 
-  /// Abre el checkout de MercadoPago (Checkout Pro) en un WebView embebido:
-  /// el pago no sale de la app. El pedido ya fue creado en este punto; el
-  /// backend lo despachará cuando MercadoPago confirme el pago vía webhook
-  /// (esta pantalla no inventa una confirmación local, solo interpreta a qué
-  /// back_url redirigió MP). Si no llegó `paymentUrl`, avisamos con un dialog
-  /// pero igual dejamos avanzar al tracking, ya que el pedido quedó creado.
+  /// Abre el checkout de MercadoPago (Checkout Pro) en el navegador del
+  /// sistema (Custom Tabs / SFSafariViewController). El pedido ya fue creado en
+  /// este punto; el backend lo despachará cuando MercadoPago confirme el pago
+  /// vía webhook. La vuelta de MP llega por deep link al seguimiento del pedido
+  /// (donde se abre a continuación), que muestra el resultado y relee el
+  /// pedido. Si no llegó `paymentUrl` o no se pudo abrir, avisamos con un
+  /// dialog pero igual dejamos avanzar al tracking, ya que el pedido quedó
+  /// creado.
   Future<void> _openMercadoPagoCheckout(String? paymentUrl) async {
-    if (paymentUrl == null || paymentUrl.isEmpty) {
-      await _dialogService.showDialog(
-        title: 'No se pudo iniciar el pago',
-        description:
-            'El pedido se creó, pero no pudimos obtener el link de pago de Mercado Pago. '
-            'Podés reintentar el pago desde el seguimiento del pedido.',
-        buttonTitle: 'Aceptar',
-      );
-      return;
-    }
-
-    final outcome = await _navigationService.navigateToPaymentWebViewView(
-      paymentUrl: paymentUrl,
+    final hasUrl = paymentUrl != null && paymentUrl.isNotEmpty;
+    final opened = hasUrl && await _mercadoPago.open(paymentUrl);
+    if (opened) return;
+    await _dialogService.showDialog(
+      title: 'No se pudo iniciar el pago',
+      description: hasUrl
+          // Con el enlace, el seguimiento ofrece «Pagar con Mercado Pago» (lo lee del back).
+          ? 'El pedido se creó, pero no pudimos abrir el pago de Mercado Pago. '
+              'Podés pagarlo desde el seguimiento del pedido.'
+          // Sin enlace no hay con qué reintentar: el pedido vence si no se paga.
+          : 'El pedido se creó, pero Mercado Pago no nos dio el enlace de pago. '
+              'Si no se puede pagar a tiempo, el pedido se cancela solo.',
+      buttonTitle: 'Aceptar',
     );
-
-    await _showPaymentOutcomeDialog(
-      outcome is PaymentOutcome ? outcome : null,
-    );
-  }
-
-  Future<void> _showPaymentOutcomeDialog(PaymentOutcome? outcome) async {
-    switch (outcome) {
-      case PaymentOutcome.success:
-        await _dialogService.showDialog(
-          title: 'Pago realizado',
-          description:
-              'Recibimos tu pago. Tu pedido se confirma automáticamente ni bien '
-              'Mercado Pago nos avisa; podés seguir el estado desde el seguimiento.',
-          buttonTitle: 'Aceptar',
-        );
-        break;
-      case PaymentOutcome.pending:
-        await _dialogService.showDialog(
-          title: 'Pago pendiente',
-          description:
-              'Tu pago quedó pendiente de confirmación de Mercado Pago. '
-              'Te avisamos cuando se acredite.',
-          buttonTitle: 'Aceptar',
-        );
-        break;
-      case PaymentOutcome.failure:
-      case PaymentOutcome.cancelled:
-      case null:
-        await _dialogService.showDialog(
-          title: 'El pago no se completó',
-          description: 'El pedido se creó, pero el pago no se confirmó. '
-              'Podés reintentar el pago desde el seguimiento del pedido.',
-          buttonTitle: 'Aceptar',
-        );
-        break;
-    }
   }
 
   @override

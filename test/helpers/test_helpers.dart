@@ -8,6 +8,8 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/services/transfer_receipt_service.dart';
 import 'fake_transfer_receipt_service.dart';
+import 'fake_mercado_pago_checkout_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'fake_m3_m5_services.dart';
 import 'package:splg_customer/services/repurchase_service.dart';
 import 'package:splg_customer/services/cylinder_recovery_service.dart';
@@ -120,6 +122,7 @@ void registerServices() {
   getAndRegisterProfilePhotoService();
   getAndRegisterOrderDocumentService();
   getAndRegisterTransferReceiptService();
+  getAndRegisterMercadoPagoCheckoutService();
   getAndRegisterRepurchaseService();
   getAndRegisterCylinderRecoveryService();
   getAndRegisterCustomerEventsService();
@@ -151,6 +154,13 @@ FakeCustomerEventsService getAndRegisterCustomerEventsService() {
   _removeRegistrationIfExists<CustomerEventsService>();
   final service = FakeCustomerEventsService();
   locator.registerSingleton<CustomerEventsService>(service);
+  return service;
+}
+
+FakeMercadoPagoCheckoutService getAndRegisterMercadoPagoCheckoutService() {
+  _removeRegistrationIfExists<MercadoPagoCheckoutService>();
+  final service = FakeMercadoPagoCheckoutService();
+  locator.registerSingleton<MercadoPagoCheckoutService>(service);
   return service;
 }
 

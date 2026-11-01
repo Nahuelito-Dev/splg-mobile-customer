@@ -39,20 +39,10 @@ class AppConfig {
     defaultValue: 'demo',
   );
 
-  /// Back URLs de Checkout Pro de MercadoPago (deben coincidir con
-  /// `MP_SUCCESS_URL` / `MP_FAILURE_URL` / `MP_PENDING_URL` del backend). El
-  /// WebView de pago las usa para detectar cuándo MP redirige de vuelta y
-  /// cerrarse solo, sin salir de la app.
-  static const String mpSuccessUrl = String.fromEnvironment(
-    'MP_SUCCESS_URL',
-    defaultValue: 'https://splg.app/pago/exito',
-  );
-  static const String mpFailureUrl = String.fromEnvironment(
-    'MP_FAILURE_URL',
-    defaultValue: 'https://splg.app/pago/error',
-  );
-  static const String mpPendingUrl = String.fromEnvironment(
-    'MP_PENDING_URL',
-    defaultValue: 'https://splg.app/pago/pendiente',
-  );
+  /// Deep link con el que Mercado Pago devuelve al cliente a la app al
+  /// terminar el pago: `splg://pago/{exito|pendiente|error}` (más el query que
+  /// agrega MP: `payment_id`, `status`, `external_reference`...). El back lo
+  /// arma en las `back_urls` de la preferencia; acá sólo se reconoce.
+  static const String paymentLinkScheme = 'splg';
+  static const String paymentLinkHost = 'pago';
 }

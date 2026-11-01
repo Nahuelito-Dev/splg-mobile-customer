@@ -40,8 +40,6 @@ import 'package:splg_customer/ui/views/order_detail/order_detail_view.dart'
 import 'package:splg_customer/ui/views/order_tracking/order_tracking_view.dart'
     as _i12;
 import 'package:splg_customer/ui/views/orders/orders_view.dart' as _i19;
-import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart'
-    as _i15;
 import 'package:splg_customer/ui/views/personal_info/personal_info_view.dart'
     as _i29;
 import 'package:splg_customer/ui/views/profile/profile_view.dart' as _i8;
@@ -90,7 +88,6 @@ class Routes {
 
   static const legalView = '/legal-view';
 
-  static const paymentWebViewView = '/payment-web-view-view';
 
   static const welcomeView = '/welcome-view';
 
@@ -144,7 +141,6 @@ class Routes {
     orderTrackingView,
     qrScanView,
     legalView,
-    paymentWebViewView,
     welcomeView,
     recoverPasswordView,
     signupDoneView,
@@ -182,7 +178,6 @@ class StackedRouter extends _i1.RouterBase {
     _i1.RouteDef(Routes.orderTrackingView, page: _i12.OrderTrackingView),
     _i1.RouteDef(Routes.qrScanView, page: _i13.QrScanView),
     _i1.RouteDef(Routes.legalView, page: _i14.LegalView),
-    _i1.RouteDef(Routes.paymentWebViewView, page: _i15.PaymentWebViewView),
     _i1.RouteDef(Routes.welcomeView, page: _i16.WelcomeView),
     _i1.RouteDef(Routes.recoverPasswordView, page: _i17.RecoverPasswordView),
     _i1.RouteDef(Routes.signupDoneView, page: _i18.SignupDoneView),
@@ -316,14 +311,6 @@ class StackedRouter extends _i1.RouterBase {
       return _i32.MaterialPageRoute<dynamic>(
         builder: (context) =>
             _i14.LegalView(key: args.key, document: args.document),
-        settings: data,
-      );
-    },
-    _i15.PaymentWebViewView: (data) {
-      final args = data.getArgs<PaymentWebViewViewArguments>(nullOk: false);
-      return _i32.MaterialPageRoute<dynamic>(
-        builder: (context) =>
-            _i15.PaymentWebViewView(key: args.key, paymentUrl: args.paymentUrl),
         settings: data,
       );
     },
@@ -800,30 +787,6 @@ class LegalViewArguments {
   @override
   int get hashCode {
     return key.hashCode ^ document.hashCode;
-  }
-}
-
-class PaymentWebViewViewArguments {
-  const PaymentWebViewViewArguments({this.key, required this.paymentUrl});
-
-  final _i32.Key? key;
-
-  final String paymentUrl;
-
-  @override
-  String toString() {
-    return '{"key": "$key", "paymentUrl": "$paymentUrl"}';
-  }
-
-  @override
-  bool operator ==(covariant PaymentWebViewViewArguments other) {
-    if (identical(this, other)) return true;
-    return other.key == key && other.paymentUrl == paymentUrl;
-  }
-
-  @override
-  int get hashCode {
-    return key.hashCode ^ paymentUrl.hashCode;
   }
 }
 
@@ -1501,25 +1464,6 @@ extension NavigatorStateExtension on _i36.NavigationService {
     );
   }
 
-  Future<dynamic> navigateToPaymentWebViewView({
-    _i32.Key? key,
-    required String paymentUrl,
-    int? routerId,
-    bool preventDuplicates = true,
-    Map<String, String>? parameters,
-    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
-        transition,
-  }) async {
-    return navigateTo<dynamic>(
-      Routes.paymentWebViewView,
-      arguments: PaymentWebViewViewArguments(key: key, paymentUrl: paymentUrl),
-      id: routerId,
-      preventDuplicates: preventDuplicates,
-      parameters: parameters,
-      transition: transition,
-    );
-  }
-
   Future<dynamic> navigateToWelcomeView({
     _i32.Key? key,
     int? routerId,
@@ -2108,25 +2052,6 @@ extension NavigatorStateExtension on _i36.NavigationService {
     return replaceWith<dynamic>(
       Routes.legalView,
       arguments: LegalViewArguments(key: key, document: document),
-      id: routerId,
-      preventDuplicates: preventDuplicates,
-      parameters: parameters,
-      transition: transition,
-    );
-  }
-
-  Future<dynamic> replaceWithPaymentWebViewView({
-    _i32.Key? key,
-    required String paymentUrl,
-    int? routerId,
-    bool preventDuplicates = true,
-    Map<String, String>? parameters,
-    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
-        transition,
-  }) async {
-    return replaceWith<dynamic>(
-      Routes.paymentWebViewView,
-      arguments: PaymentWebViewViewArguments(key: key, paymentUrl: paymentUrl),
       id: routerId,
       preventDuplicates: preventDuplicates,
       parameters: parameters,

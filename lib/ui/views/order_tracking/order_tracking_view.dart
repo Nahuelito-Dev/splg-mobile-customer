@@ -279,6 +279,20 @@ class _ActiveContent extends StatelessWidget {
                       key: const Key('tracking-express-notice'),
                       style: type.caption),
                 ],
+                if (model.mercadoPagoLabel != null) ...[
+                  const SizedBox(height: 8),
+                  Text(model.mercadoPagoLabel!,
+                      key: const Key('tracking-payment-state'),
+                      style: type.caption),
+                ],
+                if (model.canPayWithMercadoPago) ...[
+                  const SizedBox(height: 8),
+                  SplgButton(
+                    key: const Key('tracking-pay-mercadopago'),
+                    title: model.payButtonTitle,
+                    onPressed: model.payWithMercadoPago,
+                  ),
+                ],
                 if (model.showDriverCard ||
                     model.stage == TrackingStage.pending) ...[
                   const SizedBox(height: 4),

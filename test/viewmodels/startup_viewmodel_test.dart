@@ -9,6 +9,10 @@ import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/ui/views/startup/startup_viewmodel.dart';
 import 'package:stacked_services/stacked_services.dart';
 
+import 'package:splg_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
+
+import '../helpers/fake_mercado_pago_checkout_service.dart';
 import '../helpers/test_helpers.dart';
 import '../helpers/test_helpers.mocks.dart';
 
@@ -51,6 +55,44 @@ void main() {
 
       verify(nav.replaceWithHomeView()).called(1);
       verifyNever(nav.replaceWithWelcomeView());
+    });
+
+    group('vuelta de Mercado Pago con la app cerrada -', () {
+      late FakeMercadoPagoCheckoutService mp;
+
+      setUp(() {
+        mp = locator<MercadoPagoCheckoutService>()
+            as FakeMercadoPagoCheckoutService;
+        when(customer.isUserLoggedIn).thenReturn(true);
+        when(customer.init()).thenAnswer((_) async => true);
+      });
+
+      test('lee el link inicial al arrancar', () async {
+        await StartupViewModel().runStartupLogic();
+        expect(mp.started, 1);
+      });
+
+      test('con el pedido en el link abre su seguimiento', () async {
+        mp.pending =
+            const PaymentReturn(PaymentOutcome.success, orderId: 'o-1');
+
+        await StartupViewModel().runStartupLogic();
+
+        verify(nav.replaceWithHomeView()).called(1);
+        verify(nav.navigateToOrderTrackingView(orderId: 'o-1')).called(1);
+        expect(mp.pending, isNotNull,
+            reason: 'lo consume el seguimiento, que muestra el aviso');
+      });
+
+      test('sin el pedido en el link va al inicio y lo descarta', () async {
+        mp.pending = const PaymentReturn(PaymentOutcome.success);
+
+        await StartupViewModel().runStartupLogic();
+
+        verify(nav.replaceWithHomeView()).called(1);
+        verifyNoMoreInteractions(nav);
+        expect(mp.pending, isNull);
+      });
     });
   });
 }

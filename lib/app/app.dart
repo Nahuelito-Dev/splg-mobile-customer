@@ -6,6 +6,7 @@ import 'package:stacked/stacked_annotations.dart';
 import 'package:stacked_services/stacked_services.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/order_document_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/services/transfer_receipt_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/customer_service.dart';
@@ -39,7 +40,6 @@ import 'package:splg_customer/ui/bottom_sheets/receiver/receiver_sheet.dart';
 import 'package:splg_customer/ui/views/qr_scan/qr_scan_view.dart';
 import 'package:splg_customer/ui/bottom_sheets/delivery_code/delivery_code_sheet.dart';
 import 'package:splg_customer/ui/views/legal/legal_view.dart';
-import 'package:splg_customer/ui/views/payment_webview/payment_webview_view.dart';
 import 'package:splg_customer/ui/views/welcome/welcome_view.dart';
 import 'package:splg_customer/ui/views/recover_password/recover_password_view.dart';
 import 'package:splg_customer/ui/views/signup_done/signup_done_view.dart';
@@ -77,7 +77,6 @@ import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
     MaterialRoute(page: OrderTrackingView),
     MaterialRoute(page: QrScanView),
     MaterialRoute(page: LegalView),
-    MaterialRoute(page: PaymentWebViewView),
     MaterialRoute(page: WelcomeView),
     MaterialRoute(page: RecoverPasswordView),
     MaterialRoute(page: SignupDoneView),
@@ -123,6 +122,7 @@ import 'package:splg_customer/ui/views/public_catalog/public_catalog_view.dart';
     LazySingleton(classType: ProfilePhotoService),
     LazySingleton(classType: OrderDocumentService),
     LazySingleton(classType: TransferReceiptService),
+    LazySingleton(classType: MercadoPagoCheckoutService),
 // @stacked-service
   ],
   bottomsheets: [

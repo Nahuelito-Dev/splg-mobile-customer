@@ -23,7 +23,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
@@ -42,12 +42,24 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Vuelta de Mercado Pago (Checkout Pro): splg://pago/{exito|pendiente|error}.
+                 La recibe app_links; el deep linking propio de Flutter queda apagado
+                 más abajo para que no intente abrirlo como ruta. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="splg" android:host="pago"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="flutter_deeplinking_enabled"
+            android:value="false" />
         <meta-data android:name="com.google.android.geo.API_KEY"
                android:value="AIzaSyAvywoBGIhVqoWUn-MhybUea1oXIoKgtp8"/>
     </application>
@@ -57,6 +69,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Custom Tabs: navegadores que los soportan (flutter_custom_tabs). -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

@@ -21,6 +21,7 @@ import 'package:splg_customer/services/repurchase_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/location_service.dart';
+import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
 
 /// Inicio: catálogo de garrafas, carrito y el pedido en curso. El menú lateral
@@ -41,6 +42,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   final _locationService = locator<LocationService>();
   final _repurchaseService = locator<RepurchaseService>();
   final _events = locator<CustomerEventsService>();
+  final _mercadoPago = locator<MercadoPagoCheckoutService>();
 
   StreamSubscription<RepurchaseInvitationEvent>? _invitationSubscription;
   StreamSubscription<RepurchaseClosedEvent>? _closedSubscription;
@@ -179,8 +181,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     await _historyService.tryRefreshHistory(limit: 10);
     final paymentUrl = accepted.paymentUrl;
     if (paymentUrl != null && paymentUrl.isNotEmpty) {
-      await _navigationService.navigateToPaymentWebViewView(
-          paymentUrl: paymentUrl);
+      await _mercadoPago.open(paymentUrl);
     }
     if (_closed) return;
     await _navigationService.navigateToOrderTrackingView(
