@@ -73,18 +73,8 @@ class OrderBreakdown {
   /// Recargo express que hoy forma parte del [total].
   double get expressSurchargeInTotal => isExpress ? expressSurchargeAmount : 0;
 
-  /// Recargo por el medio de pago; 0 si no hay con qué calcularlo.
-  double get paymentSurcharge {
-    final informed = paymentSurchargeAmount;
-    if (informed != null) return informed;
-    final items = itemsSubtotal;
-    if (items == null) return 0;
-    final rest =
-        ((total - items - zoneSurcharge - expressSurchargeInTotal) * 100)
-                .round() /
-            100;
-    return rest > 0 ? rest : 0;
-  }
+  /// Recargo por el medio de pago, tal como lo informa el back; 0 si no lo informa.
+  double get paymentSurcharge => paymentSurchargeAmount ?? 0;
 
   /// Lee el cuerpo de `GET /orders/:id`; null si no es un objeto con total.
   static OrderBreakdown? fromJson(dynamic raw) {

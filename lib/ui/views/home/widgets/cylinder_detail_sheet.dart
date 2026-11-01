@@ -114,8 +114,10 @@ class _CylinderDetailSheetState extends State<CylinderDetailSheet> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Llevando ${d.quantity} o más: '
-                          '${money.format(cylinder.price * (1 - d.percentage / 100))} c/u',
+                          d.unitPrice == null
+                              ? 'Llevando ${d.quantity} o más'
+                              : 'Llevando ${d.quantity} o más: '
+                                  '${money.format(d.unitPrice!)} c/u',
                           style: type.body,
                         ),
                       ),

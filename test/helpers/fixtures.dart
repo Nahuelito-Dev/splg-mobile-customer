@@ -44,7 +44,8 @@ Order order({
     Order(
       id: id,
       address: address ?? addr('a1', 'Mitre 123', city: 'Posadas'),
-      items: items ?? [OrderItem(cylinder: cylinder(), quantity: 1)],
+      items: items ??
+          [OrderItem(cylinder: cylinder(), quantity: 1, subtotal: 1000)],
       total: total,
       paymentMethod: paymentMethod,
       status: status,
@@ -129,13 +130,18 @@ QuoteOutcome backQuote({
   String? zoneName,
   String? paymentMethod,
   double? paymentSurchargePercentage,
+  double? discountPercentage,
 }) {
   final subtotal = unit * qty;
   final total = subtotal + zoneSurcharge + paymentSurcharge;
   return QuoteOutcome.ok(OrderQuote(
     lines: [
       QuoteLine(
-          gasCylinderId: id, quantity: qty, unitPrice: unit, subtotal: subtotal)
+          gasCylinderId: id,
+          quantity: qty,
+          unitPrice: unit,
+          subtotal: subtotal,
+          discountPercentage: discountPercentage)
     ],
     subtotal: subtotal,
     zoneSurcharge: zoneSurcharge,

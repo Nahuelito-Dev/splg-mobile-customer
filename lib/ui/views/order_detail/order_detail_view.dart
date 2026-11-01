@@ -5,7 +5,6 @@ import 'package:stacked/stacked.dart';
 import 'package:splg_customer/ui/views/order_detail/widgets/transfer_card.dart';
 import 'package:splg_customer/ui/widgets/app_info.dart';
 
-import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/services/order_document_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/ui/widgets/load_scaffold.dart';
@@ -122,7 +121,9 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                         for (final i in o.items)
                           AppInfoRow(
                               title: itemLabel(i),
-                              value: money.format(Pricing.charged(i))),
+                              value: i.subtotal == null
+                                  ? ''
+                                  : money.format(i.subtotal!)),
                         if ((model.breakdown?.zoneSurcharge ?? 0) > 0)
                           AppInfoRow(
                               title: 'Recargo por zona',

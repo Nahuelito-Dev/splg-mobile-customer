@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_lib/domain/discount.dart';
 import 'package:splg_lib/domain/order_item.dart';
@@ -14,49 +15,52 @@ void main() {
     Discount(quantity: 4, percentage: 20),
   ]);
 
-  test('toma la promoción de mayor umbral alcanzado', () {
-    expect(Pricing.applied(c, 1), isNull);
-    expect(Pricing.applied(c, 2)!.percentage, 10);
-    expect(Pricing.applied(c, 5)!.percentage, 20);
-    expect(Pricing.applied(c, 9)!.percentage, 30);
-  });
-
-  test('subtotal de un renglón', () {
-    expect(Pricing.subtotal(OrderItem(cylinder: c, quantity: 4)),
-        closeTo(3200, 0.001));
-  });
-
-  test('el precio unitario se redondea a centavos como el back', () {
-    final g = cylinder(price: 21350.5, discounts: [
-      Discount(quantity: 3, percentage: 7.5),
-    ]);
-    // 21350.5 x 0,925 = 19749,2125 -> 19749,21 por unidad
-    expect(Pricing.unitPrice(g, 3), 19749.21);
-    expect(Pricing.subtotal(OrderItem(cylinder: g, quantity: 3)), 59247.63);
-    expect(Pricing.unitPrice(g, 2), 21350.5);
-  });
-
-  test(
-      'un renglón de pedido ya trae el precio con promoción: no se descuenta dos veces',
-      () {
-    final item = OrderItem(
-        cylinder: cylinder(price: 14155, discounts: [
-          Discount(quantity: 2, percentage: 5),
-        ]),
-        quantity: 2);
-    expect(Pricing.charged(item), 28310);
-  });
-
   test('las promociones se muestran de menor a mayor', () {
     expect(Pricing.sortedDiscounts(c).map((d) => d.quantity), [2, 4, 6]);
     expect(Pricing.badge(Pricing.sortedDiscounts(c).first), '−10% x2');
   });
 
-  test('sin promociones el subtotal es precio x cantidad', () {
+  test('el precio con promoción es el que manda el back, sin cuentas en la app',
+      () {
+    final d = Discount.fromJson(
+        {'quantity': 3, 'discountPercentage': 7.5, 'unitPrice': 19749.21});
+    expect(d.unitPrice, 19749.21);
     expect(
-        Pricing.subtotal(
-            OrderItem(cylinder: cylinder(price: 700), quantity: 3)),
-        2100);
+        Discount.fromJson({'quantity': 3, 'discountPercentage': 7.5}).unitPrice,
+        isNull);
+  });
+
+  test('la cotización trae el porcentaje de la promoción aplicada', () {
+    final q = OrderQuote.fromJson({
+      'items': [
+        {
+          'gasCylinderId': 'g1',
+          'quantity': 2,
+          'unitPrice': 900,
+          'subtotal': 1800,
+          'discountPercentage': 10,
+        },
+        {
+          'gasCylinderId': 'g2',
+          'quantity': 1,
+          'unitPrice': 500,
+          'subtotal': 500
+        },
+      ],
+      'subtotal': 2300,
+      'total': 2300,
+    })!;
+    expect(q.lines[0].discountPercentage, 10);
+    expect(q.lines[1].discountPercentage, isNull);
+  });
+
+  test('el renglón de un pedido trae lo que cobra el back', () {
+    final item = OrderItem.fromJson({
+      'quantity': 2,
+      'subtotal': 28310,
+      'gas_cylinder': cylinder(price: 14155).toJson(),
+    });
+    expect(item.subtotal, 28310);
   });
 
   group('ApiResult.fromError', () {

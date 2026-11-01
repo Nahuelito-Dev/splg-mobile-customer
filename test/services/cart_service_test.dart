@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/domain/cart.dart';
-import 'package:splg_customer/domain/pricing.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_lib/domain/order_item.dart';
 import 'package:splg_lib/network/api_error_text.dart';
@@ -179,7 +178,7 @@ void main() {
       await cart.add('g1', 3);
       final item = cart.order!.items.single;
       expect(item.cylinder.price, 900);
-      expect(Pricing.charged(item), cart.cart.total);
+      expect(item.subtotal, cart.cart.total);
     });
 
     test('un back viejo sin listUnitPrice no rompe: lista = vigente', () {

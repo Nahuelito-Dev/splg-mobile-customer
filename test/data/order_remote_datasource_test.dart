@@ -231,6 +231,7 @@ void main() {
             'editable': true,
             'subtotal_items': 14900,
             'zone_surcharge': {'name': 'Villa Cabello', 'amount': 900},
+            'paymentSurchargeAmount': 1580,
             'scheduledDate': '2026-10-20',
           }));
       final repo = OrderRepositoryImp(OrderRemoteDatasource());

@@ -18,14 +18,22 @@ void main() {
       expect(b.paymentSurcharge, 0);
     });
 
-    test('con recargo de transferencia: total - renglones - zona', () {
-      final b = OrderBreakdown.fromJson({
+    test('el recargo de pago es el que informa el back, no se deduce del total',
+        () {
+      final informado = OrderBreakdown.fromJson({
+        'total_amount': 17380,
+        'subtotal_items': 14900,
+        'zone_surcharge': {'amount': 900},
+        'paymentSurchargeAmount': 1580,
+      })!;
+      final sinInformar = OrderBreakdown.fromJson({
         'total_amount': 17380,
         'subtotal_items': 14900,
         'zone_surcharge': {'amount': 900},
       })!;
 
-      expect(b.paymentSurcharge, 1580);
+      expect(informado.paymentSurcharge, 1580);
+      expect(sinInformar.paymentSurcharge, 0);
     });
 
     test('sin subtotal de renglones no inventa un recargo', () {

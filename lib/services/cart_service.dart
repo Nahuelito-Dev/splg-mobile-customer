@@ -67,6 +67,7 @@ class CartService with ListenableServiceMixin {
               description: '',
             ),
             quantity: line.quantity,
+            subtotal: line.subtotal,
           ),
       ],
       total: c.total,

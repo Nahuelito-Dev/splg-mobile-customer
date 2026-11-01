@@ -8,12 +8,17 @@ class QuoteLine {
     required this.quantity,
     required this.unitPrice,
     required this.subtotal,
+    this.discountPercentage,
   });
 
   final String gasCylinderId;
   final int quantity;
   final double unitPrice;
   final double subtotal;
+
+  /// Porcentaje de la promoción por volumen que aplicó el back; null si el
+  /// renglón se cotizó a precio de lista.
+  final double? discountPercentage;
 }
 
 /// Cotización de un pedido (`POST /orders/quote`): el desglose que después
@@ -96,6 +101,7 @@ class OrderQuote {
         quantity: (_num(l['quantity']) ?? 0).toInt(),
         unitPrice: _num(l['unitPrice']) ?? 0,
         subtotal: _num(l['subtotal']) ?? 0,
+        discountPercentage: _num(l['discountPercentage']),
       );
 
   static double? _num(dynamic v) =>

@@ -171,6 +171,7 @@ class OrderApiMapper {
 
       return {
         'quantity': _asInt(_pick(item, ['quantity'])) ?? 0,
+        'subtotal': _asNum(_pick(item, ['subtotal'])),
         'gas_cylinder': {
           'gas_cylinder_id':
               _pick(cylinderMap, ['gas_cylinder_id', 'gasCylinderId', 'id']) ??

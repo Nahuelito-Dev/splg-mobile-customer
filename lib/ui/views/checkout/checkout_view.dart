@@ -352,13 +352,10 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
   }
 }
 
-/// Insignia de la promoción por volumen que aplicó el back: el precio unitario
-/// de la cotización contra el de lista de la garrafa.
+/// Insignia de la promoción por volumen que aplicó el back en la cotización.
 String? _promo(CheckoutViewModel model, OrderItem item) {
-  final line = model.quoteLineFor(item);
-  final list = item.cylinder.price;
-  if (line == null || list <= 0 || line.unitPrice >= list) return null;
-  final pct = (1 - line.unitPrice / list) * 100;
+  final pct = model.quoteLineFor(item)?.discountPercentage;
+  if (pct == null) return null;
   return '−${pct.toStringAsFixed(0)}% x${item.quantity}';
 }
 

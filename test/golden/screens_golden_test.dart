@@ -220,9 +220,9 @@ void main() {
   testGoldens('Detalle del pedido', (t) async {
     await loadAppFonts();
     when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
-        order(status: OrderStatus.pending, total: 1230),
+        order(status: OrderStatus.pending, total: 1050),
         const OrderBreakdown(
-            total: 1230,
+            total: 1050,
             itemsSubtotal: 1000,
             zoneSurcharge: 50,
             zoneName: 'Centro')));
@@ -309,7 +309,7 @@ void main() {
     final history = locator<HistoryService>() as MockHistoryService;
     when(history.quoteOrder(any,
             timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')))
-        .thenAnswer((_) async => backQuote(unit: 14155));
+        .thenAnswer((_) async => backQuote(unit: 14155, discountPercentage: 5));
     final slots = locator<TimeSlotService>() as MockTimeSlotService;
     when(slots.availabilityFor(any)).thenAnswer((_) async => const [
           TimeSlotAvailability(
