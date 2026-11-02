@@ -43,13 +43,37 @@ void main() {
       verifyNever(tracking.confirmDelivery(any, any, any));
     });
 
+    test('un código de 6 dígitos (pedidos viejos) llega al back', () async {
+      when(tracking.confirmDelivery('o1', '482913', 'tok')).thenAnswer(
+          (_) async =>
+              const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success));
+      final model = DeliveryCodeSheetModel(orderId: 'o1');
+      model.codeController.text = '482913';
+
+      expect(await model.submit(), isTrue);
+
+      verify(tracking.confirmDelivery('o1', '482913', 'tok')).called(1);
+    });
+
+    test('el bloqueo por intentos se muestra en la hoja y no cierra', () async {
+      when(tracking.confirmDelivery('o1', '482913', 'tok')).thenAnswer(
+          (_) async => const ConfirmDeliveryOutcome(
+              ConfirmDeliveryResult.blocked, OrderTrackingService.blockedText));
+      final model = DeliveryCodeSheetModel(orderId: 'o1');
+      model.codeController.text = '482913';
+
+      expect(await model.submit(), isFalse);
+
+      expect(model.errorMessage, OrderTrackingService.blockedText);
+    });
+
     test('largo incorrecto: no llama al back', () async {
       final model = DeliveryCodeSheetModel(orderId: 'o1');
       model.codeController.text = 'ABC';
 
       expect(await model.submit(), isFalse);
 
-      expect(model.errorMessage, contains('10'));
+      expect(model.errorMessage, contains('entre 4 y 12'));
       verifyNever(tracking.confirmDelivery(any, any, any));
     });
 

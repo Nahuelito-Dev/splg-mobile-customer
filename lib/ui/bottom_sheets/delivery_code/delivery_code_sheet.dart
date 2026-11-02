@@ -45,15 +45,15 @@ class DeliveryCodeSheet extends StackedView<DeliveryCodeSheetModel> {
               SplgTextField(
                 key: const Key('delivery-code-field'),
                 controller: viewModel.codeController,
-                hint: 'Ej.: CFE49C3076',
+                hint: 'Ej.: 482913',
                 enabled: !busy,
                 textInputAction: TextInputAction.done,
-                keyboardType: TextInputType.visiblePassword,
+                keyboardType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
                   const _UpperCaseFormatter(),
                   LengthLimitingTextInputFormatter(
-                      DeliveryCodeSheetModel.codeLength),
+                      DeliveryCodeSheetModel.maxLength),
                 ],
                 onSubmitted: (_) => _submit(viewModel),
               ),

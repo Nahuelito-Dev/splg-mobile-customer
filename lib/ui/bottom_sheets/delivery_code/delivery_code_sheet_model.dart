@@ -12,9 +12,19 @@ import 'package:splg_customer/services/order_tracking_service.dart';
 class DeliveryCodeSheetModel extends BaseViewModel {
   DeliveryCodeSheetModel({required this.orderId});
 
-  /// Largo del código que genera el back (5 bytes en hexadecimal).
-  static const codeLength = 10;
+  /// Largo que puede tener un código de entrega. El back genera 6 dígitos, pero
+  /// los pedidos viejos traen 10 caracteres hexadecimales: la app no decide por
+  /// el formato exacto, deja que el back responda.
+  static const minLength = 4;
+  static const maxLength = 12;
   static final _valid = RegExp(r'^[A-Z0-9]+$');
+
+  /// true si [normalized] (ya pasado por [normalize]) tiene forma plausible
+  /// de código: alfanumérico de [minLength] a [maxLength].
+  static bool isPlausible(String normalized) =>
+      _valid.hasMatch(normalized) &&
+      normalized.length >= minLength &&
+      normalized.length <= maxLength;
 
   final String orderId;
   final codeController = TextEditingController();
@@ -32,8 +42,8 @@ class DeliveryCodeSheetModel extends BaseViewModel {
   static String? validate(String raw) {
     final code = normalize(raw);
     if (code.isEmpty) return 'Ingresá el código que te muestra el repartidor.';
-    if (!_valid.hasMatch(code) || code.length != codeLength) {
-      return 'El código tiene $codeLength letras o números. Revisalo.';
+    if (!isPlausible(code)) {
+      return 'El código tiene entre $minLength y $maxLength letras o números. Revisalo.';
     }
     return null;
   }

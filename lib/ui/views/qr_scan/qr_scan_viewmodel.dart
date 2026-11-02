@@ -9,15 +9,24 @@ import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
 import 'package:splg_customer/services/app_permissions.dart';
+import 'package:splg_customer/ui/bottom_sheets/delivery_code/delivery_code_sheet_model.dart';
 import 'package:splg_lib/permissions/app_permission.dart';
 
 /// Pantalla de escaneo del QR que muestra el chofer al llegar. El QR trae
 /// EXACTAMENTE el `deliveryCode` (string plano, no JSON), asi que lo leido
 /// se manda tal cual como `code` a `POST /orders/:id/confirm-delivery`.
 class QrScanViewModel extends BaseViewModel {
-  QrScanViewModel({required this.orderId});
+  QrScanViewModel({required this.orderId, DateTime Function()? clock})
+      : _now = clock ?? DateTime.now;
 
   final String orderId;
+  final DateTime Function() _now;
+
+  /// Cuánto se ignora una lectura que ya se rechazó (la cámara sigue apuntando al mismo QR).
+  static const repeatedReadingWindow = Duration(seconds: 4);
+
+  String? _lastRejected;
+  DateTime? _lastRejectedAt;
 
   final _customerService = locator<CustomerService>();
   final _trackingService = locator<OrderTrackingService>();
@@ -71,23 +80,34 @@ class QrScanViewModel extends BaseViewModel {
 
   /// Se dispara con cada frame donde el scanner detecta un codigo. Frenamos
   /// la camara mientras confirmamos con el backend para no reprocesar el
-  /// mismo QR ni disparar dos requests en paralelo.
-  // TODO: hoy tomamos el primer codigo leido sin validar que sea el de ESTE
-  // pedido antes de mandarlo (esa validacion la hace el backend contra
-  // order.deliveryCode y devuelve 400 si no matchea). Si el cliente llegara a
-  // tener mas de un pedido on_the_way a la vez, un 400 no distingue "codigo
-  // de otro pedido" de "codigo mal escrito" — UX a revisar si se da ese caso.
+  /// mismo QR ni disparar dos requests en paralelo. Antes de mandar nada se
+  /// descarta lo que no tiene forma plausible de codigo (URLs, texto largo); el
+  /// formato exacto lo decide el back; una lectura que ya
+  /// se rechazo se ignora un rato. Si el back dice que es el codigo de otro
+  /// pedido, se le explica al cliente en vez de un "invalido" generico.
   Future<void> onDetect(BarcodeCapture capture) async {
     if (_isProcessing) {
       return;
     }
 
-    final code =
-        capture.barcodes.map((barcode) => barcode.rawValue?.trim()).firstWhere(
-              (value) => value != null && value.isNotEmpty,
-              orElse: () => null,
-            );
-    if (code == null) {
+    final readings = capture.barcodes
+        .map((barcode) => barcode.rawValue?.trim())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toList();
+    if (readings.isEmpty) {
+      return;
+    }
+    final code = readings
+        .map(DeliveryCodeSheetModel.normalize)
+        .firstWhere(DeliveryCodeSheetModel.isPlausible, orElse: () => '');
+
+    if (code.isEmpty) {
+      if (_isRepeatedRejection(readings.first)) return;
+      await _rejectUnreadable(readings.first);
+      return;
+    }
+    if (_isRepeatedRejection(code)) {
       return;
     }
 
@@ -124,14 +144,51 @@ class QrScanViewModel extends BaseViewModel {
     // acá no se muestra otro diálogo ni se vuelve atrás.
     if (outcome.result == ConfirmDeliveryResult.sessionExpired) return;
 
+    final rejectsCode = const {
+      ConfirmDeliveryResult.invalidCode,
+      ConfirmDeliveryResult.otherOrder,
+      ConfirmDeliveryResult.malformedCode,
+      ConfirmDeliveryResult.blocked,
+    }.contains(outcome.result);
     await _dialogService.showDialog(
-      title: outcome.result == ConfirmDeliveryResult.invalidCode
-          ? 'Código inválido'
-          : 'No se pudo confirmar',
+      title: switch (outcome.result) {
+        ConfirmDeliveryResult.invalidCode => 'Código inválido',
+        ConfirmDeliveryResult.otherOrder => 'Es el QR de otro pedido',
+        ConfirmDeliveryResult.malformedCode => 'No pudimos leer el código',
+        ConfirmDeliveryResult.blocked => 'Código bloqueado',
+        _ => 'No se pudo confirmar',
+      },
       description:
           outcome.message ?? 'No pudimos confirmar la entrega. Probá de nuevo.',
     );
 
+    if (rejectsCode) _remember(code);
+    _isProcessing = false;
+    rebuildUi();
+    await _startCamera();
+  }
+
+  bool _isRepeatedRejection(String reading) =>
+      reading == _lastRejected &&
+      _lastRejectedAt != null &&
+      _now().difference(_lastRejectedAt!) < repeatedReadingWindow;
+
+  void _remember(String reading) {
+    _lastRejected = reading;
+    _lastRejectedAt = _now();
+  }
+
+  /// Lo leido no tiene forma de codigo de entrega (otro QR, o un frame mal
+  /// leido): no se manda al back.
+  Future<void> _rejectUnreadable(String reading) async {
+    _isProcessing = true;
+    rebuildUi();
+    await controller.stop();
+    await _dialogService.showDialog(
+      title: 'No pudimos leer el código',
+      description: OrderTrackingService.malformedCodeText,
+    );
+    _remember(reading);
     _isProcessing = false;
     rebuildUi();
     await _startCamera();

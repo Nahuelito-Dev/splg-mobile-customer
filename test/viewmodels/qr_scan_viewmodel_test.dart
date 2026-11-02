@@ -80,12 +80,12 @@ void main() {
       test(
           'el QR bueno confirma la entrega y vuelve con true, sin diálogo de error',
           () async {
-        when(tracking.confirmDelivery('o1', 'ABC123', 'tok')).thenAnswer(
+        when(tracking.confirmDelivery('o1', 'A1B2C3D4E5', 'tok')).thenAnswer(
             (_) async =>
                 const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success));
         final model = QrScanViewModel(orderId: 'o1');
 
-        await model.onDetect(scan('ABC123'));
+        await model.onDetect(scan('A1B2C3D4E5'));
 
         final titles = verify(dialogs.showDialog(
           title: captureAnyNamed('title'),
@@ -97,13 +97,13 @@ void main() {
 
       test('un código rechazado muestra el mensaje del back y deja reintentar',
           () async {
-        when(tracking.confirmDelivery('o1', 'MAL', 'tok')).thenAnswer(
+        when(tracking.confirmDelivery('o1', '0123456789', 'tok')).thenAnswer(
             (_) async => const ConfirmDeliveryOutcome(
                 ConfirmDeliveryResult.invalidCode,
                 'Código de entrega inválido'));
         final model = QrScanViewModel(orderId: 'o1');
 
-        await model.onDetect(scan('MAL'));
+        await model.onDetect(scan('0123456789'));
 
         verify(dialogs.showDialog(
           title: 'Código inválido',
@@ -113,14 +113,108 @@ void main() {
         expect(model.isProcessing, isFalse);
       });
 
+      test('un código de 6 dígitos (pedidos viejos) llega al back', () async {
+        when(tracking.confirmDelivery('o1', '482913', 'tok')).thenAnswer(
+            (_) async =>
+                const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success));
+        final model = QrScanViewModel(orderId: 'o1');
+
+        await model.onDetect(scan('482913'));
+
+        verify(tracking.confirmDelivery('o1', '482913', 'tok')).called(1);
+        verify(navigation.back(result: true)).called(1);
+      });
+
+      test('un QR que no tiene forma de código no se manda al back', () async {
+        final model = QrScanViewModel(orderId: 'o1');
+
+        await model.onDetect(scan('https://example.com/menu'));
+
+        verifyNever(tracking.confirmDelivery(any, any, any));
+        verify(dialogs.showDialog(
+          title: 'No pudimos leer el código',
+          description: OrderTrackingService.malformedCodeText,
+        )).called(1);
+        expect(model.isProcessing, isFalse);
+      });
+
+      test('entre varios QR en el cuadro manda el que tiene forma de código',
+          () async {
+        when(tracking.confirmDelivery('o1', 'A1B2C3D4E5', 'tok')).thenAnswer(
+            (_) async =>
+                const ConfirmDeliveryOutcome(ConfirmDeliveryResult.success));
+        final model = QrScanViewModel(orderId: 'o1');
+
+        await model.onDetect(BarcodeCapture(barcodes: [
+          Barcode(rawValue: 'https://example.com'),
+          Barcode(rawValue: 'a1b2c3d4e5'),
+        ]));
+
+        verify(tracking.confirmDelivery('o1', 'A1B2C3D4E5', 'tok')).called(1);
+        verify(navigation.back(result: true)).called(1);
+      });
+
+      test(
+          'la misma lectura rechazada se ignora un rato y después se reintenta',
+          () async {
+        var now = DateTime(2026, 11, 1, 20);
+        when(tracking.confirmDelivery('o1', '0123456789', 'tok')).thenAnswer(
+            (_) async => const ConfirmDeliveryOutcome(
+                ConfirmDeliveryResult.invalidCode,
+                'Código de entrega inválido'));
+        final model = QrScanViewModel(orderId: 'o1', clock: () => now);
+
+        await model.onDetect(scan('0123456789'));
+        now = now.add(const Duration(seconds: 1));
+        await model.onDetect(scan('0123456789'));
+        verify(tracking.confirmDelivery('o1', '0123456789', 'tok')).called(1);
+
+        now = now.add(QrScanViewModel.repeatedReadingWindow);
+        await model.onDetect(scan('0123456789'));
+        verify(tracking.confirmDelivery('o1', '0123456789', 'tok')).called(1);
+      });
+
+      test('si el back dice que es de otro pedido, lo explica', () async {
+        when(tracking.confirmDelivery('o1', '0123456789', 'tok')).thenAnswer(
+            (_) async => const ConfirmDeliveryOutcome(
+                ConfirmDeliveryResult.otherOrder,
+                OrderTrackingService.otherOrderText));
+        final model = QrScanViewModel(orderId: 'o1');
+
+        await model.onDetect(scan('0123456789'));
+
+        verify(dialogs.showDialog(
+          title: 'Es el QR de otro pedido',
+          description: OrderTrackingService.otherOrderText,
+        )).called(1);
+        verifyNever(navigation.back(result: anyNamed('result')));
+      });
+
+      test('con el código bloqueado avisa que pida uno nuevo al chofer',
+          () async {
+        when(tracking.confirmDelivery('o1', '482913', 'tok')).thenAnswer(
+            (_) async => const ConfirmDeliveryOutcome(
+                ConfirmDeliveryResult.blocked,
+                OrderTrackingService.blockedText));
+        final model = QrScanViewModel(orderId: 'o1');
+
+        await model.onDetect(scan('482913'));
+
+        verify(dialogs.showDialog(
+          title: 'Código bloqueado',
+          description: OrderTrackingService.blockedText,
+        )).called(1);
+        verifyNever(navigation.back(result: anyNamed('result')));
+      });
+
       test('un error de red no se informa como código inválido', () async {
-        when(tracking.confirmDelivery('o1', 'ABC123', 'tok')).thenAnswer(
+        when(tracking.confirmDelivery('o1', 'A1B2C3D4E5', 'tok')).thenAnswer(
             (_) async => const ConfirmDeliveryOutcome(
                 ConfirmDeliveryResult.networkError,
                 'Sin conexión. Revisá tu internet.'));
         final model = QrScanViewModel(orderId: 'o1');
 
-        await model.onDetect(scan('ABC123'));
+        await model.onDetect(scan('A1B2C3D4E5'));
 
         verify(dialogs.showDialog(
           title: 'No se pudo confirmar',
@@ -131,12 +225,12 @@ void main() {
       test(
           'un 401 no muestra otro diálogo ni vuelve atrás: lo atiende la sesión',
           () async {
-        when(tracking.confirmDelivery('o1', 'ABC123', 'tok')).thenAnswer(
+        when(tracking.confirmDelivery('o1', 'A1B2C3D4E5', 'tok')).thenAnswer(
             (_) async => const ConfirmDeliveryOutcome(
                 ConfirmDeliveryResult.sessionExpired, 'Tu sesión venció.'));
         final model = QrScanViewModel(orderId: 'o1');
 
-        await model.onDetect(scan('ABC123'));
+        await model.onDetect(scan('A1B2C3D4E5'));
 
         verifyNever(dialogs.showDialog(
           title: anyNamed('title'),

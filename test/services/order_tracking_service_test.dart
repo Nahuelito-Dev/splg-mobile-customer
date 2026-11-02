@@ -43,6 +43,59 @@ void main() {
       expect(outcome.message, 'Código de entrega inválido');
     });
 
+    test('un 400 con code de otro pedido es otherOrder', () async {
+      fakeHttp((_) => const FakeReply(400, {
+            'statusCode': 400,
+            'message': 'Ese código es de otro de tus pedidos en camino',
+            'code': 'DELIVERY_CODE_OTRO_PEDIDO',
+          }));
+
+      final outcome = await service.confirmDelivery('o1', '0123456789', 'tok');
+
+      expect(outcome.result, ConfirmDeliveryResult.otherOrder);
+      expect(outcome.message, OrderTrackingService.otherOrderText);
+    });
+
+    test('un 409 con DELIVERY_CODE_BLOQUEADO es blocked, no un error genérico',
+        () async {
+      fakeHttp((_) => const FakeReply(409, {
+            'statusCode': 409,
+            'message': 'Demasiados intentos: pedile al chofer un código nuevo',
+            'code': 'DELIVERY_CODE_BLOQUEADO',
+          }));
+
+      final outcome = await service.confirmDelivery('o1', '482913', 'tok');
+
+      expect(outcome.result, ConfirmDeliveryResult.blocked);
+      expect(outcome.message, OrderTrackingService.blockedText);
+    });
+
+    test('un 400 con code de formato es malformedCode', () async {
+      fakeHttp((_) => const FakeReply(400, {
+            'statusCode': 400,
+            'message': 'x',
+            'code': 'DELIVERY_CODE_FORMATO',
+          }));
+
+      final outcome = await service.confirmDelivery('o1', 'MAL', 'tok');
+
+      expect(outcome.result, ConfirmDeliveryResult.malformedCode);
+      expect(outcome.message, OrderTrackingService.malformedCodeText);
+    });
+
+    test('un 400 con code incorrecto sigue siendo invalidCode', () async {
+      fakeHttp((_) => const FakeReply(400, {
+            'statusCode': 400,
+            'message': 'Código de entrega inválido',
+            'code': 'DELIVERY_CODE_INCORRECTO',
+          }));
+
+      final outcome = await service.confirmDelivery('o1', 'FFFFFFFFFF', 'tok');
+
+      expect(outcome.result, ConfirmDeliveryResult.invalidCode);
+      expect(outcome.message, 'Código de entrega inválido');
+    });
+
     test('un 400 con mensaje técnico usa el texto propio', () async {
       fakeHttp((_) => const FakeReply(400, {'message': 'Bad Request'}));
 

@@ -13,12 +13,21 @@ import 'package:splg_lib/network/api_error_text.dart';
 /// Cómo terminó el intento de confirmar la entrega con el código del QR.
 /// - `invalidCode`: el back lo rechazó con un 400 de negocio (código que no
 ///   coincide o pedido que ya no está en camino).
+/// - `otherOrder`: el back reconoció el código como el de otro pedido en
+///   camino del mismo cliente (`code: DELIVERY_CODE_OTRO_PEDIDO`).
+/// - `malformedCode`: el back dijo que no tiene forma de código de entrega, o
+///   sea que se leyó o se tipeó mal (`code: DELIVERY_CODE_FORMATO`).
+/// - `blocked`: 409 `DELIVERY_CODE_BLOQUEADO`, se agotaron los intentos: el
+///   chofer tiene que generar un código nuevo.
 /// - `sessionExpired`: 401, la sesión dejó de valer.
 /// - `networkError`: no hubo respuesta (sin conexión, timeout).
 /// - `failed`: cualquier otro rechazo (403, 404, 5xx...).
 enum ConfirmDeliveryResult {
   success,
   invalidCode,
+  otherOrder,
+  malformedCode,
+  blocked,
   sessionExpired,
   networkError,
   failed,
@@ -222,9 +231,30 @@ class OrderTrackingService {
         );
       }
       if (status == 400) {
+        final reason = data is Map ? data['code'] : null;
+        if (reason == 'DELIVERY_CODE_OTRO_PEDIDO') {
+          return const ConfirmDeliveryOutcome(
+            ConfirmDeliveryResult.otherOrder,
+            otherOrderText,
+          );
+        }
+        if (reason == 'DELIVERY_CODE_FORMATO') {
+          return const ConfirmDeliveryOutcome(
+            ConfirmDeliveryResult.malformedCode,
+            malformedCodeText,
+          );
+        }
         return ConfirmDeliveryOutcome(
           ConfirmDeliveryResult.invalidCode,
           ApiErrorText.businessMessage(status, data) ?? _invalidCodeText,
+        );
+      }
+      if (status == 409 &&
+          data is Map &&
+          data['code'] == 'DELIVERY_CODE_BLOQUEADO') {
+        return const ConfirmDeliveryOutcome(
+          ConfirmDeliveryResult.blocked,
+          blockedText,
         );
       }
       if (isIdempotencyConflict(status, data)) {
@@ -248,6 +278,13 @@ class OrderTrackingService {
       );
     }
   }
+
+  static const otherOrderText =
+      'Ese código es de otro de tus pedidos en camino. Escaneá el QR del repartidor que trae este pedido.';
+  static const blockedText =
+      'Demasiados intentos: pedile al chofer un código nuevo.';
+  static const malformedCodeText =
+      'No pudimos leer bien el código. Acercá el celular al QR y probá de nuevo.';
 
   static const _invalidCodeText =
       'El código no es válido o el pedido ya no está en camino.';
