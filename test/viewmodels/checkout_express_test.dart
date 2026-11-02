@@ -173,7 +173,7 @@ void main() {
 
     test('elegir express cotiza con la modalidad y no pide franja', () async {
       final model = await ready();
-      expect(model.canConfirmOrder, isFalse); // común: falta la franja
+      expect(model.canConfirmOrder, isTrue); // común sin franja: lo antes posible
 
       model.setDeliveryMode(DeliveryMode.express);
       expect(model.quote, isNull); // recotiza
@@ -186,7 +186,7 @@ void main() {
       model.dispose();
     });
 
-    test('volver a normal vuelve a pedir la franja', () async {
+    test('volver a normal recotiza y deja confirmar sin franja (lo antes posible)', () async {
       final model = await ready();
       model.setDeliveryMode(DeliveryMode.express);
       await wait();
@@ -195,7 +195,7 @@ void main() {
 
       expect(quotedModes.last, DeliveryMode.standard);
       expect(model.quote!.total, 2000);
-      expect(model.canConfirmOrder, isFalse);
+      expect(model.canConfirmOrder, isTrue);
       model.dispose();
     });
   });
@@ -281,6 +281,23 @@ void main() {
           .thenAnswer((_) async =>
               CreateOrderResult(success: true, order: order(total: 4350)));
     }
+
+    test('común sin franja: «lo antes posible», sin fecha ni franja', () async {
+      stubCreate();
+      final model = await ready();
+
+      await model.confirmOrder();
+
+      final call = verify(history.createOrder(captureAny,
+          timeSlotId: captureAnyNamed('timeSlotId'),
+          fromCart: true,
+          deliveryMode: anyNamed('deliveryMode'),
+          receiver: anyNamed('receiver'),
+          expectedTotal: anyNamed('expectedTotal')));
+      expect((call.captured[0] as Order).requestedDeliveryDate, isNull);
+      expect(call.captured[1], isNull);
+      model.dispose();
+    });
 
     test('express: sin franja y con la modalidad', () async {
       stubCreate();

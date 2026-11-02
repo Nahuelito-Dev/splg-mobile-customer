@@ -1148,13 +1148,13 @@ void main() {
       expect(find.text('Buenos Aires 4114'), findsOneWidget);
       expect(find.text('\$1.800'), findsWidgets);
       expect(find.text('Sin cupo'), findsOneWidget);
-      // Sin franja elegida no se puede confirmar.
+      // Sin franja elegida se puede confirmar igual: el pedido es para lo antes posible.
       expect(
           t
               .widget<SplgButton>(
                   find.widgetWithText(SplgButton, 'Confirmar pedido'))
               .onPressed,
-          isNull);
+          isNotNull);
       await t.tap(find.byKey(const Key('slot-s1')));
       await settle(t);
       expect(

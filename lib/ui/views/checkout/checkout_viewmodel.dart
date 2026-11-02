@@ -410,7 +410,6 @@ class CheckoutViewModel extends ReactiveViewModel {
         order!.items.isNotEmpty &&
         !_cartService.cart.hasUnavailableItems &&
         addressController.text.isNotEmpty &&
-        (isExpress || _selectedTimeSlotId != null) &&
         _quote != null;
   }
 
@@ -524,8 +523,10 @@ class CheckoutViewModel extends ReactiveViewModel {
 
     // Update order with new fields. La franja seleccionada aporta la ventana
     // horaria para mostrar; su id se manda aparte al backend (timeSlotId).
+    // Sin franja elegida el pedido es para «lo antes posible»: no se agenda
+    // (el back exige fecha y franja juntas) y el despacho lo ofrece enseguida.
     final updatedOrder = order!.copyWith(
-      requestedDeliveryDate: selectedDate,
+      requestedDeliveryDate: timeSlotId == null ? null : selectedDate,
       deliveryWindowStart: slot?.startTime,
       deliveryWindowEnd: slot?.endTime,
       paymentMethod: paymentMethod,

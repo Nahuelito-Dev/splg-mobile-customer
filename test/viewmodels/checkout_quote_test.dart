@@ -184,11 +184,11 @@ void main() {
     model.dispose();
   });
 
-  test('con cotización y franja elegida deja confirmar; sin cotización no',
+  test('con cotización deja confirmar, con o sin franja; mientras cotiza no',
       () async {
     final model = CheckoutViewModel()..initialize();
     await wait(); // franjas + cotización
-    expect(model.canConfirmOrder, isFalse); // falta la franja
+    expect(model.canConfirmOrder, isTrue); // sin franja: lo antes posible
 
     model.selectTimeSlot('s1');
     expect(model.canConfirmOrder, isFalse); // cotizando de nuevo
