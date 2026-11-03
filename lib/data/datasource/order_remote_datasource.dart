@@ -159,14 +159,16 @@ class OrderRemoteDatasource {
   }
 
   /// Un 404 del PATCH: o el pedido ya no existe (texto propio, el del back es
-  /// técnico) o es otro recurso ("Dirección no encontrada") y vale su mensaje.
+  /// genérico) o es otro recurso ("Dirección no encontrada") y vale su mensaje.
   ApiResult<dynamic>? _notFoundOf(Object e) {
     if (e is! DioException || e.response?.statusCode != 404) return null;
     final data = e.response?.data;
     final message = data is Map && data['message'] is String
         ? (data['message'] as String).trim()
         : '';
-    if (message.isEmpty || message.startsWith('Order with ID')) {
+    if (message.isEmpty ||
+        message == kBackOrderNotFoundText ||
+        message.startsWith(kLegacyBackOrderNotFoundPrefix)) {
       return const ApiResult.fail(kOrderGoneText, status: 404);
     }
     return ApiResult.fail(message, status: 404);

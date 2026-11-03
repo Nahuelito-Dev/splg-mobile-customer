@@ -173,6 +173,20 @@ void main() {
         () async {
       fakeHttp((_) => const FakeReply(404, {
             'statusCode': 404,
+            'message': 'Pedido no encontrado',
+          }));
+      final repo = OrderRepositoryImp(OrderRemoteDatasource());
+
+      final result = await repo.updateOrder('o1', {}, 'tok', 'k');
+
+      expect(result.rejected, isTrue);
+      expect(result.message, 'Este pedido ya no está disponible.');
+    });
+
+    test('404 con el texto de un back anterior (Order with ID): mismo rechazo',
+        () async {
+      fakeHttp((_) => const FakeReply(404, {
+            'statusCode': 404,
             'message': 'Order with ID: o1 not found',
           }));
       final repo = OrderRepositoryImp(OrderRemoteDatasource());
@@ -271,7 +285,7 @@ void main() {
         () async {
       fakeHttp((_) => const FakeReply(404, {
             'statusCode': 404,
-            'message': 'Order with ID: o1 not found',
+            'message': 'Pedido no encontrado',
           }));
 
       final result = await OrderRemoteDatasource().fetchMyRefunds('o1', 'tok');
