@@ -96,6 +96,24 @@ void main() {
     expect(outcome.retryable, isFalse);
   });
 
+  test(
+      '400 porque la distribuidora no cargó el precio del envase: llega tal '
+      'cual y no se reintenta', () async {
+    const sinPrecio = 'La distribuidora todavía no cargó el precio del envase '
+        'de Garrafa 10kg: no se puede tomar el pedido';
+    fakeHttp((_) => const FakeReply(400, {
+          'statusCode': 400,
+          'message': sinPrecio,
+          'error': 'Bad Request',
+        }));
+
+    final outcome = await history.quoteOrder(pedido(PaymentMethod.cash));
+
+    expect(outcome.ok, isFalse);
+    expect(outcome.message, sinPrecio);
+    expect(outcome.retryable, isFalse);
+  });
+
   test('sin red, 429 y 5xx se pueden reintentar con texto propio', () async {
     for (final reply in [
       const FakeReply.networkError(),

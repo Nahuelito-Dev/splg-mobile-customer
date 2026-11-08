@@ -409,6 +409,13 @@ class EditOrderViewModel extends BaseViewModel {
     scheduleQuote();
   }
 
+  /// La cotización de la edición cobra envases (más garrafas que las vacías
+  /// que el cliente tiene para canjear).
+  bool get chargesContainers => _quote?.chargesContainers ?? false;
+
+  /// Envases que cobra la cotización de la edición.
+  int get containersCharged => _quote?.containersCharged ?? 0;
+
   // ─── Guardar ───
   bool saving = false;
 

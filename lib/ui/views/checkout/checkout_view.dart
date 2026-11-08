@@ -98,6 +98,20 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                               style:
                                   type.caption.copyWith(color: Colors.white70)),
                         ),
+                      if (model.chargesContainers) ...[
+                        surcharge(
+                            const Key('checkout-container-charge'),
+                            containerChargeLabel(model.containersCharged),
+                            model.quote!.containerChargeAmount),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                          child: Text(
+                              containerChargeNote(model.containersCharged),
+                              key: const Key('checkout-container-note'),
+                              style:
+                                  type.caption.copyWith(color: Colors.white70)),
+                        ),
+                      ],
                       if ((model.quote?.zoneSurcharge ?? 0) > 0)
                         surcharge(const Key('checkout-zone-surcharge'),
                             'Recargo por zona', model.quote!.zoneSurcharge),
@@ -137,8 +151,8 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                         padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
                         child: Text(Pricing.ivaIncluido,
                             key: const Key('checkout-iva'),
-                            style: type.caption
-                                .copyWith(color: Colors.white70)),
+                            style:
+                                type.caption.copyWith(color: Colors.white70)),
                       ),
                       if (model.quoteError != null)
                         Padding(

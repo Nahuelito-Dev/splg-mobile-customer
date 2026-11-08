@@ -131,9 +131,12 @@ QuoteOutcome backQuote({
   String? paymentMethod,
   double? paymentSurchargePercentage,
   double? discountPercentage,
+  int containersCharged = 0,
+  double? containerUnitPrice,
 }) {
   final subtotal = unit * qty;
-  final total = subtotal + zoneSurcharge + paymentSurcharge;
+  final double containerCharge = containersCharged * (containerUnitPrice ?? 0);
+  final total = subtotal + zoneSurcharge + paymentSurcharge + containerCharge;
   return QuoteOutcome.ok(OrderQuote(
     lines: [
       QuoteLine(
@@ -141,7 +144,10 @@ QuoteOutcome backQuote({
           quantity: qty,
           unitPrice: unit,
           subtotal: subtotal,
-          discountPercentage: discountPercentage)
+          discountPercentage: discountPercentage,
+          containersCharged: containersCharged,
+          containerUnitPrice: containerUnitPrice,
+          containerSubtotal: containerCharge)
     ],
     subtotal: subtotal,
     zoneSurcharge: zoneSurcharge,
@@ -152,5 +158,6 @@ QuoteOutcome backQuote({
     balance: total,
     paymentMethod: paymentMethod,
     paymentSurchargePercentage: paymentSurchargePercentage,
+    containerChargeAmount: containerCharge,
   ));
 }

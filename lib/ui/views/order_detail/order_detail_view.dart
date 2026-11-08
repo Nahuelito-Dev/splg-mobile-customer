@@ -124,6 +124,13 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                               value: i.subtotal == null
                                   ? ''
                                   : money.format(i.subtotal!)),
+                        if (model.chargesContainers)
+                          AppInfoRow(
+                              key: const Key('detail-container-charge'),
+                              title: containerChargeLabel(
+                                  model.breakdown!.containersCharged),
+                              value: money.format(
+                                  model.breakdown!.containerChargeAmount)),
                         if ((model.breakdown?.zoneSurcharge ?? 0) > 0)
                           AppInfoRow(
                               title: 'Recargo por zona',

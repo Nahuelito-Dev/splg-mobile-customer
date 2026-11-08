@@ -9,6 +9,7 @@ import 'package:splg_customer/domain/cancel_result.dart';
 import 'package:splg_customer/domain/cart.dart';
 import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_customer/domain/order_breakdown.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/domain/time_slot_availability.dart';
 import 'package:splg_customer/domain/update_order_result.dart';
@@ -625,6 +626,30 @@ void main() {
       expect(find.textContaining('Recargo por'), findsNothing);
     });
 
+    phoneTest('detalle con envases cobrados: línea "Envases (N)"', (t) async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order(total: 21000),
+          const OrderBreakdown(
+              total: 21000,
+              itemsSubtotal: 1000,
+              containerChargeAmount: 20000,
+              containersCharged: 2)));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.byKey(const Key('detail-container-charge')), findsOneWidget);
+      expect(find.text('Envases (2)'), findsOneWidget);
+      expect(find.text('\$20.000'), findsOneWidget);
+    });
+
+    phoneTest('detalle sin envases cobrados no muestra la línea', (t) async {
+      when(history.fetchOrderDetail('o1')).thenAnswer((_) async => OrderDetail(
+          order(), const OrderBreakdown(total: 1000, itemsSubtotal: 1000)));
+      await t.pumpWidget(app(const OrderDetailView(orderId: 'o1')));
+      await settle(t);
+      expect(find.byKey(const Key('detail-container-charge')), findsNothing);
+      expect(find.textContaining('Envases'), findsNothing);
+    });
+
     phoneTest('detalle de un pedido entregado: calificar, reclamar, repetir',
         (t) async {
       when(history.fetchOrderDetail('o1')).thenAnswer(
@@ -1215,6 +1240,62 @@ void main() {
         }
       });
     }
+
+    phoneTest('con envases a cobrar: línea "Envases (N)" y la explicación',
+        (t) async {
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
+          .thenAnswer((_) async =>
+              backQuote(containersCharged: 2, containerUnitPrice: 5000));
+      await t.pumpWidget(app(const CheckoutView()));
+      await settle(t);
+      expect(
+          find.byKey(const Key('checkout-container-charge')), findsOneWidget);
+      expect(find.text('Envases (2)'), findsOneWidget);
+      expect(find.text('\$10.000'), findsOneWidget);
+      expect(
+          find.text('Pedís más garrafas que los envases que tenés: se te '
+              'cobran 2 envases, que quedan tuyos.'),
+          findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const Key('checkout-total'))).data,
+          '\$11.800');
+    });
+
+    phoneTest('sin envases a cobrar no muestra la línea ni la explicación',
+        (t) async {
+      await t.pumpWidget(app(const CheckoutView()));
+      await settle(t);
+      expect(find.byKey(const Key('checkout-container-charge')), findsNothing);
+      expect(find.byKey(const Key('checkout-container-note')), findsNothing);
+    });
+
+    phoneTest('400 sin precio del envase: el mensaje del back y no confirma',
+        (t) async {
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart')))
+          .thenAnswer((_) async => const QuoteOutcome.failed(
+              'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido',
+              retryable: false));
+      await t.pumpWidget(app(const CheckoutView()));
+      await settle(t);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('checkout-quote-error')),
+              matching: find.text(
+                  'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido')),
+          findsOneWidget);
+      expect(find.byKey(const Key('checkout-container-charge')), findsNothing);
+      expect(
+          t
+              .widget<SplgButton>(
+                  find.widgetWithText(SplgButton, 'Confirmar pedido'))
+              .onPressed,
+          isNull);
+    });
   });
   group('Modificar pedido', () {
     setUp(() {
@@ -1293,6 +1374,63 @@ void main() {
       await t.tap(find.widgetWithText(SplgButton, 'Guardar cambios'));
       await settle(t);
       verify(history.updateOrder('o1', any, timeSlotId: null)).called(1);
+    });
+
+    phoneTest('sumar garrafas sin envases: línea "Envases (N)" y explicación',
+        (t) async {
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              orderId: anyNamed('orderId')))
+          .thenAnswer((i) async {
+        final qty = (i.positionalArguments.first as Order)
+            .items
+            .fold<int>(0, (n, it) => n + it.quantity);
+        return backQuote(
+            qty: qty,
+            containersCharged: qty > 2 ? qty - 2 : 0,
+            containerUnitPrice: qty > 2 ? 5000 : null);
+      });
+      await t.pumpWidget(app(EditOrderView(order: editable())));
+      await settle(t);
+      expect(find.byKey(const Key('edit-container-charge')), findsNothing);
+
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await settle(t);
+      expect(find.text('Envases (1) \$5.000'), findsOneWidget);
+      expect(
+          find.text('Pedís más garrafas que los envases que tenés: se te '
+              'cobra 1 envase, que queda tuyo.'),
+          findsOneWidget);
+    });
+
+    phoneTest('400 sin precio del envase: el mensaje del back y no guarda',
+        (t) async {
+      await t.pumpWidget(app(EditOrderView(order: editable())));
+      await settle(t);
+      final history = locator<HistoryService>() as MockHistoryService;
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'),
+              fromCart: anyNamed('fromCart'),
+              orderId: anyNamed('orderId')))
+          .thenAnswer((_) async => const QuoteOutcome.failed(
+              'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido',
+              retryable: false));
+      await t.tap(find.byTooltip('Agregar uno').first);
+      await settle(t);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('edit-quote-error')),
+              matching: find.text(
+                  'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido')),
+          findsOneWidget);
+      expect(
+          t
+              .widget<SplgButton>(
+                  find.widgetWithText(SplgButton, 'Guardar cambios'))
+              .onPressed,
+          isNull);
     });
 
     phoneTest('la forma de pago no ofrece Mercado Pago', (t) async {

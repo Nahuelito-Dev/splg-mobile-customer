@@ -77,6 +77,17 @@ String paymentSurchargeLabel(String? method, double? percentage) {
   return 'Recargo$medio$pct';
 }
 
+/// "Envases (2)": la línea del cargo de envases en el desglose.
+String containerChargeLabel(int count) => 'Envases ($count)';
+
+/// Por qué se cobran envases: el cliente pide más garrafas que las vacías que
+/// tiene para canjear, y los envases que paga pasan a ser suyos.
+String containerChargeNote(int count) => count == 1
+    ? 'Pedís más garrafas que los envases que tenés: se te cobra 1 envase, '
+        'que queda tuyo.'
+    : 'Pedís más garrafas que los envases que tenés: se te cobran $count '
+        'envases, que quedan tuyos.';
+
 /// "2x Garrafa 10kg" para un renglón del pedido.
 String itemLabel(OrderItem item) {
   final type = item.cylinder.type.trim();

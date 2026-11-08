@@ -9,6 +9,9 @@ class QuoteLine {
     required this.unitPrice,
     required this.subtotal,
     this.discountPercentage,
+    this.containersCharged = 0,
+    this.containerUnitPrice,
+    this.containerSubtotal = 0,
   });
 
   final String gasCylinderId;
@@ -19,6 +22,16 @@ class QuoteLine {
   /// Porcentaje de la promoción por volumen que aplicó el back; null si el
   /// renglón se cotizó a precio de lista.
   final double? discountPercentage;
+
+  /// Envases de esta garrafa que se cobran porque el cliente pide más de los
+  /// que tiene; 0 si los canjea todos.
+  final int containersCharged;
+
+  /// Precio del envase que usó el back; null si no hay envases a cobrar.
+  final double? containerUnitPrice;
+
+  /// Importe de los envases de este renglón (no está en [subtotal]).
+  final double containerSubtotal;
 }
 
 /// Cotización de un pedido (`POST /orders/quote`): el desglose que después
@@ -38,6 +51,7 @@ class OrderQuote {
     this.expressSurcharge = 0,
     this.paymentMethod,
     this.paymentSurchargePercentage,
+    this.containerChargeAmount = 0,
   });
 
   final List<QuoteLine> lines;
@@ -60,6 +74,16 @@ class OrderQuote {
 
   /// Recargo express que ya está sumado al [total] (0 si no es express).
   final double expressSurcharge;
+
+  /// Cargo por los envases que el cliente compra, ya sumado al [total] y fuera
+  /// del [subtotal]; 0 si canjea todos.
+  final double containerChargeAmount;
+
+  /// Cantidad de envases que se cobran, sumando los renglones.
+  int get containersCharged =>
+      lines.fold(0, (count, l) => count + l.containersCharged);
+
+  bool get chargesContainers => containerChargeAmount > 0;
 
   /// Lee la respuesta del back; null si no trae un `total` numérico (no se
   /// inventa un precio con una respuesta ilegible).
@@ -85,6 +109,7 @@ class OrderQuote {
       expressSurcharge: _num(raw['expressSurcharge']) ?? 0,
       paymentMethod: raw['paymentMethod']?.toString(),
       paymentSurchargePercentage: _num(raw['paymentSurchargePercentage']),
+      containerChargeAmount: _num(raw['containerChargeAmount']) ?? 0,
     );
   }
 
@@ -102,6 +127,9 @@ class OrderQuote {
         unitPrice: _num(l['unitPrice']) ?? 0,
         subtotal: _num(l['subtotal']) ?? 0,
         discountPercentage: _num(l['discountPercentage']),
+        containersCharged: (_num(l['containersCharged']) ?? 0).toInt(),
+        containerUnitPrice: _num(l['containerUnitPrice']),
+        containerSubtotal: _num(l['containerSubtotal']) ?? 0,
       );
 
   static double? _num(dynamic v) =>

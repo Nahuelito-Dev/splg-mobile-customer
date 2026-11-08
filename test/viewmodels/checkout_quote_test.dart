@@ -495,4 +495,48 @@ void main() {
       model.dispose();
     });
   });
+
+  group('envases (F35)', () {
+    test('pide más garrafas que envases: la cotización trae el cargo y cuántos',
+        () async {
+      stubQuote(
+          (_) => backQuote(containersCharged: 2, containerUnitPrice: 5000));
+      final model = CheckoutViewModel()..initialize();
+      await wait();
+
+      expect(model.chargesContainers, isTrue);
+      expect(model.containersCharged, 2);
+      expect(model.quote!.containerChargeAmount, 10000);
+      // El total es el del back (ya trae los envases); la app no suma nada.
+      expect(model.quote!.total, 11800);
+      expect(model.canConfirmOrder, isTrue);
+      model.dispose();
+    });
+
+    test('canjea todos los envases: no hay cargo', () async {
+      final model = CheckoutViewModel()..initialize();
+      await wait();
+
+      expect(model.chargesContainers, isFalse);
+      expect(model.containersCharged, 0);
+      model.dispose();
+    });
+
+    test('400 sin precio del envase: muestra el mensaje del back y no confirma',
+        () async {
+      stubQuote((_) => const QuoteOutcome.failed(
+          'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido',
+          retryable: false));
+      final model = CheckoutViewModel()..initialize();
+      await wait();
+
+      expect(model.quote, isNull);
+      expect(model.chargesContainers, isFalse);
+      expect(model.quoteError,
+          'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido');
+      expect(model.canRetryQuote, isFalse);
+      expect(model.canConfirmOrder, isFalse);
+      model.dispose();
+    });
+  });
 }

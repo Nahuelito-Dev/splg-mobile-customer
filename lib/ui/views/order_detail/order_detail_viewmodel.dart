@@ -131,6 +131,10 @@ class OrderDetailViewModel extends LoadViewModel with TransferPayment {
   OrderDocument? downloading;
 
   /// El pedido es express, o lo fue y pasó al reparto común.
+  /// El pedido cobró envases (el cliente pidió más garrafas que las vacías que
+  /// tenía para canjear).
+  bool get chargesContainers => breakdown?.chargesContainers ?? false;
+
   bool get isExpress => breakdown?.isExpress ?? false;
   bool get expressDegraded => breakdown?.expressDegraded ?? false;
 

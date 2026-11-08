@@ -24,6 +24,8 @@ class OrderBreakdown {
     this.receiver,
     this.paymentSurchargeAmount,
     this.paymentSurchargePercentage,
+    this.containerChargeAmount = 0,
+    this.containersCharged = 0,
   });
 
   final double total;
@@ -65,6 +67,15 @@ class OrderBreakdown {
   /// Quién recibe, si el cliente lo indicó.
   final OrderReceiver? receiver;
 
+  /// Cargo por los envases que el cliente compró con este pedido (ya está en
+  /// el [total]); 0 en los pedidos que no los cobran o anteriores al cobro.
+  final double containerChargeAmount;
+
+  /// Envases cobrados, sumando `order_items[].containersCharged`.
+  final int containersCharged;
+
+  bool get chargesContainers => containerChargeAmount > 0;
+
   bool get isExpress => deliveryMode == DeliveryMode.express;
 
   /// El express no encontró moto y siguió por el reparto común sin recargo.
@@ -98,7 +109,18 @@ class OrderBreakdown {
       receiver: OrderReceiver.fromJson(raw['receiver']),
       paymentSurchargeAmount: _num(raw['paymentSurchargeAmount']),
       paymentSurchargePercentage: _num(raw['paymentSurchargePercentage']),
+      containerChargeAmount: _num(raw['containerChargeAmount']) ?? 0,
+      containersCharged: _containersCharged(raw['order_items']),
     );
+  }
+
+  static int _containersCharged(dynamic items) {
+    if (items is! List) return 0;
+    var count = 0;
+    for (final item in items) {
+      if (item is Map) count += (_num(item['containersCharged']) ?? 0).toInt();
+    }
+    return count;
   }
 
   static double? _num(dynamic v) {

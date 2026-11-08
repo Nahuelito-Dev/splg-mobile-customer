@@ -619,4 +619,50 @@ void main() {
       m.dispose();
     });
   });
+
+  group('envases (F35)', () {
+    test('sumar garrafas sin envases para canjear: la edición muestra el cargo',
+        () async {
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+          .thenAnswer((i) async {
+        final o = i.positionalArguments.first as Order;
+        final qty = o.items.fold<int>(0, (n, it) => n + it.quantity);
+        return backQuote(
+            qty: qty,
+            containersCharged: qty > 2 ? qty - 2 : 0,
+            containerUnitPrice: qty > 2 ? 5000 : null);
+      });
+      final m = await ready();
+      expect(m.chargesContainers, isFalse);
+
+      m.changeQuantity(m.cylinders.first, 1);
+      await wait();
+
+      expect(m.chargesContainers, isTrue);
+      expect(m.containersCharged, 1);
+      expect(m.quote!.containerChargeAmount, 5000);
+      expect(m.quote!.total, 7700);
+      m.dispose();
+    });
+
+    test('400 sin precio del envase: muestra el mensaje y no guarda', () async {
+      final m = await ready();
+      when(history.quoteOrder(any,
+              timeSlotId: anyNamed('timeSlotId'), orderId: anyNamed('orderId')))
+          .thenAnswer((_) async => const QuoteOutcome.failed(
+              'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido',
+              retryable: false));
+
+      m.changeQuantity(m.cylinders.first, 1);
+      await wait();
+
+      expect(m.hasChanges, isTrue);
+      expect(m.quoteError,
+          'La distribuidora todavía no cargó el precio del envase de Garrafa 10kg: no se puede tomar el pedido');
+      expect(m.canRetryQuote, isFalse);
+      expect(m.canSave, isFalse);
+      m.dispose();
+    });
+  });
 }

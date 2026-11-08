@@ -123,6 +123,13 @@ class EditOrderView extends StackedView<EditOrderViewModel> {
                               key: const Key('edit-quoting'),
                               style:
                                   type.caption.copyWith(color: Colors.white70)),
+                        if (model.chargesContainers)
+                          Text(
+                              '${containerChargeLabel(model.containersCharged)} ${money.format(model.quote!.containerChargeAmount)}',
+                              key: const Key('edit-container-charge'),
+                              textAlign: TextAlign.right,
+                              style:
+                                  type.caption.copyWith(color: Colors.white70)),
                         if ((model.quote?.zoneSurcharge ?? 0) > 0)
                           Text(
                               'Recargo por zona ${money.format(model.quote!.zoneSurcharge)}',
@@ -143,6 +150,13 @@ class EditOrderView extends StackedView<EditOrderViewModel> {
                 ],
               ),
             ),
+            if (model.chargesContainers)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                child: Text(containerChargeNote(model.containersCharged),
+                    key: const Key('edit-container-note'),
+                    style: type.caption.copyWith(color: Colors.white70)),
+              ),
             if (model.quoteError != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),

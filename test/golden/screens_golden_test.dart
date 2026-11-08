@@ -14,6 +14,7 @@ import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
 import 'package:splg_customer/domain/orders_page.dart';
 import 'package:splg_customer/ui/views/home/widgets/home_map.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/ui/views/checkout/checkout_viewmodel.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/time_slot_service.dart';
@@ -329,6 +330,101 @@ void main() {
     await t.tap(find.byKey(const Key('slot-s1')));
     await t.pumpAndSettle();
     await check(t, 'checkout');
+  });
+  testGoldens('Confirmación con envases a cobrar', (t) async {
+    await loadAppFonts();
+    CheckoutViewModel.now = () => DateTime(2026, 10, 12);
+    addTearDown(() => CheckoutViewModel.now = DateTime.now);
+    locator.unregister<CartService>();
+    final cart = FakeCart();
+    cart.seedOrder(order(
+      items: [
+        OrderItem(
+            cylinder: cylinder(price: 14900, discounts: [
+              Discount(quantity: 2, percentage: 5),
+            ]),
+            quantity: 2),
+      ],
+      address: addr('a1', 'Buenos Aires 4114'),
+    ));
+    locator.registerSingleton<CartService>(cart);
+    CheckoutViewModel.quoteDebounce = Duration.zero;
+    addTearDown(() =>
+        CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
+    final history = locator<HistoryService>() as MockHistoryService;
+    when(history.quoteOrder(any,
+            timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')))
+        .thenAnswer((_) async => backQuote(
+            unit: 14155,
+            discountPercentage: 5,
+            containersCharged: 1,
+            containerUnitPrice: 10000));
+    final slots = locator<TimeSlotService>() as MockTimeSlotService;
+    when(slots.availabilityFor(any)).thenAnswer((_) async => const [
+          TimeSlotAvailability(
+              timeSlotId: 's1',
+              name: 'Mañana',
+              startTime: '08:00:00',
+              endTime: '12:00:00',
+              remaining: 60),
+          TimeSlotAvailability(
+              timeSlotId: 's2',
+              name: 'Tarde',
+              startTime: '16:00:00',
+              endTime: '20:00:00',
+              remaining: 0),
+        ]);
+    await pumpScreen(t, const CheckoutView());
+    await t.tap(find.byKey(const Key('slot-s1')));
+    await t.pumpAndSettle();
+    await check(t, 'checkout_envases');
+  });
+  testGoldens('Confirmación sin precio del envase (400)', (t) async {
+    await loadAppFonts();
+    CheckoutViewModel.now = () => DateTime(2026, 10, 12);
+    addTearDown(() => CheckoutViewModel.now = DateTime.now);
+    locator.unregister<CartService>();
+    final cart = FakeCart();
+    cart.seedOrder(order(
+      items: [
+        OrderItem(
+            cylinder: cylinder(price: 14900, discounts: [
+              Discount(quantity: 2, percentage: 5),
+            ]),
+            quantity: 2),
+      ],
+      address: addr('a1', 'Buenos Aires 4114'),
+    ));
+    locator.registerSingleton<CartService>(cart);
+    CheckoutViewModel.quoteDebounce = Duration.zero;
+    addTearDown(() =>
+        CheckoutViewModel.quoteDebounce = const Duration(milliseconds: 400));
+    final history = locator<HistoryService>() as MockHistoryService;
+    when(history.quoteOrder(any,
+            timeSlotId: anyNamed('timeSlotId'), fromCart: anyNamed('fromCart')))
+        .thenAnswer((_) async => const QuoteOutcome.failed(
+            'La distribuidora todavía no cargó el precio del envase de '
+            'Garrafa 10kg: no se puede tomar el pedido',
+            retryable: false));
+    final slots = locator<TimeSlotService>() as MockTimeSlotService;
+    when(slots.availabilityFor(any)).thenAnswer((_) async => const [
+          TimeSlotAvailability(
+              timeSlotId: 's1',
+              name: 'Mañana',
+              startTime: '08:00:00',
+              endTime: '12:00:00',
+              remaining: 60),
+          TimeSlotAvailability(
+              timeSlotId: 's2',
+              name: 'Tarde',
+              startTime: '16:00:00',
+              endTime: '20:00:00',
+              remaining: 0),
+        ]);
+    await pumpScreen(t, const CheckoutView());
+    await t.tap(find.byKey(const Key('slot-s1')));
+    await t.pumpAndSettle();
+    await check(t, 'checkout_envase_sin_precio');
   });
   testGoldens('Modificar pedido', (t) async {
     await loadAppFonts();

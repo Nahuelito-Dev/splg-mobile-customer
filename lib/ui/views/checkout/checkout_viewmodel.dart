@@ -405,6 +405,13 @@ class CheckoutViewModel extends ReactiveViewModel {
   /// null mientras no hay cotización.
   QuoteLine? quoteLineFor(OrderItem item) => _quote?.lineFor(item.cylinder.id);
 
+  /// La cotización cobra envases: el cliente pide más garrafas que las vacías
+  /// que tiene para canjear.
+  bool get chargesContainers => _quote?.chargesContainers ?? false;
+
+  /// Envases que cobra la cotización.
+  int get containersCharged => _quote?.containersCharged ?? 0;
+
   bool get canConfirmOrder {
     return order != null &&
         order!.items.isNotEmpty &&
