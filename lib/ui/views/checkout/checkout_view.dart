@@ -154,6 +154,14 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                             style:
                                 type.caption.copyWith(color: Colors.white70)),
                       ),
+                      if (model.isReservation &&
+                          model.quote != null &&
+                          model.quote!.deposit > 0) ...[
+                        surcharge(const Key('checkout-deposit'),
+                            'Seña a pagar ahora', model.quote!.deposit),
+                        surcharge(const Key('checkout-balance'),
+                            'Saldo al entregar', model.quote!.balance),
+                      ],
                       if (model.quoteError != null)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
@@ -195,9 +203,12 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                           onDark: true,
                           icon: SplgIcons.online,
                           title: 'Entrega express',
-                          subtitle: _modeSubtitle(model.expressOption),
+                          subtitle: model.isReservation
+                              ? 'No se combina con una reserva.'
+                              : _modeSubtitle(model.expressOption),
                           selected: model.isExpress,
                           onTap: model.isBusy ||
+                                  model.isReservation ||
                                   !(model.expressOption?.available ?? false)
                               ? null
                               : () =>
@@ -232,6 +243,68 @@ class CheckoutView extends StackedView<CheckoutViewModel> {
                             onTap: () => model.setPaymentMethod(m),
                           ),
                       divider(),
+                      if (model.canReserve) ...[
+                        SplgRadioRow(
+                          key: const Key('checkout-reservation'),
+                          onDark: true,
+                          icon: SplgIcons.calendar,
+                          title: 'Reservar con seña',
+                          subtitle: 'Apartamos las garrafas para el día que '
+                              'elijas; no se despachan hasta que la seña esté '
+                              'paga y llegue la fecha.',
+                          selected: model.isReservation,
+                          onTap: model.isBusy
+                              ? null
+                              : () =>
+                                  model.setReservation(!model.isReservation),
+                        ),
+                        if (model.isReservation) ...[
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text('Monto de la seña',
+                                style: type.caption
+                                    .copyWith(color: Colors.white70)),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: SplgTextField(
+                              key: const Key('checkout-deposit-field'),
+                              controller: model.depositController,
+                              hint: 'Ej: 5000',
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              enabled: !model.isBusy,
+                              errorText: model.depositError,
+                              onChanged: model.onDepositChanged,
+                              prefix: const Padding(
+                                padding: EdgeInsets.only(left: 12),
+                                child: Text('\$'),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                            child: Text(
+                                model.selectedPaymentMethod ==
+                                        PaymentMethod.mercadoPago
+                                    ? 'Con Mercado Pago pagás la seña ahora '
+                                        'en línea; tiene que ser mayor a cero.'
+                                    : 'La seña la confirma la distribuidora. '
+                                        'Si no dejás seña, poné 0.',
+                                key: const Key('checkout-deposit-hint'),
+                                style: type.caption
+                                    .copyWith(color: Colors.white70)),
+                          ),
+                        ],
+                        divider(),
+                      ],
                       if (model.isExpress)
                         Padding(
                           padding: const EdgeInsets.symmetric(

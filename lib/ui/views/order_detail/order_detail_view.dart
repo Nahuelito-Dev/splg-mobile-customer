@@ -36,6 +36,12 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
         final o = model.order!;
         final street = o.address?.streetName.trim() ?? '';
         final actions = <Widget>[
+          if (model.canPayDeposit)
+            SplgButton(
+                key: const Key('detail-pay-deposit'),
+                title: 'Pagar la seña',
+                loading: model.payingDeposit,
+                onPressed: model.payingDeposit ? null : model.payDeposit),
           if (model.canTrack)
             SplgButton(title: 'Ver seguimiento', onPressed: model.track),
           if (model.canRate)
@@ -99,7 +105,7 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
             children: [
               SplgSectionBar(
                   title: dateTimeLabel(o.createdAt),
-                  trailing: statusLabel(o.status)),
+                  trailing: orderStatusLabel(o)),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -112,7 +118,35 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                           'Forma de pago: ${paymentLabel(o.paymentMethod)}',
                       amountKey: const Key('detail-total'),
                     ),
+                    if (model.liveNotice != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(model.liveNotice!,
+                            key: const Key('detail-live-notice'),
+                            style: type.caption
+                                .copyWith(fontWeight: FontWeight.w700)),
+                      ),
                     const SizedBox(height: 16),
+                    if (model.reservationRows.isNotEmpty) ...[
+                      AppInfoSection(
+                        key: const Key('detail-reservation'),
+                        icon: SplgIcons.calendar,
+                        title: 'Reserva con seña',
+                        rows: [
+                          for (final r in model.reservationRows)
+                            AppInfoRow(title: r.title, value: r.value),
+                        ],
+                      ),
+                      if (model.isReserved)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                              'Tu reserva se activa y sale a reparto el día de '
+                              'la entrega, si la seña está paga.',
+                              key: const Key('detail-reservation-note'),
+                              style: type.caption),
+                        ),
+                    ],
                     if (model.showTransferCard) TransferCard(model: model),
                     AppInfoSection(
                       icon: SplgIcons.cart,
@@ -213,7 +247,52 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                         icon: SplgIcons.truck,
                         title: 'Repartidor',
                         rows: [
-                          AppInfoRow(title: 'Nombre:', value: o.deliveryName)
+                          AppInfoRow(title: 'Nombre:', value: o.deliveryName),
+                          if (model.driverSummary != null)
+                            AppInfoRow(
+                                key: const Key('detail-driver-rating'),
+                                title: 'Calificación:',
+                                value: model.driverSummary!.label)
+                        ],
+                      ),
+                    if (model.historyError != null ||
+                        model.driverSummaryError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (model.historyError != null)
+                              Text(
+                                  'No pudimos cargar el historial del pedido. '
+                                  '${model.historyError}',
+                                  key: const Key('detail-timeline-error'),
+                                  style: type.caption),
+                            if (model.driverSummaryError != null)
+                              Text(
+                                  'No pudimos cargar la calificación del '
+                                  'repartidor. ${model.driverSummaryError}',
+                                  key: const Key('detail-driver-rating-error'),
+                                  style: type.caption),
+                            SplgButton(
+                                key: const Key('detail-extras-retry'),
+                                title: 'Reintentar',
+                                style: SplgButtonStyle.outlined,
+                                loading: model.retryingExtras,
+                                onPressed: model.retryingExtras
+                                    ? null
+                                    : model.retryExtras),
+                          ],
+                        ),
+                      ),
+                    if (model.timelineRows.isNotEmpty)
+                      AppInfoSection(
+                        key: const Key('detail-timeline'),
+                        icon: SplgIcons.clock,
+                        title: 'Historial del pedido',
+                        rows: [
+                          for (final r in model.timelineRows)
+                            AppInfoRow(title: r.title, value: r.value),
                         ],
                       ),
                     const SizedBox(height: 4),

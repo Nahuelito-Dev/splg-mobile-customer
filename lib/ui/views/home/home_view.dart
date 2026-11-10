@@ -67,7 +67,9 @@ class HomeView extends StackedView<HomeViewModel> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: _LocationNotice(
                       text: model.locationNotice!,
-                      onSettings: model.openLocationSettings,
+                      onSettings: model.locationSettingsHint
+                          ? model.openLocationSettings
+                          : null,
                       onClose: model.dismissLocationNotice,
                     ),
                   ),
@@ -152,6 +154,14 @@ class HomeView extends StackedView<HomeViewModel> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      SplgButton(
+                        key: const Key('home-express'),
+                        title: 'Pedido express de un toque',
+                        style: SplgButtonStyle.outlined,
+                        loading: model.expressBusy,
+                        onPressed: model.expressOrder,
+                      ),
                       if (model.canPlaceOrder) ...[
                         const SizedBox(height: 12),
                         SplgButton(
@@ -174,10 +184,10 @@ class HomeView extends StackedView<HomeViewModel> {
 /// Aviso de "Mi ubicación" (GPS apagado) con camino a Ajustes.
 class _LocationNotice extends StatelessWidget {
   const _LocationNotice(
-      {required this.text, required this.onSettings, required this.onClose});
+      {required this.text, this.onSettings, required this.onClose});
 
   final String text;
-  final VoidCallback onSettings;
+  final VoidCallback? onSettings;
   final VoidCallback onClose;
 
   @override
@@ -194,7 +204,8 @@ class _LocationNotice extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(text, style: type.body)),
-            TextButton(onPressed: onSettings, child: const Text('Ajustes')),
+            if (onSettings != null)
+              TextButton(onPressed: onSettings, child: const Text('Ajustes')),
             IconButton(
               tooltip: 'Cerrar aviso',
               icon: const Icon(SplgIcons.close, size: 18),

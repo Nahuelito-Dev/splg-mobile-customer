@@ -13,6 +13,7 @@ import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/domain/delivery_options.dart';
+import 'package:splg_customer/domain/deposit_input.dart';
 import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/order_receiver.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
@@ -242,11 +243,58 @@ class CheckoutViewModel extends ReactiveViewModel {
     if (mode == DeliveryMode.express && !(expressOption?.available ?? false)) {
       return;
     }
+    // Un express no se agenda: no se combina con una reserva.
+    if (mode == DeliveryMode.express && _reservation) return;
     _mode = mode;
     _deliveryNotice = null;
     notifyListeners();
     scheduleQuote();
   }
+
+  // ─── Reserva con seña (CU-072) ───
+  // Aparta el stock para el día elegido: no se despacha hasta que la seña esté
+  // paga y llegue la fecha. Mismas reglas que el alta del back: seña no
+  // negativa con 2 decimales, mayor a cero con Mercado Pago y sin superar el
+  // total. No se combina con el express.
+
+  bool _reservation = false;
+  bool get isReservation => _reservation;
+
+  final TextEditingController depositController = TextEditingController();
+
+  /// Total de la última cotización que salió bien: tope local de la seña
+  /// mientras llega la siguiente.
+  double? _lastTotal;
+
+  /// La cotización vigente se pidió como reserva con la seña tipeada.
+  bool _quoteIsReservation = false;
+
+  bool get canReserve => !isExpress;
+
+  void setReservation(bool value) {
+    if (isBusy || value == _reservation) return;
+    if (value && isExpress) return;
+    _reservation = value;
+    rebuildUi();
+    scheduleQuote();
+  }
+
+  /// La seña como está tipeada, validada contra el medio de pago y el total.
+  DepositInput get depositInput => DepositInput.parse(
+        depositController.text,
+        method: _selectedPaymentMethod,
+        total: _quote?.total ?? _lastTotal,
+        format: money.format,
+      );
+
+  /// Qué corregir en la seña; null si es válida, no es una reserva o el campo
+  /// sigue vacío (se indica al confirmar).
+  String? get depositError =>
+      !_reservation || depositController.text.trim().isEmpty
+          ? null
+          : depositInput.error;
+
+  void onDepositChanged(String _) => scheduleQuote();
 
   // ─── Quién recibe (CU-128, opcional) ───
 
@@ -329,16 +377,38 @@ class CheckoutViewModel extends ReactiveViewModel {
   Future<void> _runQuote(int version) async {
     final current = order;
     if (current == null) return;
+    final priced = current.copyWith(
+      requestedDeliveryDate: _selectedDate,
+      paymentMethod: _selectedPaymentMethod,
+    );
+    // Con la seña inválida se cotiza el pedido común, sólo para tener el total.
+    final deposit = depositInput;
+    final asReservation = _reservation && deposit.valid;
     final outcome = await _historyService.quoteOrder(
-      current.copyWith(
-        requestedDeliveryDate: _selectedDate,
-        paymentMethod: _selectedPaymentMethod,
-      ),
+      priced,
       timeSlotId: _selectedTimeSlotId,
       fromCart: true,
       deliveryMode: _mode,
+      isReservation: asReservation,
+      depositAmount: deposit.amount,
     );
     if (_disposed || version != _quoteVersion) return;
+    if (_reservation && !outcome.ok && !outcome.retryable) {
+      // El back rechazó la reserva (p. ej. la seña supera el total): se pide el
+      // total del pedido común para que el tope local sea el vigente y el
+      // mensaje del back queda a la vista.
+      final plain = await _historyService.quoteOrder(
+        priced,
+        timeSlotId: _selectedTimeSlotId,
+        fromCart: true,
+        deliveryMode: _mode,
+      );
+      if (_disposed || version != _quoteVersion) return;
+      _lastTotal = plain.quote?.total;
+    }
+    _quoteIsReservation = asReservation && outcome.ok;
+    final quoted = outcome.quote;
+    if (quoted != null) _lastTotal = quoted.total;
     // El express dejó de estar disponible: se vuelve al reparto común con el
     // motivo a la vista y se cotiza de nuevo.
     if (outcome.expressUnavailableReason != null && isExpress) {
@@ -417,7 +487,8 @@ class CheckoutViewModel extends ReactiveViewModel {
         order!.items.isNotEmpty &&
         !_cartService.cart.hasUnavailableItems &&
         addressController.text.isNotEmpty &&
-        _quote != null;
+        _quote != null &&
+        (!_reservation || (depositInput.valid && _quoteIsReservation));
   }
 
   /// Reloj del checkout; los tests lo fijan para que el golden no dependa del día.
@@ -499,6 +570,10 @@ class CheckoutViewModel extends ReactiveViewModel {
     // Sin la cotización que se le mostró al cliente no se confirma.
     final quoted = _quote;
     if (quoted == null) return;
+    // Una reserva sale con la seña que se cotizó, ya validada.
+    final deposit = depositInput;
+    final reservation = _reservation;
+    if (reservation && !(deposit.valid && _quoteIsReservation)) return;
     final version = _quoteVersion;
 
     setBusy(true);
@@ -533,7 +608,9 @@ class CheckoutViewModel extends ReactiveViewModel {
     // Sin franja elegida el pedido es para «lo antes posible»: no se agenda
     // (el back exige fecha y franja juntas) y el despacho lo ofrece enseguida.
     final updatedOrder = order!.copyWith(
-      requestedDeliveryDate: timeSlotId == null ? null : selectedDate,
+      // La reserva se aparta para un día aunque no se elija franja.
+      requestedDeliveryDate:
+          timeSlotId == null && !reservation ? null : selectedDate,
       deliveryWindowStart: slot?.startTime,
       deliveryWindowEnd: slot?.endTime,
       paymentMethod: paymentMethod,
@@ -550,6 +627,8 @@ class CheckoutViewModel extends ReactiveViewModel {
       deliveryMode: mode,
       receiver: receiver,
       expectedTotal: quoted.total,
+      isReservation: reservation,
+      depositAmount: reservation ? deposit.amount : null,
     );
 
     if (result.success) {
@@ -570,7 +649,16 @@ class CheckoutViewModel extends ReactiveViewModel {
       }
 
       if (paymentMethod == PaymentMethod.mercadoPago) {
-        await _openMercadoPagoCheckout(result.paymentUrl);
+        await _openMercadoPagoCheckout(result.paymentUrl, deposit: reservation);
+      } else if (reservation) {
+        await _dialogService.showDialog(
+          title: 'Reserva creada',
+          description:
+              'Reservamos tu pedido para el ${DateFormat('dd/MM/yyyy', 'es_AR').format(selectedDate)}. '
+              '${quoted.deposit > 0 ? 'La seña de ${money.format(quoted.deposit)} se confirma con la distribuidora. ' : ''}'
+              'El saldo de ${money.format(quoted.balance)} se paga al entregar.',
+          buttonTitle: 'Aceptar',
+        );
       }
 
       // Con el pedido hecho es cuando tiene sentido el aviso de estados.
@@ -579,10 +667,20 @@ class CheckoutViewModel extends ReactiveViewModel {
       final trackedOrderId = result.order?.id ?? updatedOrder.id;
       // Se vuelve al inicio y se abre el seguimiento encima: «Volver» no cae
       // en el carrito ni en el checkout.
-      await _navigationService.clearTillFirstAndShow(
-        Routes.orderTrackingView,
-        arguments: OrderTrackingViewArguments(orderId: trackedOrderId),
-      );
+      if (reservation) {
+        // Una reserva no se despacha: no hay repartidor que seguir. Se ve su
+        // detalle, con la seña, el saldo y la fecha.
+        await _navigationService.clearTillFirstAndShow(
+          Routes.orderDetailView,
+          arguments: OrderDetailViewArguments(
+              orderId: trackedOrderId, order: result.order),
+        );
+      } else {
+        await _navigationService.clearTillFirstAndShow(
+          Routes.orderTrackingView,
+          arguments: OrderTrackingViewArguments(orderId: trackedOrderId),
+        );
+      }
     } else if (result.priceChanged) {
       // No se creó nada: el total ya no es el que se mostró. Se vuelve a
       // cotizar y el cliente confirma de nuevo con el precio vigente.
@@ -639,16 +737,22 @@ class CheckoutViewModel extends ReactiveViewModel {
   /// pedido. Si no llegó `paymentUrl` o no se pudo abrir, avisamos con un
   /// dialog pero igual dejamos avanzar al tracking, ya que el pedido quedó
   /// creado.
-  Future<void> _openMercadoPagoCheckout(String? paymentUrl) async {
+  ///
+  /// Con [deposit] es la seña de una reserva: el pedido queda apartado y el
+  /// pago se reintenta desde su detalle.
+  Future<void> _openMercadoPagoCheckout(String? paymentUrl,
+      {bool deposit = false}) async {
+    final retryWhere =
+        deposit ? 'el detalle de la reserva' : 'el seguimiento del pedido';
     final hasUrl = paymentUrl != null && paymentUrl.isNotEmpty;
     final opened = hasUrl && await _mercadoPago.open(paymentUrl);
     if (opened) return;
     await _dialogService.showDialog(
       title: 'No se pudo iniciar el pago',
       description: hasUrl
-          // Con el enlace, el seguimiento ofrece «Pagar con Mercado Pago» (lo lee del back).
+          // Con el enlace, el seguimiento o el detalle ofrecen pagar (lo leen del back).
           ? 'El pedido se creó, pero no pudimos abrir el pago de Mercado Pago. '
-              'Podés pagarlo desde el seguimiento del pedido.'
+              'Podés pagarlo desde $retryWhere.'
           // Sin enlace no hay con qué reintentar: el pedido vence si no se paga.
           : 'El pedido se creó, pero Mercado Pago no nos dio el enlace de pago. '
               'Si no se puede pagar a tiempo, el pedido se cancela solo.',
@@ -661,6 +765,7 @@ class CheckoutViewModel extends ReactiveViewModel {
     _disposed = true;
     _quoteTimer?.cancel();
     deliveryDetailsController.dispose();
+    depositController.dispose();
     super.dispose();
   }
 

@@ -267,6 +267,13 @@ class _ActiveContent extends StatelessWidget {
                   key: const Key('tracking-status-title'),
                   style: type.subtitle,
                 ),
+                if (model.liveNotice != null) ...[
+                  const SizedBox(height: 6),
+                  Text(model.liveNotice!,
+                      key: const Key('tracking-live-notice'),
+                      style:
+                          type.caption.copyWith(fontWeight: FontWeight.w700)),
+                ],
                 if (model.pickupNotice != null) ...[
                   const SizedBox(height: 6),
                   Text(model.pickupNotice!,

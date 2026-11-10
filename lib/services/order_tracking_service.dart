@@ -44,6 +44,33 @@ class ConfirmDeliveryOutcome {
   bool get isSuccess => result == ConfirmDeliveryResult.success;
 }
 
+/// Qué pasó con el pedido sin ser un cambio de estado.
+enum OrderLiveEventKind { paymentApproved, paymentRefunded, updated }
+
+/// Aviso en vivo del back (`order:payment-approved`, `order:payment-refunded`,
+/// `order:updated`). Lleva lo justo para armar el texto; el pedido se relee.
+class OrderLiveEvent {
+  const OrderLiveEvent(
+    this.kind, {
+    this.isDeposit = false,
+    this.amount,
+    this.totalAmount,
+    this.previousTotalAmount,
+  });
+
+  final OrderLiveEventKind kind;
+
+  /// `payment-approved` de la seña de una reserva (`tipo: 'deposit'`).
+  final bool isDeposit;
+
+  /// Importe devuelto (`payment-refunded`).
+  final double? amount;
+
+  /// Total nuevo y anterior (`updated`).
+  final double? totalAmount;
+  final double? previousTotalAmount;
+}
+
 class DriverLocationUpdate {
   const DriverLocationUpdate({
     required this.lat,
@@ -98,6 +125,7 @@ class OrderTrackingService {
   final _arrivedController = StreamController<void>.broadcast();
   final _expressDegradedController = StreamController<void>.broadcast();
   final _orderChangedController = StreamController<void>.broadcast();
+  final _liveEventController = StreamController<OrderLiveEvent>.broadcast();
 
   /// Si el back cortó la conexión por el token vencido (`server:session-expired`):
   /// socket.io no reconecta solo cuando corta el servidor.
@@ -126,6 +154,10 @@ class OrderTrackingService {
   /// (`order:updated`), se aprobó el pago (`order:payment-approved`) o se
   /// reintegró (`order:payment-refunded`). Hay que volver a leerlo.
   Stream<void> get orderChanges => _orderChangedController.stream;
+
+  /// El mismo aviso que [orderChanges], con lo necesario para contárselo al
+  /// cliente. Llega después de pedir la relectura.
+  Stream<OrderLiveEvent> get liveEvents => _liveEventController.stream;
 
   /// Renueva la URL firmada de la foto del chofer. 409 (pedido fuera de
   /// aceptado/en camino) y 404 no son error: significan "sin foto".
@@ -351,9 +383,9 @@ class OrderTrackingService {
     _socket?.on('order:searching-driver', onOrderStatusUpdate);
     _socket?.on('order:arrived', onArrived);
     _socket?.on('order:express-degraded', onExpressDegraded);
-    _socket?.on('order:updated', onOrderChanged);
-    _socket?.on('order:payment-approved', onOrderChanged);
-    _socket?.on('order:payment-refunded', onOrderChanged);
+    _socket?.on('order:updated', onOrderUpdated);
+    _socket?.on('order:payment-approved', onPaymentApproved);
+    _socket?.on('order:payment-refunded', onPaymentRefunded);
     _socket?.on('server:session-expired', onSessionExpired);
     _socket?.on('server:access-revoked', onAccessRevoked);
 
@@ -430,6 +462,40 @@ class OrderTrackingService {
     final data = _toMap(payload);
     if (data == null || !_isForTrackedOrder(data)) return;
     _orderChangedController.add(null);
+  }
+
+  @visibleForTesting
+  void onPaymentApproved(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    onOrderChanged(payload);
+    _liveEventController.add(OrderLiveEvent(
+      OrderLiveEventKind.paymentApproved,
+      isDeposit: data['tipo'] == 'deposit',
+    ));
+  }
+
+  @visibleForTesting
+  void onPaymentRefunded(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    onOrderChanged(payload);
+    _liveEventController.add(OrderLiveEvent(
+      OrderLiveEventKind.paymentRefunded,
+      amount: _toDouble(data['amount']),
+    ));
+  }
+
+  @visibleForTesting
+  void onOrderUpdated(dynamic payload) {
+    final data = _toMap(payload);
+    if (data == null || !_isForTrackedOrder(data)) return;
+    onOrderChanged(payload);
+    _liveEventController.add(OrderLiveEvent(
+      OrderLiveEventKind.updated,
+      totalAmount: _toDouble(data['totalAmount']),
+      previousTotalAmount: _toDouble(data['previousTotalAmount']),
+    ));
   }
 
   @visibleForTesting

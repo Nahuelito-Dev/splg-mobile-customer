@@ -44,6 +44,7 @@ import 'package:splg_customer/domain/my_claim.dart';
 import 'package:splg_lib/permissions/app_permission.dart';
 // @stacked-import
 
+import 'fixtures.dart';
 import 'test_helpers.mocks.dart';
 
 @GenerateMocks(
@@ -245,6 +246,7 @@ MockGasCylinderService getAndRegisterGasCylinderService() {
 MockCustomerService getAndRegisterCustomerService() {
   _removeRegistrationIfExists<CustomerService>();
   final service = MockCustomerService();
+  when(service.customer).thenReturn(customerWith());
   locator.registerSingleton<CustomerService>(service);
   return service;
 }

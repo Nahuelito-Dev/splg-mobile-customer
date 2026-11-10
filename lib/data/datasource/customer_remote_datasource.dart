@@ -96,4 +96,42 @@ class CustomerRemoteDatasource {
       return ApiResult.fromError(e);
     }
   }
+
+  /// `GET /customers/user/:userId`: el `customer_id`, que no es el id del
+  /// usuario que usa el resto de la app.
+  Future<ApiResult<String>> fetchCustomerRecordId(
+    String userId,
+    String token,
+  ) async {
+    try {
+      final response = await _apiClient.get('customers/user/$userId', token);
+      final id = response.data is Map
+          ? (response.data as Map)['customer_id']?.toString()
+          : null;
+      if (id == null || id.isEmpty) {
+        return const ApiResult.fail(ApiErrorText.generic);
+      }
+      return ApiResult.ok(id);
+    } catch (e) {
+      log('e in fetchCustomerRecordId: ${e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
+  /// `PATCH /customers/:id/location` (CU-094): ubicación de referencia del
+  /// cliente, como `"latitud,longitud"`.
+  Future<ApiResult<void>> updateLocation(
+    String customerId,
+    String latLng,
+    String token,
+  ) async {
+    try {
+      await _apiClient.patch(
+          'customers/$customerId/location', {'latLng': latLng}, token);
+      return const ApiResult.ok();
+    } catch (e) {
+      log('e in updateLocation: ${e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
 }

@@ -54,6 +54,53 @@ class OrderRemoteDatasource {
     }
   }
 
+  /// `GET /orders/:id/status-history` (CU-170): del más viejo al más nuevo.
+  Future<ApiResult<dynamic>> fetchStatusHistory(
+    String orderId,
+    String token,
+  ) async {
+    try {
+      final response =
+          await _apiClient.get('orders/$orderId/status-history', token);
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      log('e in fetchStatusHistory: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
+  /// `POST /orders/express/quote` (CU-147): vista previa de la compra express
+  /// con la dirección predeterminada y la garrafa habitual. No escribe nada.
+  Future<ApiResult<dynamic>> expressQuote(
+    Map<String, dynamic> body,
+    String token,
+  ) async {
+    try {
+      final response =
+          await _apiClient.post('orders/express/quote', body, token);
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      log('e in expressQuote: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
+  /// `POST /orders/express` (CU-147), idempotente por `Idempotency-Key`.
+  Future<ApiResult<dynamic>> expressBuy(
+    Map<String, dynamic> body,
+    String token,
+    String idempotencyKey,
+  ) async {
+    try {
+      final response = await _apiClient.post(
+          'orders/express', body, token, {'Idempotency-Key': idempotencyKey});
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      log('e in expressBuy: ${e is DioException ? e.response?.statusCode : e.runtimeType}');
+      return ApiResult.fromError(e);
+    }
+  }
+
   /// `PATCH /orders/:id`: el cliente dueño edita su pedido mientras está
   /// pendiente y sin repartidor. Idempotente por `Idempotency-Key`, que llega
   /// de afuera para que los reintentos de una misma edición lleven la misma

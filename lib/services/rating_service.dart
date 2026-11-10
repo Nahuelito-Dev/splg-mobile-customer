@@ -1,6 +1,7 @@
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/data/datasource/rating_remote_datasource.dart';
+import 'package:splg_customer/domain/rating_summary.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_lib/network/api_error_text.dart';
 
@@ -24,5 +25,22 @@ class RatingService {
     if (trimmed != null && trimmed.isNotEmpty) body['comment'] = trimmed;
 
     return _datasource.createRating(body, token);
+  }
+
+  /// Promedio de calificaciones de un usuario (CU-065), acá el chofer del
+  /// pedido. Un error vuelve con el texto y el código del back.
+  Future<ApiResult<RatingSummary>> summaryOf(String userId) async {
+    final token = await _customerService.token;
+    if (token == null) {
+      return const ApiResult.fail(ApiErrorText.sessionExpired, status: 401);
+    }
+    final result = await _datasource.fetchSummary(userId, token);
+    if (!result.ok) {
+      return ApiResult.fail(result.message ?? ApiErrorText.generic,
+          status: result.status);
+    }
+    final summary = RatingSummary.fromJson(result.data);
+    if (summary == null) return const ApiResult.fail(ApiErrorText.generic);
+    return ApiResult.ok(summary);
   }
 }

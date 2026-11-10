@@ -19,6 +19,9 @@ import 'package:splg_customer/domain/cancel_result.dart' as _i6;
 import 'package:splg_customer/domain/cart.dart' as _i11;
 import 'package:splg_customer/domain/consumption.dart' as _i29;
 import 'package:splg_customer/domain/create_order_result.dart' as _i2;
+import 'package:splg_customer/domain/express_preview.dart' as _i901;
+import 'package:splg_customer/domain/order_status_entry.dart' as _i902;
+import 'package:splg_customer/domain/rating_summary.dart' as _i903;
 import 'package:splg_customer/domain/delivery_options.dart' as _i23;
 import 'package:splg_customer/domain/my_claim.dart' as _i42;
 import 'package:splg_customer/domain/order_breakdown.dart' as _i9;
@@ -948,6 +951,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
     _i23.DeliveryMode? deliveryMode = _i23.DeliveryMode.standard,
     _i24.OrderReceiver? receiver,
     double? expectedTotal,
+    bool? isReservation = false,
+    double? depositAmount,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -959,6 +964,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
             #deliveryMode: deliveryMode,
             #receiver: receiver,
             #expectedTotal: expectedTotal,
+            #isReservation: isReservation,
+            #depositAmount: depositAmount,
           },
         ),
         returnValue:
@@ -973,6 +980,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #deliveryMode: deliveryMode,
               #receiver: receiver,
               #expectedTotal: expectedTotal,
+              #isReservation: isReservation,
+              #depositAmount: depositAmount,
             },
           ),
         )),
@@ -988,6 +997,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #deliveryMode: deliveryMode,
               #receiver: receiver,
               #expectedTotal: expectedTotal,
+              #isReservation: isReservation,
+              #depositAmount: depositAmount,
             },
           ),
         )),
@@ -1000,6 +1011,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
     String? orderId,
     bool? fromCart = false,
     _i23.DeliveryMode? deliveryMode = _i23.DeliveryMode.standard,
+    bool? isReservation = false,
+    double? depositAmount,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1010,6 +1023,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
             #orderId: orderId,
             #fromCart: fromCart,
             #deliveryMode: deliveryMode,
+            #isReservation: isReservation,
+            #depositAmount: depositAmount,
           },
         ),
         returnValue: _i20.Future<_i3.QuoteOutcome>.value(_FakeQuoteOutcome_1(
@@ -1022,6 +1037,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #orderId: orderId,
               #fromCart: fromCart,
               #deliveryMode: deliveryMode,
+              #isReservation: isReservation,
+              #depositAmount: depositAmount,
             },
           ),
         )),
@@ -1036,6 +1053,8 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
               #orderId: orderId,
               #fromCart: fromCart,
               #deliveryMode: deliveryMode,
+              #isReservation: isReservation,
+              #depositAmount: depositAmount,
             },
           ),
         )),
@@ -1399,6 +1418,60 @@ class MockHistoryService extends _i1.Mock implements _i22.HistoryService {
         ),
         returnValueForMissingStub: null,
       );
+
+  @override
+  _i20.Future<_i5.ApiResult<_i901.ExpressPreview>> expressPreview(
+          {required _i8.PaymentMethod? paymentMethod}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #expressPreview,
+          [],
+          {#paymentMethod: paymentMethod},
+        ),
+        returnValue: _i20.Future<_i5.ApiResult<_i901.ExpressPreview>>.value(
+            _i5.ApiResult<_i901.ExpressPreview>.fail('dummy')),
+        returnValueForMissingStub:
+            _i20.Future<_i5.ApiResult<_i901.ExpressPreview>>.value(
+                _i5.ApiResult<_i901.ExpressPreview>.fail('dummy')),
+      ) as _i20.Future<_i5.ApiResult<_i901.ExpressPreview>>);
+
+  @override
+  _i20.Future<_i2.CreateOrderResult> expressBuy({
+    required _i8.PaymentMethod? paymentMethod,
+    String? gasCylinderId,
+    int? quantity = 1,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #expressBuy,
+          [],
+          {
+            #paymentMethod: paymentMethod,
+            #gasCylinderId: gasCylinderId,
+            #quantity: quantity,
+          },
+        ),
+        returnValue: _i20.Future<_i2.CreateOrderResult>.value(
+            const _i2.CreateOrderResult(success: false)),
+        returnValueForMissingStub: _i20.Future<_i2.CreateOrderResult>.value(
+            const _i2.CreateOrderResult(success: false)),
+      ) as _i20.Future<_i2.CreateOrderResult>);
+
+  @override
+  _i20.Future<_i5.ApiResult<List<_i902.OrderStatusEntry>>> fetchStatusHistory(
+          String? orderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchStatusHistory,
+          [orderId],
+        ),
+        returnValue:
+            _i20.Future<_i5.ApiResult<List<_i902.OrderStatusEntry>>>.value(
+                const _i5.ApiResult<List<_i902.OrderStatusEntry>>.ok([])),
+        returnValueForMissingStub:
+            _i20.Future<_i5.ApiResult<List<_i902.OrderStatusEntry>>>.value(
+                const _i5.ApiResult<List<_i902.OrderStatusEntry>>.ok([])),
+      ) as _i20.Future<_i5.ApiResult<List<_i902.OrderStatusEntry>>>);
 }
 
 /// A class which mocks [GasCylinderService].
@@ -1775,6 +1848,22 @@ class MockCustomerService extends _i1.Mock implements _i28.CustomerService {
           ),
         )),
       ) as _i20.Future<_i5.ApiResult<_i30.Address?>>);
+
+  @override
+  _i20.Future<_i5.ApiResult<void>> updateLocation(
+    double? lat,
+    double? lng,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateLocation,
+          [lat, lng],
+        ),
+        returnValue: _i20.Future<_i5.ApiResult<void>>.value(
+            const _i5.ApiResult<void>.ok()),
+        returnValueForMissingStub: _i20.Future<_i5.ApiResult<void>>.value(
+            const _i5.ApiResult<void>.ok()),
+      ) as _i20.Future<_i5.ApiResult<void>>);
 
   @override
   _i20.Future<_i5.ApiResult<void>> setDefaultAddress(String? addressId) =>
@@ -2515,6 +2604,13 @@ class MockOrderTrackingService extends _i1.Mock
       ) as _i20.Stream<void>);
 
   @override
+  _i20.Stream<_i16.OrderLiveEvent> get liveEvents => (super.noSuchMethod(
+        Invocation.getter(#liveEvents),
+        returnValue: _i20.Stream<_i16.OrderLiveEvent>.empty(),
+        returnValueForMissingStub: _i20.Stream<_i16.OrderLiveEvent>.empty(),
+      ) as _i20.Stream<_i16.OrderLiveEvent>);
+
+  @override
   _i20.Stream<void> get orderChanges => (super.noSuchMethod(
         Invocation.getter(#orderChanges),
         returnValue: _i20.Stream<void>.empty(),
@@ -2776,6 +2872,21 @@ class MockClaimService extends _i1.Mock implements _i41.ClaimService {
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockRatingService extends _i1.Mock implements _i43.RatingService {
+  @override
+  _i20.Future<_i5.ApiResult<_i903.RatingSummary>> summaryOf(String? userId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #summaryOf,
+          [userId],
+        ),
+        returnValue: _i20.Future<_i5.ApiResult<_i903.RatingSummary>>.value(
+            const _i5.ApiResult<_i903.RatingSummary>.fail('dummy', status: 404)),
+        returnValueForMissingStub:
+            _i20.Future<_i5.ApiResult<_i903.RatingSummary>>.value(
+                const _i5.ApiResult<_i903.RatingSummary>.fail('dummy',
+                    status: 404)),
+      ) as _i20.Future<_i5.ApiResult<_i903.RatingSummary>>);
+
   @override
   _i20.Future<_i5.ApiResult<void>> rateDriver({
     required String? orderId,

@@ -14,6 +14,9 @@ import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/data/repository/order_repository_imp.dart';
 import 'package:splg_customer/domain/create_order_result.dart';
 import 'package:splg_customer/domain/delivery_options.dart';
+import 'package:splg_customer/domain/express_preview.dart';
+import 'package:splg_customer/domain/order_status_entry.dart';
+import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/domain/order_receiver.dart';
 import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repository/order_repository.dart';
@@ -78,6 +81,10 @@ class HistoryService with ListenableServiceMixin {
   /// Con [deliveryMode] express el pedido no se agenda (ni fecha ni franja) y
   /// el back vuelve a evaluar la disponibilidad. [receiver] es quien recibe, si
   /// no es el cliente.
+  ///
+  /// Con [isReservation] es una reserva con seña (CU-072): lleva la fecha
+  /// agendada y [depositAmount]; el stock queda apartado y no se despacha hasta
+  /// que la seña esté paga y llegue el día.
   Future<CreateOrderResult> createOrder(
     Order order, {
     String? timeSlotId,
@@ -85,6 +92,8 @@ class HistoryService with ListenableServiceMixin {
     DeliveryMode deliveryMode = DeliveryMode.standard,
     OrderReceiver? receiver,
     double? expectedTotal,
+    bool isReservation = false,
+    double? depositAmount,
   }) async {
     final session = _session;
     final token = await _customerService.token;
@@ -99,8 +108,12 @@ class HistoryService with ListenableServiceMixin {
     final notificationToken = await _notificationService.currentToken;
     final result = await _createOrderUseCase(
       {
-        ..._toCreateOrderPayload(
-            order, timeSlotId, notificationToken, fromCart, deliveryMode),
+        ..._toCreateOrderPayload(order, timeSlotId,
+            notificationToken: notificationToken,
+            fromCart: fromCart,
+            deliveryMode: deliveryMode,
+            isReservation: isReservation,
+            depositAmount: depositAmount),
         if (receiver != null) 'receiver': receiver.toJson(),
         // Lo cotizado es lo cobrado: si el total ya es otro, el back responde
         // 409 y no crea nada.
@@ -147,12 +160,16 @@ class HistoryService with ListenableServiceMixin {
   ///
   /// Con [deliveryMode] express suma el recargo express; si dejó de estar
   /// disponible responde con el motivo del back.
+  ///
+  /// Con [isReservation] cotiza la reserva: trae `deposit` y `balance`.
   Future<QuoteOutcome> quoteOrder(
     Order order, {
     String? timeSlotId,
     String? orderId,
     bool fromCart = false,
     DeliveryMode deliveryMode = DeliveryMode.standard,
+    bool isReservation = false,
+    double? depositAmount,
   }) async {
     final token = await _customerService.token;
     if (token == null) {
@@ -162,7 +179,10 @@ class HistoryService with ListenableServiceMixin {
     final result = await _orderDatasource.quoteOrder(
       {
         ..._toQuotePayload(order, timeSlotId,
-            fromCart: fromCart, deliveryMode: deliveryMode),
+            fromCart: fromCart,
+            deliveryMode: deliveryMode,
+            isReservation: isReservation,
+            depositAmount: depositAmount),
         if (orderId != null) 'orderId': orderId,
       },
       token,
@@ -185,6 +205,116 @@ class HistoryService with ListenableServiceMixin {
     final quote = OrderQuote.fromJson(result.data);
     if (quote == null) return const QuoteOutcome.failed(ApiErrorText.generic);
     return QuoteOutcome.ok(quote);
+  }
+
+  /// Vista previa de la compra express de un toque
+  /// (`POST /orders/express/quote`, CU-147). No escribe nada.
+  Future<ApiResult<ExpressPreview>> expressPreview({
+    required PaymentMethod paymentMethod,
+  }) async {
+    final token = await _customerService.token;
+    if (token == null) {
+      return const ApiResult.fail(ApiErrorText.sessionExpired, status: 401);
+    }
+    final result = await _orderDatasource.expressQuote(
+      {'paymentMethod': OrderApiMapper.serializePaymentMethod(paymentMethod)},
+      token,
+    );
+    if (!result.ok) {
+      return ApiResult.fail(result.message ?? ApiErrorText.generic,
+          status: result.status);
+    }
+    final preview = ExpressPreview.fromJson(result.data);
+    if (preview == null) return const ApiResult.fail(ApiErrorText.generic);
+    return ApiResult.ok(preview);
+  }
+
+  /// Claves de idempotencia de la compra express, por intención (medio de pago,
+  /// garrafa y cantidad que se vieron en la vista previa).
+  final _expressKeys = IdempotencyKeys();
+
+  /// Confirma la compra express (`POST /orders/express`, CU-147) con lo que
+  /// mostró [expressPreview]. Si el express dejó de estar disponible el back
+  /// responde 409 con el motivo.
+  Future<CreateOrderResult> expressBuy({
+    required PaymentMethod paymentMethod,
+    String? gasCylinderId,
+    int quantity = 1,
+  }) async {
+    final session = _session;
+    final token = await _customerService.token;
+    if (token == null) {
+      return const CreateOrderResult(
+        success: false,
+        message: ApiErrorText.sessionExpired,
+        retryable: false,
+      );
+    }
+    final notificationToken = await _notificationService.currentToken;
+    final body = <String, dynamic>{
+      'paymentMethod': OrderApiMapper.serializePaymentMethod(paymentMethod),
+      if (gasCylinderId != null) 'gasCylinderId': gasCylinderId,
+      'quantity': quantity,
+      if (notificationToken != null && notificationToken.isNotEmpty)
+        'notificationToken': notificationToken,
+    };
+    final intention = '${body['paymentMethod']}|$gasCylinderId|$quantity';
+    final result = await _orderDatasource.expressBuy(
+        body, token, _expressKeys.keyFor(intention));
+    if (!result.ok) {
+      final conflict =
+          result.status == 422 && result.message == kIdempotencyConflictText;
+      final data = result.body;
+      final reason = result.status == 409 &&
+              data is Map &&
+              data['code'] == 'EXPRESS_NOT_AVAILABLE'
+          ? data['reason']?.toString() ?? 'unknown'
+          : null;
+      _expressKeys.settle(intention, keep: result.keepKey && !conflict);
+      return CreateOrderResult(
+        success: false,
+        message: conflict
+            ? kOrderMaybeCreatedText
+            : reason != null
+                ? expressUnavailableText(reason)
+                : result.message,
+        expressUnavailableReason: reason,
+        idempotencyConflict: conflict,
+        retryable: result.keepKey || ApiErrorText.isRetryable(result.status),
+      );
+    }
+    _expressKeys.settle(intention, keep: false);
+    final created = OrderApiMapper.parseOrder(result.data);
+    if (created == null) return const CreateOrderResult(success: false);
+    if (session == _session) {
+      _localChanges++;
+      _history.removeWhere((o) => o.id == created.id);
+      _history.insert(0, created);
+    }
+    _hasPendingOrder.value =
+        _history.any((o) => o.status == OrderStatus.pending);
+    notifyListeners();
+    return CreateOrderResult(
+      success: true,
+      order: created,
+      paymentUrl: OrderApiMapper.extractPaymentUrl(result.data),
+    );
+  }
+
+  /// Historial de estados del pedido (`GET /orders/:id/status-history`,
+  /// CU-170). Un error vuelve con el texto y el código del back.
+  Future<ApiResult<List<OrderStatusEntry>>> fetchStatusHistory(
+      String orderId) async {
+    final token = await _customerService.token;
+    if (token == null) {
+      return const ApiResult.fail(ApiErrorText.sessionExpired, status: 401);
+    }
+    final result = await _orderDatasource.fetchStatusHistory(orderId, token);
+    if (!result.ok) {
+      return ApiResult.fail(result.message ?? ApiErrorText.generic,
+          status: result.status);
+    }
+    return ApiResult.ok(OrderStatusEntry.listFromJson(result.data));
   }
 
   /// Edita un pedido pendiente (`PATCH /orders/:id`). El precio lo calcula el
@@ -415,16 +545,19 @@ class HistoryService with ListenableServiceMixin {
     _createOrderUseCase.clear();
     _updateOrderUseCase.clear();
     _changeOrderUseCase.clear();
+    _expressKeys.clear();
     notifyListeners();
   }
 
   Map<String, dynamic> _toCreateOrderPayload(
     Order order,
-    String? timeSlotId, [
+    String? timeSlotId, {
     String? notificationToken,
     bool fromCart = false,
     DeliveryMode deliveryMode = DeliveryMode.standard,
-  ]) {
+    bool isReservation = false,
+    double? depositAmount,
+  }) {
     final items = order.items
         .where((item) => item.quantity > 0)
         .map((item) => {
@@ -448,6 +581,10 @@ class HistoryService with ListenableServiceMixin {
           scheduled: deliveryMode != DeliveryMode.express),
       if (deliveryMode == DeliveryMode.express)
         'deliveryMode': deliveryMode.wire,
+      if (isReservation) ...{
+        'isReservation': true,
+        'depositAmount': depositAmount ?? 0,
+      },
       // Token FCM del device: el backend lo usa para notificar el estado de
       // ESTE pedido aunque `notification_token` del customer todavía no esté
       // seteado (p.ej. primer pedido justo después de otorgar el permiso).
@@ -459,8 +596,14 @@ class HistoryService with ListenableServiceMixin {
   /// Mismo cuerpo que el alta, sin el token de notificaciones.
   Map<String, dynamic> _toQuotePayload(Order order, String? timeSlotId,
           {bool fromCart = false,
-          DeliveryMode deliveryMode = DeliveryMode.standard}) =>
-      _toCreateOrderPayload(order, timeSlotId, null, fromCart, deliveryMode);
+          DeliveryMode deliveryMode = DeliveryMode.standard,
+          bool isReservation = false,
+          double? depositAmount}) =>
+      _toCreateOrderPayload(order, timeSlotId,
+          fromCart: fromCart,
+          deliveryMode: deliveryMode,
+          isReservation: isReservation,
+          depositAmount: depositAmount);
 
   /// Cuerpo de la edición: sin precios (los pone el back). Sólo lleva lo que
   /// el cliente cambió: sin `customerNotes` no manda notas (con '' las vacía) y

@@ -11,6 +11,7 @@ import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/core/network/api_result.dart' show LoadFailure;
 import 'package:splg_customer/data/mappers/order_api_mapper.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
+import 'package:splg_customer/ui/common/live_notice.dart';
 import 'package:splg_customer/ui/common/transfer_payment.dart';
 import 'package:splg_customer/domain/signed_url.dart';
 import 'package:splg_customer/ui/views/order_tracking/order_driver_reader.dart';
@@ -173,6 +174,11 @@ class OrderTrackingViewModel extends BaseViewModel
   StreamSubscription<void>? _arrivedSubscription;
   StreamSubscription<void>? _expressDegradedSubscription;
   StreamSubscription<void>? _orderChangedSubscription;
+  StreamSubscription<OrderLiveEvent>? _liveSubscription;
+
+  /// Último aviso en vivo (pago aprobado, reintegro, pedido modificado).
+  String? _liveNotice;
+  String? get liveNotice => _liveNotice;
 
   RouteTracker? _tracker;
   Set<Polyline> _polylines = const {};
@@ -945,6 +951,11 @@ class OrderTrackingViewModel extends BaseViewModel
     // Modificado, pago aprobado o reintegrado: se vuelve a leer el pedido.
     _orderChangedSubscription =
         _trackingService.orderChanges.listen((_) => unawaited(poll()));
+    _liveSubscription?.cancel();
+    _liveSubscription = _trackingService.liveEvents.listen((event) {
+      _liveNotice = event.notice;
+      if (!_closed) rebuildUi();
+    });
 
     _arrivedSubscription = _trackingService.arrivedUpdates.listen((_) {
       if (_status != 'out_for_delivery') return;
@@ -1444,6 +1455,7 @@ class OrderTrackingViewModel extends BaseViewModel
     _arrivedSubscription?.cancel();
     _expressDegradedSubscription?.cancel();
     _orderChangedSubscription?.cancel();
+    _liveSubscription?.cancel();
     _paymentReturnSubscription?.cancel();
     _trackingService.disconnect();
     super.dispose();

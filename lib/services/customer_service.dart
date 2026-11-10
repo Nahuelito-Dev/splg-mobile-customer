@@ -9,6 +9,8 @@ import 'package:splg_customer/data/repository/address_repository_imp.dart';
 import 'package:splg_customer/domain/repository/customer_repository.dart';
 import 'package:splg_customer/data/repository/customer_repository_imp.dart';
 import 'package:splg_customer/data/datasource/customer_remote_datasource.dart';
+import 'package:splg_customer/data/datasource/coverage_remote_datasource.dart';
+import 'package:splg_customer/domain/coverage_check.dart';
 import 'package:splg_customer/domain/usecases/create_address_usecases.dart';
 import 'package:splg_customer/domain/usecases/create_customer_usecases.dart';
 import 'package:splg_customer/domain/usecases/fetch_customer_usecases.dart';
@@ -89,14 +91,16 @@ enum SignInOutcome {
 }
 
 class CustomerService with ListenableServiceMixin {
-  /// [geocoder], [addressDatasource] y [tokenReader] sólo se inyectan en los
-  /// tests.
+  /// [geocoder], [addressDatasource], [coverageDatasource] y [tokenReader] sólo
+  /// se inyectan en los tests.
   CustomerService({
     AddressGeocoder? geocoder,
     AddressRemoteDataSource? addressDatasource,
+    CoverageRemoteDatasource? coverageDatasource,
     Future<String?> Function()? tokenReader,
   })  : _geocoder = geocoder ?? const DeviceAddressGeocoder(),
         _addresses = addressDatasource ?? AddressRemoteDataSource(),
+        _coverage = coverageDatasource ?? CoverageRemoteDatasource(),
         _tokenReader = tokenReader {
     _customerRepository = CustomerRepositoryImp(_customerDatasource);
     listenToReactiveValues([_addressesRev]);
@@ -115,6 +119,10 @@ class CustomerService with ListenableServiceMixin {
 
   final AddressGeocoder _geocoder;
   final AddressRemoteDataSource _addresses;
+  final CoverageRemoteDatasource _coverage;
+
+  /// `customer_id` del cliente en sesión; se lee una vez, al primer uso.
+  String? _customerRecordId;
   final Future<String?> Function()? _tokenReader;
 
   FirebaseAuth get _firebaseAuth => FirebaseAuth.instance;
@@ -248,6 +256,7 @@ class CustomerService with ListenableServiceMixin {
 
   /// Olvida al usuario actual (cierre de sesión o baja de cuenta).
   void reset() {
+    _customerRecordId = null;
     _session++;
     _addressKeys.clear();
     _customer = _anonymous;
@@ -364,6 +373,22 @@ class CustomerService with ListenableServiceMixin {
           'No pudimos ubicar esa dirección. Revisá la calle, el número y la localidad.',
         );
       }
+      // CU-058: fuera de la cobertura no se puede pedir, así que no se guarda.
+      // Si no se pudo consultar, no se da por cubierta.
+      final coverage =
+          await _coverage.check(point.latitude, point.longitude, token);
+      if (!coverage.ok) {
+        return ApiResult.fail(coverage.message ?? ApiErrorText.generic,
+            status: coverage.status);
+      }
+      final check = CoverageCheck.fromJson(coverage.data);
+      if (check == null) return const ApiResult.fail(ApiErrorText.generic);
+      if (!check.covered) {
+        return const ApiResult.fail(
+          'Esa dirección está fuera de la zona de cobertura de la distribuidora. '
+          'Revisá la calle, el número y la localidad.',
+        );
+      }
     }
 
     final body = <String, dynamic>{
@@ -431,6 +456,27 @@ class CustomerService with ListenableServiceMixin {
         .where((a) => !knownIds.contains(a.addressId))
         .lastOrNull;
     return ApiResult.ok(created);
+  }
+
+  /// Guarda la ubicación de referencia del cliente en su perfil (CU-094). Quien
+  /// llama la usa como complemento: una falla no corta nada.
+  Future<ApiResult<void>> updateLocation(double lat, double lng) async {
+    final token = await this.token;
+    if (token == null) return const ApiResult.fail(ApiErrorText.sessionExpired);
+    final userId = _customer.customerId;
+    if (userId.isEmpty) return const ApiResult.fail(ApiErrorText.generic);
+    // La ruta pide el `customer_id`; `customerId` de la app es el id de usuario.
+    var recordId = _customerRecordId;
+    if (recordId == null) {
+      final read =
+          await _customerDatasource.fetchCustomerRecordId(userId, token);
+      if (!read.ok || read.data == null) {
+        return ApiResult.fail(read.message ?? ApiErrorText.generic,
+            status: read.status);
+      }
+      recordId = _customerRecordId = read.data;
+    }
+    return _customerDatasource.updateLocation(recordId!, '$lat,$lng', token);
   }
 
   /// Marca una dirección como predeterminada y recarga la lista.

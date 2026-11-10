@@ -111,8 +111,8 @@ class _OrdersListState extends State<_OrdersList> {
             subtitle: dateTimeLabel(o.createdAt),
             detail:
                 '${o.items.map(itemLabel).join(', ')} · ${money.format(o.total)} · ${paymentLabel(o.paymentMethod)}',
-            badge: statusLabel(o.status),
-            badgeTone: statusTone(o.status),
+            badge: orderStatusLabel(o),
+            badgeTone: orderStatusTone(o),
             highlighted: isActive(o.status),
             onTap: () => model.open(o),
           );

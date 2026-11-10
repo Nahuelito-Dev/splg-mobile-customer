@@ -1,5 +1,6 @@
 import 'package:splg_customer/ui/views/cart/cart_viewmodel.dart';
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/widgets.dart';
 import 'package:stacked/stacked.dart';
@@ -13,6 +14,11 @@ import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
+import 'package:splg_lib/network/api_error_text.dart';
+import 'package:splg_customer/domain/express_preview.dart';
+import 'package:splg_customer/domain/reserved_orders.dart';
+import 'package:splg_customer/services/notification_service.dart';
+import 'package:splg_customer/ui/common/formatters.dart';
 import 'package:splg_customer/domain/repurchase.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/customer_events_service.dart';
@@ -43,6 +49,7 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   final _repurchaseService = locator<RepurchaseService>();
   final _events = locator<CustomerEventsService>();
   final _mercadoPago = locator<MercadoPagoCheckoutService>();
+  final _notificationService = locator<NotificationService>();
 
   StreamSubscription<RepurchaseInvitationEvent>? _invitationSubscription;
   StreamSubscription<RepurchaseClosedEvent>? _closedSubscription;
@@ -326,6 +333,8 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   // ─── Pedido en curso ───
   Order? get _activeOrder {
     for (final order in _historyService.history) {
+      // La reserva con seña todavía no busca repartidor.
+      if (ReservedOrders.contains(order.id)) continue;
       if (order.status == OrderStatus.pending ||
           order.status == OrderStatus.accepted ||
           order.status == OrderStatus.outForDelivery) {
@@ -357,6 +366,111 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
         orderId: activeOrderId);
   }
 
+  // ─── Compra express de un toque (CU-147) ───
+  // Con la dirección predeterminada y la garrafa habitual el back arma la vista
+  // previa con el precio final; el cliente confirma y el pedido sale al chofer
+  // en moto más cercano. Se paga en efectivo al recibir; con otro medio de pago
+  // se usa el pedido común.
+
+  bool _expressBusy = false;
+  bool get expressBusy => _expressBusy;
+
+  Future<void> expressOrder() async {
+    if (_expressBusy) return;
+    if (!_customerService.isUserLoggedIn) {
+      await _navigationService.navigateToLoginView();
+      return;
+    }
+    _expressBusy = true;
+    rebuildUi();
+    try {
+      await _runExpress();
+    } finally {
+      _expressBusy = false;
+      if (!_closed) rebuildUi();
+    }
+  }
+
+  Future<void> _runExpress() async {
+    const method = PaymentMethod.cash;
+    final preview = await _historyService.expressPreview(paymentMethod: method);
+    if (_closed) return;
+    final data = preview.data;
+    if (!preview.ok || data == null) {
+      await _dialogService.showDialog(
+        title: 'No pudimos preparar tu pedido express',
+        description: preview.message,
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    if (!data.available || data.quote == null) {
+      await _dialogService.showDialog(
+        title: 'El express no está disponible',
+        description: '${data.unavailableText}\n\nPodés pedir con el reparto '
+            'común y elegir una franja de entrega.',
+        buttonTitle: 'Aceptar',
+      );
+      return;
+    }
+    final confirm = await _dialogService.showConfirmationDialog(
+      title: 'Pedido express',
+      description: _expressSummary(data),
+      confirmationTitle: 'Pedir ahora',
+      cancelTitle: 'Cancelar',
+    );
+    if (_closed || confirm?.confirmed != true) return;
+
+    final result = await _historyService.expressBuy(
+      paymentMethod: method,
+      gasCylinderId: data.gasCylinderId,
+      quantity: data.quantity,
+    );
+    if (_closed) return;
+    if (result.success) {
+      unawaited(_notificationService.requestPermissionAndRegister());
+      final id = result.order?.id;
+      if (id != null) {
+        await _navigationService.navigateToOrderTrackingView(orderId: id);
+      }
+      return;
+    }
+    await _dialogService.showDialog(
+      title: result.idempotencyConflict
+          ? 'Revisá Mis pedidos'
+          : result.expressUnavailableReason != null
+              ? 'El express ya no está disponible'
+              : 'No pudimos crear tu pedido',
+      description: result.message,
+      buttonTitle: 'Aceptar',
+    );
+  }
+
+  /// Qué se compra, adónde llega, cuánto sale y en cuánto tiempo.
+  String _expressSummary(ExpressPreview p) {
+    GasCylinder? cylinder;
+    for (final c in _cylinders) {
+      if (c.id == p.gasCylinderId) cylinder = c;
+    }
+    final what = cylinder == null || cylinder.type.trim().isEmpty
+        ? 'Garrafa'
+        : cylinder.type.trim();
+    final quote = p.quote!;
+    final surcharge = quote.expressSurcharge > 0
+        ? ' (incluye ${money.format(quote.expressSurcharge)} de recargo express)'
+        : '';
+    final containers = quote.chargesContainers
+        ? ' Incluye ${money.format(quote.containerChargeAmount)} de envases.'
+        : '';
+    return [
+      '${p.quantity}x $what',
+      if ((p.addressText ?? '').isNotEmpty) 'Entrega en ${p.addressText}',
+      'Total: ${money.format(quote.total)}$surcharge.$containers',
+      if (p.estimatedMinutes != null) 'Llega en ~${p.estimatedMinutes} min',
+      'Pagás en efectivo al recibir.',
+    ].join('\n');
+  }
+
   // ─── Mapa ───
   /// Punto de la dirección de entrega elegida (null si no tiene coordenadas).
   LatLng? get deliveryPoint {
@@ -374,6 +488,10 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   /// Aviso bajo el mapa cuando "Mi ubicación" no se pudo (GPS apagado).
   String? locationNotice;
 
+  /// El aviso se arregla desde los Ajustes del teléfono (GPS apagado o sin
+  /// respuesta); no cuando el back rechazó guardar la ubicación.
+  bool locationSettingsHint = true;
+
   static const locateTimeout = Duration(seconds: 15);
 
   /// "Mi ubicación": recién acá se pide el permiso. Sin permiso no pasa nada
@@ -383,12 +501,26 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
     if (_locating) return;
     _locating = true;
     locationNotice = null;
+    locationSettingsHint = true;
     try {
       final p =
           await _locationService.getCurrentPosition().timeout(locateTimeout);
       if (_closed) return;
       userPoint = LatLng(p.latitude, p.longitude);
       showUserLocation = true;
+      // CU-094: la posición que el cliente pidió ver queda como su ubicación de
+      // referencia. Si el back la rechaza se avisa con su texto.
+      if (_customerService.isUserLoggedIn) {
+        final saved =
+            await _customerService.updateLocation(p.latitude, p.longitude);
+        if (_closed) return;
+        if (!saved.ok) {
+          log('No se guardó la ubicación: ${saved.status}');
+          locationNotice = 'No pudimos guardar tu ubicación. '
+              '${saved.message ?? ApiErrorText.generic}';
+          locationSettingsHint = false;
+        }
+      }
     } on LocationUnavailableException catch (e) {
       if (e.serviceDisabled) {
         locationNotice =

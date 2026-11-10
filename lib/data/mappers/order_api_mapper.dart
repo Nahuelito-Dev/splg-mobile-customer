@@ -1,4 +1,5 @@
 import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/domain/reserved_orders.dart';
 
 class OrderApiMapper {
   static Order? parseOrder(dynamic raw) {
@@ -102,6 +103,11 @@ class OrderApiMapper {
     );
     normalized['status'] = _normalizeStatus(
       _pick(raw, ['status'])?.toString(),
+    );
+    ReservedOrders.mark(
+      normalized['order_id'].toString(),
+      reserved:
+          _pick(raw, ['status'])?.toString().trim().toLowerCase() == 'reserved',
     );
 
     final createdAt = _pick(raw, ['created_at', 'createdAt']);
@@ -207,6 +213,11 @@ class OrderApiMapper {
         normalized == 'in-progress' ||
         normalized == 'in_route') {
       return 'out_for_delivery';
+    }
+    // La reserva con seña todavía no despacha: la lib no tiene ese estado y se
+    // la lee como pendiente (ver ReservedOrders).
+    if (normalized == 'reserved') {
+      return 'pending';
     }
     if (normalized == 'assigned') {
       return 'accepted';

@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:splg_lib/splg_lib.dart';
+import 'package:splg_customer/domain/reserved_orders.dart';
 
 /// Importes en pesos: sin decimales si el monto es entero, con centavos si no
 /// (un total con recargo puede dar 47701,5: mostrarlo redondeado no coincide
@@ -38,6 +39,14 @@ String statusLabel(OrderStatus s) => switch (s) {
       OrderStatus.delivered => 'ENTREGADO',
       OrderStatus.cancelled => 'CANCELADO',
     };
+
+/// Como [statusLabel] pero distingue la reserva con seña, que el back informa
+/// como `reserved` y la lib todavía lee como pendiente.
+String orderStatusLabel(Order o) =>
+    ReservedOrders.contains(o.id) ? 'RESERVADO' : statusLabel(o.status);
+
+SplgTone orderStatusTone(Order o) =>
+    ReservedOrders.contains(o.id) ? SplgTone.info : statusTone(o.status);
 
 SplgTone statusTone(OrderStatus s) => switch (s) {
       OrderStatus.pending => SplgTone.warn,

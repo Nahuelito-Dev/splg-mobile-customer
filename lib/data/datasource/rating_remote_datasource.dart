@@ -21,4 +21,16 @@ class RatingRemoteDatasource {
       return ApiResult.fromError(e);
     }
   }
+
+  /// `GET /ratings/user/:userId/summary` (CU-065): promedio y cantidad de
+  /// calificaciones de un usuario (acá, el chofer del pedido).
+  Future<ApiResult<dynamic>> fetchSummary(String userId, String token) async {
+    try {
+      final response =
+          await _apiClient.get('ratings/user/$userId/summary', token);
+      return ApiResult.ok(response.data);
+    } catch (e) {
+      return ApiResult.fromError(e);
+    }
+  }
 }

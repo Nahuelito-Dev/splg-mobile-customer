@@ -4,10 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/core/network/idempotency.dart';
 import 'package:splg_customer/data/datasource/address_remote_datasource.dart';
+import 'package:splg_customer/data/datasource/coverage_remote_datasource.dart';
 import 'package:splg_customer/domain/address_draft.dart';
 import 'package:splg_customer/services/address_geocoder.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_lib/domain/address.dart';
+
+import '../helpers/fake_http.dart';
+import '../helpers/fixtures.dart';
 
 class _Geocoder implements AddressGeocoder {
   _Geocoder(this.point);
@@ -63,6 +67,18 @@ class _Addresses extends AddressRemoteDataSource {
   }
 }
 
+/// Cobertura (`GET /coverage-zones/check`): por defecto la dirección está cubierta.
+class _Coverage extends CoverageRemoteDatasource {
+  ApiResult<dynamic> result = const ApiResult.ok({'covered': true});
+  final points = <(double, double)>[];
+
+  @override
+  Future<ApiResult<dynamic>> check(double lat, double lng, String token) async {
+    points.add((lat, lng));
+    return result;
+  }
+}
+
 class _Slow extends _Addresses {
   _Slow(this.gate);
   final Future<void> gate;
@@ -79,8 +95,12 @@ void main() {
   const draft = AddressDraft(
       street: 'Mitre', number: '100', city: 'Posadas', reference: 'Timbre 2');
 
-  CustomerService service(_Geocoder g, _Addresses a) => CustomerService(
-      geocoder: g, addressDatasource: a, tokenReader: () async => 'tok');
+  CustomerService service(_Geocoder g, _Addresses a, [_Coverage? c]) =>
+      CustomerService(
+          geocoder: g,
+          addressDatasource: a,
+          coverageDatasource: c ?? _Coverage(),
+          tokenReader: () async => 'tok');
 
   test(
       'alta: ubica la dirección y manda latitud/longitud con los nombres del DTO',
@@ -234,6 +254,95 @@ void main() {
     final r = await s.saveAddress(draft);
     expect(r.ok, isFalse);
     expect(a.calls, isEmpty);
+  });
+
+  group('cobertura al guardar (CU-058)', () {
+    test('cubierta: consulta con las coordenadas ubicadas y guarda', () async {
+      final a = _Addresses();
+      final c = _Coverage();
+      final r = await service(_Geocoder(const GeoPoint(-27.36, -55.89)), a, c)
+          .saveAddress(draft);
+      expect(r.ok, isTrue);
+      expect(c.points, [(-27.36, -55.89)]);
+      expect(a.calls, contains('create'));
+    });
+
+    test('fuera de cobertura: avisa y no guarda', () async {
+      final a = _Addresses();
+      final c = _Coverage()..result = const ApiResult.ok({'covered': false});
+      final r = await service(_Geocoder(const GeoPoint(1, 1)), a, c)
+          .saveAddress(draft);
+      expect(r.ok, isFalse);
+      expect(r.message, contains('fuera de la zona de cobertura'));
+      expect(a.calls, isEmpty);
+    });
+
+    test('si no se puede consultar, no se da por cubierta ni se guarda',
+        () async {
+      final a = _Addresses();
+      final c = _Coverage()
+        ..result = const ApiResult.fail('Sin conexión.', status: null);
+      final r = await service(_Geocoder(const GeoPoint(1, 1)), a, c)
+          .saveAddress(draft);
+      expect(r.ok, isFalse);
+      expect(r.message, 'Sin conexión.');
+      expect(a.calls, isEmpty);
+    });
+
+    test('respuesta ilegible: no guarda', () async {
+      final a = _Addresses();
+      final c = _Coverage()..result = const ApiResult.ok({'otra': 1});
+      final r = await service(_Geocoder(const GeoPoint(1, 1)), a, c)
+          .saveAddress(draft);
+      expect(r.ok, isFalse);
+      expect(a.calls, isEmpty);
+    });
+
+    test('al editar sin mover la dirección no vuelve a consultar', () async {
+      final a = _Addresses();
+      final c = _Coverage();
+      final editing =
+          Address(addressId: 'a1', streetName: 'Mitre 100', city: 'Posadas');
+      await service(_Geocoder(const GeoPoint(1, 1)), a, c)
+          .saveAddress(draft, editing: editing);
+      expect(c.points, isEmpty);
+    });
+  });
+
+  group('ubicación de referencia (CU-094)', () {
+    test('resuelve el customer_id una vez y manda latLng a esa ruta', () async {
+      final log = fakeHttp((r) => r.path.contains('customers/user/')
+          ? const FakeReply(200, {'customer_id': 'c9'})
+          : const FakeReply(200, {}));
+      final s = service(_Geocoder(null), _Addresses())
+        ..setCustomer(customerWith());
+      expect((await s.updateLocation(-27.5, -55.9)).ok, isTrue);
+      await s.updateLocation(-27.6, -55.9);
+      expect(log.where((r) => r.path.contains('customers/user/')).length, 1);
+      final patch = log.where((r) => r.path.contains('/location')).first;
+      expect(patch.path, contains('customers/c9/location'));
+      expect((patch.body as Map)['latLng'], '-27.5,-55.9');
+    });
+
+    test('un 404 o 400 del back vuelve como falla', () async {
+      fakeHttp((r) => r.path.contains('customers/user/')
+          ? const FakeReply(200, {'customer_id': 'c9'})
+          : const FakeReply(404, {'message': 'Cliente no encontrado'}));
+      final r = await (service(_Geocoder(null), _Addresses())
+            ..setCustomer(customerWith()))
+          .updateLocation(1, 2);
+      expect(r.ok, isFalse);
+      expect(r.status, 404);
+    });
+
+    test('sin poder leer el customer_id no manda el PATCH', () async {
+      final log = fakeHttp((_) => const FakeReply(403, {'message': 'x'}));
+      final r = await (service(_Geocoder(null), _Addresses())
+            ..setCustomer(customerWith()))
+          .updateLocation(1, 2);
+      expect(r.ok, isFalse);
+      expect(log.where((r) => r.path.contains('/location')), isEmpty);
+    });
   });
 
   test('addressFromApi lee los nombres camelCase del back', () {
