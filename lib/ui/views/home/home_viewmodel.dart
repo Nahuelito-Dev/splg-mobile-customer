@@ -29,10 +29,12 @@ import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/location_service.dart';
 import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/ui/bottom_sheets/address_list/address_list_sheet_model.dart';
+import 'package:splg_customer/ui/common/catalog_photos.dart';
 
 /// Inicio: catálogo de garrafas, carrito y el pedido en curso. El menú lateral
 /// y las demás pantallas salen de acá.
-class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
+class HomeViewModel extends ReactiveViewModel
+    with WidgetsBindingObserver, CatalogPhotos {
   /// [pollInterval] sólo se cambia en los tests.
   HomeViewModel({this.pollInterval = const Duration(seconds: 10)});
 
@@ -242,16 +244,16 @@ class HomeViewModel extends ReactiveViewModel with WidgetsBindingObserver {
   /// se abre desde la vista y se repinta sola cuando el back responde).
   Future<void> addFeatured(GasCylinder cylinder) => addItem(cylinder, 1);
 
-  String? cylinderPhoto(String id) => _gasCylinderService.photoUrl(id);
+  @override
+  GasCylinderService get catalogPhotoService => _gasCylinderService;
 
   /// Si las URLs firmadas de las fotos vencieron, vuelve a pedir el catálogo en
   /// silencio (sin loader) para renovarlas.
   Future<void> renewCatalogPhotos() async {
-    if (isBusy || !_gasCylinderService.hasExpiredPhotos) return;
-    try {
-      await _loadCylinders();
-      if (!_closed) notifyListeners();
-    } catch (_) {}
+    if (isBusy) return;
+    if (await _gasCylinderService.renewPhotos() && !_closed) {
+      notifyListeners();
+    }
   }
 
   Future<void> _loadCylinders() async {

@@ -5,13 +5,17 @@ import 'package:splg_customer/data/repository/gascylinder_repository_imp.dart';
 import 'package:splg_customer/data/datasource/gascylinder_remote_datasource.dart';
 
 class GasCylinderService {
-  GasCylinderService() {
+  GasCylinderService({
+    GasCylinderRemoteDatasource? datasource,
+    DateTime Function()? clock,
+  })  : _gasCylinderDatasource = datasource ?? GasCylinderRemoteDatasource(),
+        _clock = clock ?? DateTime.now {
     _gascylinderRepository = GasCylinderRepositoryImp(_gasCylinderDatasource);
     _fetchGasCylindersUseCase =
         FetchGasCylindersUseCase(_gascylinderRepository);
   }
 
-  final _gasCylinderDatasource = GasCylinderRemoteDatasource();
+  final GasCylinderRemoteDatasource _gasCylinderDatasource;
   late GasCylinderRepositoryImp _gascylinderRepository;
   late FetchGasCylindersUseCase _fetchGasCylindersUseCase;
 
@@ -27,6 +31,47 @@ class GasCylinderService {
   /// Hay garrafas con foto cuya URL ya venció (hay que volver a pedir el catálogo).
   bool get hasExpiredPhotos =>
       _gascylinderRepository.photos.values.any((p) => !p.isValid);
+
+  /// La garrafa tiene foto en el último catálogo (vigente o vencida).
+  bool hasPhoto(String id) => _gascylinderRepository.photos.containsKey(id);
+
+  /// Espera mínima entre dos pedidos del catálogo para renovar fotos: una foto
+  /// que falla aun recién firmada no arma un bucle de pedidos.
+  static const photoRenewalCooldown = Duration(seconds: 30);
+
+  /// Reloj de la renovación; los tests lo fijan.
+  final DateTime Function() _clock;
+
+  bool _lastWasPublic = false;
+  DateTime? _lastPhotoRenewal;
+  Future<bool>? _renewing;
+
+  /// Vuelve a pedir el último catálogo (el público o el de la distribuidora)
+  /// para renovar las URLs firmadas de las fotos, que vencen a los pocos
+  /// minutos: cuando alguna venció o cuando falló la carga de [failedUrl].
+  /// Un pedido a la vez y no más de uno cada [photoRenewalCooldown].
+  /// Devuelve true si hay fotos nuevas para mostrar.
+  Future<bool> renewPhotos({String? failedUrl}) {
+    final pending = _renewing;
+    if (pending != null) return pending;
+    final photos = _gascylinderRepository.photos.values;
+    if (failedUrl != null) {
+      // La que falló ya se reemplazó: alcanza con repintar.
+      if (!photos.any((p) => p.url == failedUrl)) return Future.value(true);
+    } else if (!hasExpiredPhotos) {
+      return Future.value(false);
+    }
+    final now = _clock();
+    final last = _lastPhotoRenewal;
+    if (last != null && now.difference(last) < photoRenewalCooldown) {
+      return Future.value(false);
+    }
+    _lastPhotoRenewal = now;
+    final load = _lastWasPublic ? getPublicCatalog() : getGasCylinders();
+    return _renewing = load
+        .then((_) => true, onError: (_) => false)
+        .whenComplete(() => _renewing = null);
+  }
 
   /// Del más liviano al más pesado (5, 10, 15, 25, 45). El peso viene como
   /// texto, que ordenado como tal pondría el 5 al final; los que no tienen un
@@ -72,6 +117,7 @@ class GasCylinderService {
 
   /// Catálogo de la distribuidora sin sesión.
   Future<List<GasCylinder>> getPublicCatalog() async {
+    _lastWasPublic = true;
     final gasCylinders = await _gascylinderRepository.getPublicCatalog();
     _gasCylinder
       ..clear()
@@ -80,6 +126,7 @@ class GasCylinderService {
   }
 
   Future<List<GasCylinder>> getGasCylinders() async {
+    _lastWasPublic = false;
     final gasCylinders = await _fetchGasCylindersUseCase();
 
     _gasCylinder.clear();

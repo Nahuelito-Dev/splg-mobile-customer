@@ -13,6 +13,7 @@ import 'package:splg_customer/domain/order_breakdown.dart';
 import 'package:splg_customer/domain/order_status_entry.dart';
 import 'package:splg_customer/domain/payment_outcome.dart';
 import 'package:splg_customer/domain/rating_summary.dart';
+import 'package:splg_customer/domain/order_payments.dart';
 import 'package:splg_customer/domain/reserved_orders.dart';
 import 'package:splg_customer/domain/order_receiver.dart';
 import 'package:splg_customer/domain/order_refund.dart';
@@ -42,7 +43,9 @@ class OrderDetailViewModel extends LoadViewModel with TransferPayment {
   String get transferOrderId => orderId;
   @override
   bool get transferIsOnline =>
-      order?.paymentMethod == PaymentMethod.online && !isReserved;
+      order != null &&
+      OrderPayments.of(order!) == OrderPaymentKind.transfer &&
+      !isReserved;
   @override
   bool get transferCancelled => order?.status == OrderStatus.cancelled;
   @override

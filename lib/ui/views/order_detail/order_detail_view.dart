@@ -114,8 +114,7 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                     SplgSoftCard(
                       label: 'Total del pedido',
                       amount: money.format(o.total),
-                      caption:
-                          'Forma de pago: ${paymentLabel(o.paymentMethod)}',
+                      caption: 'Forma de pago: ${orderPaymentLabel(o)}',
                       amountKey: const Key('detail-total'),
                     ),
                     if (model.liveNotice != null)
@@ -182,12 +181,7 @@ class OrderDetailView extends StackedView<OrderDetailViewModel> {
                                           null
                                       ? 'Recargo por pago'
                                       : paymentSurchargeLabel(
-                                          switch (o.paymentMethod) {
-                                            PaymentMethod.cash => 'cash',
-                                            PaymentMethod.online => 'transfer',
-                                            PaymentMethod.mercadoPago =>
-                                              'mercadopago',
-                                          },
+                                          orderSurchargeMethod(o),
                                           model.breakdown!
                                               .paymentSurchargePercentage),
                               value: money

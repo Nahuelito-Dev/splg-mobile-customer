@@ -23,6 +23,7 @@ import 'package:splg_customer/services/cylinder_recovery_service.dart';
 import 'package:splg_customer/services/history_service.dart';
 import 'package:splg_customer/services/mercado_pago_checkout_service.dart';
 import 'package:splg_customer/domain/payment_outcome.dart';
+import 'package:splg_customer/domain/order_payments.dart';
 import 'package:splg_customer/domain/payment_state.dart';
 import 'package:splg_customer/ui/views/order_tracking/payment_state_reader.dart';
 import 'package:splg_customer/services/order_tracking_service.dart';
@@ -254,7 +255,8 @@ class OrderTrackingViewModel extends BaseViewModel
   @override
   String get transferOrderId => orderId;
   @override
-  bool get transferIsOnline => _order?.paymentMethod == PaymentMethod.online;
+  bool get transferIsOnline =>
+      _order != null && OrderPayments.of(_order!) == OrderPaymentKind.transfer;
   @override
   bool get transferCancelled => isCancelled;
   @override

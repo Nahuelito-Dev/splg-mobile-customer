@@ -110,7 +110,7 @@ class _OrdersListState extends State<_OrdersList> {
             title: street.isEmpty ? 'Dirección no disponible' : street,
             subtitle: dateTimeLabel(o.createdAt),
             detail:
-                '${o.items.map(itemLabel).join(', ')} · ${money.format(o.total)} · ${paymentLabel(o.paymentMethod)}',
+                '${o.items.map(itemLabel).join(', ')} · ${money.format(o.total)} · ${orderPaymentLabel(o)}',
             badge: orderStatusLabel(o),
             badgeTone: orderStatusTone(o),
             highlighted: isActive(o.status),

@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:splg_lib/splg_lib.dart';
+import 'package:splg_customer/domain/order_payments.dart';
 import 'package:splg_customer/domain/reserved_orders.dart';
 
 /// Importes en pesos: sin decimales si el monto es entero, con centavos si no
@@ -65,6 +66,24 @@ String paymentLabel(PaymentMethod m) => switch (m) {
       PaymentMethod.cash => 'Efectivo',
       PaymentMethod.online => 'Transferencia',
       PaymentMethod.mercadoPago => 'Mercado Pago',
+    };
+
+/// El medio de pago de un pedido leído del back, con la cuenta corriente y el
+/// pago en línea sin detalle (que no se afirma como transferencia).
+String orderPaymentLabel(Order order) => switch (OrderPayments.of(order)) {
+      OrderPaymentKind.cash => 'Efectivo',
+      OrderPaymentKind.transfer => 'Transferencia',
+      OrderPaymentKind.mercadoPago => 'Mercado Pago',
+      OrderPaymentKind.account => 'Cuenta corriente',
+      OrderPaymentKind.online => 'Pago en línea',
+    };
+
+/// El medio de un pedido como lo nombra [paymentSurchargeLabel].
+String? orderSurchargeMethod(Order order) => switch (OrderPayments.of(order)) {
+      OrderPaymentKind.cash => 'cash',
+      OrderPaymentKind.transfer => 'transfer',
+      OrderPaymentKind.mercadoPago => 'mercadopago',
+      OrderPaymentKind.account || OrderPaymentKind.online => null,
     };
 
 /// Porcentaje para mostrar: "10", "7,5", "12,34" (hasta 2 decimales, coma).

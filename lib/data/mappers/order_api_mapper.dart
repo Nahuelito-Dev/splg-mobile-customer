@@ -1,4 +1,5 @@
 import 'package:splg_lib/domain/order.dart';
+import 'package:splg_customer/domain/order_payments.dart';
 import 'package:splg_customer/domain/reserved_orders.dart';
 
 class OrderApiMapper {
@@ -98,9 +99,12 @@ class OrderApiMapper {
     normalized['order_id'] = _pick(raw, ['order_id', 'orderId', 'id']) ?? '';
     normalized['total_amount'] =
         _asNum(_pick(raw, ['total_amount', 'totalAmount', 'total'])) ?? 0;
-    normalized['payment_method'] = _normalizePaymentMethod(
-      _pick(raw, ['payment_method', 'paymentMethod'])?.toString(),
+    final payment = OrderPayments.fromApi(
+      _text(_pick(raw, ['payment_method', 'paymentMethod'])),
+      _text(_pick(raw, ['paymentMethodDetail', 'payment_method_detail'])),
     );
+    normalized['payment_method'] = _libPaymentMethod(
+        OrderPayments.mark(normalized['order_id'].toString(), payment));
     normalized['status'] = _normalizeStatus(
       _pick(raw, ['status'])?.toString(),
     );
@@ -225,10 +229,18 @@ class OrderApiMapper {
     return normalized;
   }
 
-  static String _normalizePaymentMethod(String? method) {
-    if (method == null || method.isEmpty) return 'cash';
-    if (method == 'transfer') return 'online';
-    return method;
+  /// El valor de `PaymentMethod` de la lib con que se lee el pedido. La cuenta
+  /// corriente no está en la lib: se lee como efectivo (sin cobro en línea ni
+  /// datos bancarios) y las pantallas toman el medio real de [OrderPayments].
+  static String _libPaymentMethod(OrderPaymentKind kind) => switch (kind) {
+        OrderPaymentKind.cash || OrderPaymentKind.account => 'cash',
+        OrderPaymentKind.transfer || OrderPaymentKind.online => 'online',
+        OrderPaymentKind.mercadoPago => 'mercadopago',
+      };
+
+  static String? _text(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
   }
 
   /// Serializa un [PaymentMethod] al string que espera el backend al crear

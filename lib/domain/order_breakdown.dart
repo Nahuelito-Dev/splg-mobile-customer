@@ -1,6 +1,7 @@
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_customer/domain/delivery_options.dart';
 import 'package:splg_customer/domain/order_receiver.dart';
+import 'package:splg_customer/domain/order_payments.dart';
 import 'package:splg_customer/domain/reserved_orders.dart';
 
 /// Lo que `GET /orders/:id` trae del pedido además de los datos que lee
@@ -191,6 +192,10 @@ bool canEditOrder(Order order, OrderBreakdown? breakdown) =>
     breakdown?.reserved != true &&
     order.deliveryId == null &&
     order.paymentMethod != PaymentMethod.mercadoPago &&
+    // La cuenta corriente la maneja el administrador; sin detalle no se sabe
+    // a qué medio se pasaría.
+    const {OrderPaymentKind.cash, OrderPaymentKind.transfer}
+        .contains(OrderPayments.of(order)) &&
     (breakdown?.paymentStatus ?? 'pending') == 'pending' &&
     breakdown?.editable != false;
 

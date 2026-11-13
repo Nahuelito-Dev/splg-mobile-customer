@@ -1522,6 +1522,27 @@ class MockGasCylinderService extends _i1.Mock
       ) as String?);
 
   @override
+  bool hasPhoto(String? id) => (super.noSuchMethod(
+        Invocation.method(
+          #hasPhoto,
+          [id],
+        ),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  _i20.Future<bool> renewPhotos({String? failedUrl}) => (super.noSuchMethod(
+        Invocation.method(
+          #renewPhotos,
+          [],
+          {#failedUrl: failedUrl},
+        ),
+        returnValue: _i20.Future<bool>.value(false),
+        returnValueForMissingStub: _i20.Future<bool>.value(false),
+      ) as _i20.Future<bool>);
+
+  @override
   void savePendingSelection(Map<String, int>? selection) => super.noSuchMethod(
         Invocation.method(
           #savePendingSelection,

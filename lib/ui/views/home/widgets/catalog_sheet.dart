@@ -90,6 +90,7 @@ class _CatalogSheet extends StatelessWidget {
           image: SignedImage(
             key: Key('cylinder-photo-${c.id}'),
             url: model.cylinderPhoto(c.id),
+            onError: model.photoFailed,
             fallback:
                 Image.asset('assets/cylinder_10.png', fit: BoxFit.contain),
           ),

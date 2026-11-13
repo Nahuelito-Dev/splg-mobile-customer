@@ -52,6 +52,7 @@ class FeaturedStrip extends StatelessWidget {
                       width: 38,
                       child: SignedImage(
                         url: model.cylinderPhoto(c.id),
+                        onError: model.photoFailed,
                         fallback: Image.asset('assets/cylinder_10.png',
                             fit: BoxFit.contain),
                       ),

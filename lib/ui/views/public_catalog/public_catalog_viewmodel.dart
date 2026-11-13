@@ -6,10 +6,11 @@ import 'package:splg_lib/domain/gas_cylinder.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/services/gas_cylinder_service.dart';
+import 'package:splg_customer/ui/common/catalog_photos.dart';
 
 /// Catálogo para quien todavía no inició sesión: se mira y se arma una
 /// selección; para pedir hay que entrar, y la selección viaja al carrito.
-class PublicCatalogViewModel extends BaseViewModel {
+class PublicCatalogViewModel extends BaseViewModel with CatalogPhotos {
   final _gasCylinderService = locator<GasCylinderService>();
   final _navigationService = locator<NavigationService>();
 
@@ -35,7 +36,10 @@ class PublicCatalogViewModel extends BaseViewModel {
     setBusy(false);
   }
 
-  String? photo(String id) => _gasCylinderService.photoUrl(id);
+  @override
+  GasCylinderService get catalogPhotoService => _gasCylinderService;
+
+  String? photo(String id) => cylinderPhoto(id);
 
   bool soldOut(String id) => _gasCylinderService.outOfStock.contains(id);
 
