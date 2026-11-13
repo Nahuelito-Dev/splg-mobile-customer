@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
+import 'package:splg_customer/ui/common/status_bar.dart';
 
 import 'signup_viewmodel.dart';
 
@@ -164,79 +165,82 @@ class SignupView extends StackedView<SignupViewModel> {
       },
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
-        child: Scaffold(
-          resizeToAvoidBottomInset: true,
-          body: Column(
-            children: [
-              Stack(
-                children: [
-                  const SplgIllustrationHeader(
-                      illustration: SplgIllustration.recoverPassword),
-                  SafeArea(
-                    child: IconButton(
-                      tooltip: 'Volver',
-                      icon: const Icon(SplgIcons.back,
-                          size: 24, color: Colors.white),
-                      onPressed: model.back,
+        child: StatusBarRegion.brand(
+          child: Scaffold(
+            resizeToAvoidBottomInset: true,
+            body: Column(
+              children: [
+                Stack(
+                  children: [
+                    const SplgIllustrationHeader(
+                        illustration: SplgIllustration.recoverPassword),
+                    SafeArea(
+                      child: IconButton(
+                        tooltip: 'Volver',
+                        icon: const Icon(SplgIcons.back,
+                            size: 24, color: Colors.white),
+                        onPressed: model.back,
+                      ),
+                    ),
+                  ],
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Registro',
+                            style:
+                                type.title.copyWith(fontSize: context.sp(16))),
+                        const SizedBox(height: 4),
+                        Text(
+                            switch (model.step) {
+                              0 => '1. Tus datos',
+                              1 => '2. Tu cuenta',
+                              _ => '3. Tu consumo (opcional)',
+                            },
+                            style: type.subtitle),
+                        ...switch (model.step) {
+                          0 => step1,
+                          1 => step2,
+                          _ => step3,
+                        },
+                      ],
                     ),
                   ),
-                ],
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Registro',
-                          style: type.title.copyWith(fontSize: context.sp(16))),
-                      const SizedBox(height: 4),
-                      Text(
-                          switch (model.step) {
-                            0 => '1. Tus datos',
-                            1 => '2. Tu cuenta',
-                            _ => '3. Tu consumo (opcional)',
-                          },
-                          style: type.subtitle),
-                      ...switch (model.step) {
-                        0 => step1,
-                        1 => step2,
-                        _ => step3,
-                      },
-                    ],
-                  ),
                 ),
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SplgStepDots(
-                          count: SignupViewModel.stepCount,
-                          current: model.step),
-                      const SizedBox(height: 12),
-                      SplgButton(
-                        title: model.step < SignupViewModel.stepCount - 1
-                            ? 'Siguiente'
-                            : 'Registrarme',
-                        loading: model.isBusy,
-                        onPressed: model.next,
-                      ),
-                      if (model.step == SignupViewModel.stepCount - 1)
-                        TextButton(
-                          key: const Key('signup-skip-consumption'),
-                          onPressed:
-                              model.isBusy ? null : model.skipConsumption,
-                          child: const Text('Omitir y registrarme'),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SplgStepDots(
+                            count: SignupViewModel.stepCount,
+                            current: model.step),
+                        const SizedBox(height: 12),
+                        SplgButton(
+                          title: model.step < SignupViewModel.stepCount - 1
+                              ? 'Siguiente'
+                              : 'Registrarme',
+                          loading: model.isBusy,
+                          onPressed: model.next,
                         ),
-                    ],
+                        if (model.step == SignupViewModel.stepCount - 1)
+                          TextButton(
+                            key: const Key('signup-skip-consumption'),
+                            onPressed:
+                                model.isBusy ? null : model.skipConsumption,
+                            child: const Text('Omitir y registrarme'),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

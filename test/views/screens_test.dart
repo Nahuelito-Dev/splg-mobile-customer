@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mockito/mockito.dart';
@@ -1444,5 +1445,89 @@ void main() {
       expect(find.byKey(const Key('edit-pay-mercadoPago')), findsNothing);
       expect(find.text('Mercado Pago'), findsNothing);
     });
+  });
+
+  group('Barra de estado', () {
+    setUp(() {
+      locator.unregister<CartService>();
+      locator.registerSingleton<CartService>(FakeCart());
+      final gas = locator<GasCylinderService>() as MockGasCylinderService;
+      when(gas.getGasCylinders())
+          .thenAnswer((_) async => [cylinder(price: 14900)]);
+    });
+
+    // El sistema se queda con el último estilo declarado: cada prueba arranca
+    // de uno que no es de ninguna pantalla para ver el que pone la suya.
+    Future<void> resetStatusBar(WidgetTester t) async {
+      SystemChrome.setSystemUIOverlayStyle(
+          const SystemUiOverlayStyle(statusBarColor: Color(0x01000000)));
+      await t.pump();
+      expect(SystemChrome.latestStyle?.statusBarIconBrightness, isNull);
+    }
+
+    void expectIcons(Brightness icons, {String? reason}) {
+      final style = SystemChrome.latestStyle;
+      expect(style?.statusBarIconBrightness, icons, reason: reason);
+      // iOS lo pide al revés: el brillo del fondo.
+      expect(style?.statusBarBrightness,
+          icons == Brightness.light ? Brightness.dark : Brightness.light,
+          reason: reason);
+    }
+
+    phoneTest('el menú lateral naranja pone la hora y la batería claras',
+        (t) async {
+      await resetStatusBar(t);
+      await t.pumpWidget(app(const Scaffold(drawer: AppDrawer())));
+      t.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+      await t.pumpAndSettle();
+      expectIcons(Brightness.light);
+    });
+
+    phoneTest(
+        'el inicio sobre el mapa va oscuro y vuelve a oscuro al cerrar '
+        'el menú', (t) async {
+      await resetStatusBar(t);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expectIcons(Brightness.dark, reason: 'inicio');
+
+      await t.tap(find.byTooltip('Abrir menú'));
+      await t.pumpAndSettle();
+      expectIcons(Brightness.light, reason: 'menú abierto');
+
+      await t.tap(find.byTooltip('Cerrar menú'));
+      await t.pumpAndSettle();
+      expectIcons(Brightness.dark, reason: 'menú cerrado');
+    });
+
+    // MaterialApp declara el estilo del tema sólo al construirse: al navegar
+    // manda el de la pantalla nueva o queda el de la anterior. Por eso se
+    // llega a cada pantalla desde una con el estilo contrario.
+    for (final (name, screen, icons) in [
+      ('registro (cabecera naranja)', const SignupView(), Brightness.light),
+      ('registro completado', const SignupDoneView(), Brightness.light),
+      ('bienvenida (arriba blanca)', const WelcomeView(), Brightness.dark),
+      ('login', const LoginView(), Brightness.dark),
+      ('recuperar contraseña', const RecoverPasswordView(), Brightness.dark),
+    ]) {
+      final label = icons == Brightness.light ? 'claros' : 'oscuros';
+      phoneTest('$name: íconos $label al llegar desde otra pantalla',
+          (t) async {
+        final navigator = GlobalKey<NavigatorState>();
+        final from = icons == Brightness.light
+            ? const Scaffold(body: SizedBox.expand())
+            : const SignupDoneView();
+        await t.pumpWidget(MaterialApp(
+            navigatorKey: navigator, theme: AppTheme.lightTheme, home: from));
+        await settle(t);
+        expectIcons(
+            icons == Brightness.light ? Brightness.dark : Brightness.light,
+            reason: 'pantalla de partida');
+        unawaited(navigator.currentState!
+            .push(MaterialPageRoute<void>(builder: (_) => screen)));
+        await t.pumpAndSettle();
+        expectIcons(icons, reason: name);
+      });
+    }
   });
 }

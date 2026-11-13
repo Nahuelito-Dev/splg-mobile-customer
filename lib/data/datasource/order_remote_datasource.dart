@@ -40,13 +40,17 @@ class OrderRemoteDatasource {
 
   /// `POST /orders/quote`: el total que cobraría el alta con este mismo cuerpo
   /// (no escribe nada). Un error vuelve como `ApiResult.fail` con el texto
-  /// listo (400 de negocio: sin stock, fuera de cobertura).
+  /// listo (400 de negocio: sin stock, fuera de cobertura). Con
+  /// [distributorId] cotiza en esa distribuidora (`X-Distributor`) en vez de
+  /// la de la app.
   Future<ApiResult<dynamic>> quoteOrder(
     Map<String, dynamic> orderData,
-    String token,
-  ) async {
+    String token, {
+    String? distributorId,
+  }) async {
     try {
-      final response = await _apiClient.post('orders/quote', orderData, token);
+      final response = await _apiClient.post('orders/quote', orderData, token,
+          {if (distributorId != null) 'X-Distributor': distributorId});
       return ApiResult.ok(response.data);
     } catch (e) {
       log('e in quoteOrder: ${e is DioException ? e.type : e.runtimeType}');

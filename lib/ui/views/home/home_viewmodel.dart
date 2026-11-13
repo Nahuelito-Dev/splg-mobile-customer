@@ -19,6 +19,7 @@ import 'package:splg_customer/domain/express_preview.dart';
 import 'package:splg_customer/domain/reserved_orders.dart';
 import 'package:splg_customer/services/notification_service.dart';
 import 'package:splg_customer/ui/common/formatters.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repurchase.dart';
 import 'package:splg_customer/services/cart_service.dart';
 import 'package:splg_customer/services/customer_events_service.dart';
@@ -139,7 +140,13 @@ class HomeViewModel extends ReactiveViewModel
     final r = await _repurchaseService.openInvitations();
     if (_closed || !r.ok) return;
     final now = DateTime.now();
-    invitation = r.data!.where((i) => i.isOpenAt(now)).firstOrNull;
+    final next = r.data!.where((i) => i.isOpenAt(now)).firstOrNull;
+    // Otra invitación arranca con la dirección del inicio.
+    if (next?.invitationId != invitation?.invitationId) {
+      _repurchaseChoice = null;
+    }
+    invitation = next;
+    _syncRepurchaseQuote();
     rebuildUi();
   }
 
@@ -154,8 +161,142 @@ class HomeViewModel extends ReactiveViewModel
     if (!_closed) rebuildUi();
   }
 
-  /// «Pedir»: el back crea el pedido con lo precargado y se sigue al
-  /// seguimiento. Un rechazo se muestra tal cual; nunca se da por hecho.
+  /// Dirección que el cliente eligió desde la tarjeta («Cambiar»).
+  Address? _repurchaseChoice;
+
+  /// Con qué dirección se pide la recompra: la elegida en la tarjeta o, si no,
+  /// la de entrega del inicio; null si no tiene ninguna vigente (entonces el
+  /// back usa la de la invitación).
+  Address? get repurchaseAddress =>
+      _current(_repurchaseChoice) ?? deliveryAddress;
+
+  /// Lo que muestra la tarjeta: la misma dirección con la que se pide.
+  String? get repurchaseAddressLabel {
+    final a = repurchaseAddress;
+    if (a == null) return invitation?.addressLabel;
+    final formatted = a.formattedAddress?.trim();
+    if (formatted != null && formatted.isNotEmpty) return formatted;
+    return [a.streetName, a.city]
+        .whereType<String>()
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+  }
+
+  /// El `addressId` que viaja al aceptar; null si es la de la invitación.
+  String? get repurchaseAddressId {
+    final a = repurchaseAddress;
+    if (a == null || a.addressId == invitation?.addressId) return null;
+    return a.addressId;
+  }
+
+  /// «Cambiar» en la tarjeta: el mismo selector de «Entregar en». Sólo cambia
+  /// la dirección de la recompra, no la del inicio ni la del carrito.
+  Future<void> changeRepurchaseAddress() async {
+    if (invitation == null || repurchaseBusy) return;
+    final response = await _bottomSheetService.showCustomSheet(
+      variant: BottomSheetType.addressList,
+      title: 'Elegí dónde te lo llevamos',
+      data: {'selectedId': repurchaseAddress?.addressId},
+    );
+    if (_closed) return;
+    if (response?.data == AddressListSheetModel.addNew) {
+      final created = await _navigationService.navigateToAddressFormView();
+      if (_closed || created is! Address) return;
+      _repurchaseChoice = _current(created) ?? created;
+    } else if (response?.confirmed == true && response?.data is Address) {
+      _repurchaseChoice = response!.data as Address;
+    } else {
+      return;
+    }
+    _syncRepurchaseQuote();
+    rebuildUi();
+  }
+
+  // Cotización con otra dirección: el total de la invitación vale para la
+  // suya; con otra lo vuelve a calcular el back (`POST /orders/quote`).
+  String? _quotedKey;
+  bool _quoting = false;
+
+  /// Cada cambio de dirección (y cada «Reintentar») es un intento nuevo; sólo
+  /// se aplica la respuesta del último. La dirección sola no alcanza: A → B →
+  /// A deja dos pedidos de A en vuelo y el viejo podría llegar último.
+  int _quoteGeneration = 0;
+  OrderQuote? _repurchaseQuote;
+
+  /// Por qué no se pudo cotizar con la dirección elegida (fuera de cobertura,
+  /// no es suya…), con el texto del back; con esto no se puede pedir.
+  String? repurchaseQuoteError;
+
+  /// La cotización falló por la red, un 429 o un 5xx: volver a pedirla puede
+  /// andar («Reintentar»). Un 400/404 es definitivo para esa dirección.
+  bool repurchaseQuoteRetryable = false;
+
+  /// Cotiza si la dirección de la recompra cambió y no es la de la invitación.
+  /// La respuesta sólo cuenta si sigue siendo la de esa dirección.
+  void _syncRepurchaseQuote() {
+    final current = invitation;
+    final addressId = repurchaseAddressId;
+    final key = current == null || addressId == null
+        ? null
+        : '${current.invitationId}:$addressId';
+    if (key == _quotedKey) return;
+    _quotedKey = key;
+    final generation = ++_quoteGeneration;
+    _repurchaseQuote = null;
+    repurchaseQuoteError = null;
+    repurchaseQuoteRetryable = false;
+    _quoting = key != null;
+    if (current == null || addressId == null) return;
+    unawaited(() async {
+      final r = await _repurchaseService.quote(current, addressId);
+      if (_closed || generation != _quoteGeneration) return;
+      _quoting = false;
+      if (r.ok) {
+        _repurchaseQuote = r.data;
+      } else {
+        repurchaseQuoteError = r.message;
+        repurchaseQuoteRetryable = ApiErrorText.isRetryable(r.status);
+      }
+      rebuildUi();
+    }());
+  }
+
+  /// «Reintentar»: vuelve a cotizar la misma dirección.
+  void retryRepurchaseQuote() {
+    if (!repurchaseQuoteRetryable) return;
+    _quotedKey = null;
+    _syncRepurchaseQuote();
+    rebuildUi();
+  }
+
+  /// «Total aproximado …» con la dirección que muestra la tarjeta: el de la
+  /// invitación si es la suya, el cotizado si es otra; «Calculando…» mientras
+  /// llega y null si no se pudo cotizar.
+  String? get repurchaseTotalText {
+    final current = invitation;
+    if (current == null) return null;
+    if (repurchaseAddressId == null) {
+      return 'Total aproximado ${money.format(current.estimatedTotal)}';
+    }
+    final quote = _repurchaseQuote;
+    if (quote != null) return 'Total aproximado ${money.format(quote.total)}';
+    if (_quoting) return 'Calculando…';
+    return null;
+  }
+
+  /// «Pedir» habilitado: hay stock y, con otra dirección, ya está cotizada.
+  bool get canAcceptRepurchase {
+    final current = invitation;
+    if (current == null || repurchaseBusy || current.hasUnavailable) {
+      return false;
+    }
+    return repurchaseAddressId == null || _repurchaseQuote != null;
+  }
+
+  /// «Pedir»: el back crea el pedido con lo precargado, en la dirección que
+  /// muestra la tarjeta, y se sigue al seguimiento. Un rechazo se muestra tal
+  /// cual; nunca se da por hecho.
   Future<void> acceptInvitation() async {
     final current = invitation;
     if (current == null || repurchaseBusy) return;
@@ -168,14 +309,20 @@ class HomeViewModel extends ReactiveViewModel
       );
       return;
     }
+    // Con otra dirección sin cotizar (cargando o rechazada) no se pide.
+    if (!canAcceptRepurchase) return;
     repurchaseBusy = true;
     rebuildUi();
-    final r = await _repurchaseService.accept(current.invitationId);
+    final r = await _repurchaseService.accept(current.invitationId,
+        addressId: repurchaseAddressId);
     repurchaseBusy = false;
     if (_closed) return;
     if (!r.ok) {
-      // 409: ya se resolvió o venció; deja de ofrecerse.
+      // 409: ya se resolvió o venció; deja de ofrecerse. 404: la dirección ya
+      // no es suya (se borró en otro lado): se releen y la tarjeta queda para
+      // elegir otra. Fuera de cobertura (400) también queda.
       if (r.status == 409) invitation = null;
+      if (r.status == 404) unawaited(_refreshAddressesQuietly());
       rebuildUi();
       await _dialogService.showDialog(
         title: 'No pudimos crear tu pedido',
@@ -195,6 +342,14 @@ class HomeViewModel extends ReactiveViewModel
     if (_closed) return;
     await _navigationService.navigateToOrderTrackingView(
         orderId: accepted.orderId);
+  }
+
+  /// Relee las direcciones sin cortar nada si falla.
+  Future<void> _refreshAddressesQuietly() async {
+    try {
+      await _customerService.refreshAddresses();
+    } catch (_) {}
+    if (!_closed) rebuildUi();
   }
 
   /// «Ahora no»: descarta la invitación.
@@ -595,6 +750,7 @@ class HomeViewModel extends ReactiveViewModel
     }
     _chosenAddress = resolved;
     _syncCartAddress(resolved);
+    _syncRepurchaseQuote();
     rebuildUi();
   }
 
@@ -607,6 +763,7 @@ class HomeViewModel extends ReactiveViewModel
     _chosenAddress = address;
     addressNotice = null;
     _syncCartAddress(address);
+    _syncRepurchaseQuote();
     rebuildUi();
   }
 

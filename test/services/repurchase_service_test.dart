@@ -131,6 +131,96 @@ void main() {
       expect(log.map((x) => x.headers['Idempotency-Key']), ['key-1', 'key-2']);
     });
 
+    test('sin dirección el cuerpo va vacío; con dirección manda addressId',
+        () async {
+      final log = fakeHttp((_) => FakeReply(201, {
+            'invitation': invitationJson(status: 'accepted'),
+            'order': {'orderId': 'o9'},
+          }));
+      await service.accept('inv-1');
+      expect(log.last.body, isEmpty);
+      await service.accept('inv-1', addressId: 'a2');
+      expect(log.last.body, {'addressId': 'a2'});
+    });
+
+    test('otra dirección es otra intención: no reusa la clave pendiente',
+        () async {
+      final log = fakeHttp((_) => const FakeReply.networkError());
+      await service.accept('inv-1', addressId: 'a2');
+      await service.accept('inv-1', addressId: 'a2');
+      await service.accept('inv-1', addressId: 'a3');
+      expect(log.map((r) => r.headers['Idempotency-Key']),
+          ['key-1', 'key-1', 'key-2']);
+    });
+
+    test('un 404 de dirección trae el motivo del back en castellano', () async {
+      fakeHttp((_) => const FakeReply(404, {
+            'message': 'No encontramos esa dirección entre las tuyas',
+            'statusCode': 404,
+          }));
+      final r = await service.accept('inv-1', addressId: 'a9');
+      expect(r.ok, isFalse);
+      expect(r.status, 404);
+      expect(r.message, 'No encontramos esa dirección entre las tuyas');
+    });
+
+    test('fuera de cobertura (400) llega con el mensaje del back', () async {
+      fakeHttp((_) => const FakeReply(400, {
+            'message':
+                'La dirección está fuera de la zona de cobertura de la distribuidora',
+            'statusCode': 400,
+          }));
+      final r = await service.accept('inv-1', addressId: 'a2');
+      expect(r.status, 400);
+      expect(r.message,
+          'La dirección está fuera de la zona de cobertura de la distribuidora');
+    });
+
+    test('cotizar con otra dirección usa POST /orders/quote en la '
+        'distribuidora de la invitación', () async {
+      final log = fakeHttp((_) => const FakeReply(201, {
+            'total': 29500,
+            'subtotal': 28000,
+            'zoneSurcharge': 1500,
+          }));
+      final r = await service.quote(invitation(), 'a2');
+      expect(log.single.method, 'POST');
+      expect(log.single.path, endsWith('orders/quote'));
+      expect(log.single.headers['X-Distributor'], 'd1');
+      expect(log.single.headers['Authorization'], 'Bearer tok');
+      expect(log.single.body, {
+        'addressId': 'a2',
+        'paymentMethod': 'cash',
+        'items': [
+          {'gasCylinderId': 'g1', 'quantity': 2, 'unitPrice': 0},
+          {'gasCylinderId': 'g2', 'quantity': 1, 'unitPrice': 0},
+        ],
+      });
+      expect(r.ok, isTrue);
+      expect(r.data!.total, 29500);
+    });
+
+    test('cotizar fuera de cobertura (400) o con una dirección ajena (404) '
+        'trae el texto del back', () async {
+      fakeHttp((_) => const FakeReply(400, {
+            'message':
+                'La dirección está fuera de la zona de cobertura de la distribuidora',
+            'statusCode': 400,
+          }));
+      final out = await service.quote(invitation(), 'a2');
+      expect(out.ok, isFalse);
+      expect(out.message,
+          'La dirección está fuera de la zona de cobertura de la distribuidora');
+
+      fakeHttp((_) => const FakeReply(404, {
+            'message': 'No encontramos esa dirección entre las tuyas',
+            'statusCode': 404,
+          }));
+      final gone = await service.quote(invitation(), 'a9');
+      expect(gone.status, 404);
+      expect(gone.message, 'No encontramos esa dirección entre las tuyas');
+    });
+
     test('descartar hace POST a dismiss', () async {
       final log = fakeHttp((_) => FakeReply(200, invitationJson()));
       final r = await service.dismiss('inv-1');

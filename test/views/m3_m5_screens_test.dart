@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mockito/mockito.dart';
+import 'package:splg_customer/app/app.bottomsheets.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/core/network/api_result.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repurchase.dart';
 import 'package:splg_customer/services/customer_service.dart';
 import 'package:splg_customer/services/cylinder_recovery_service.dart';
@@ -17,6 +19,7 @@ import 'package:splg_customer/ui/views/profile/profile_view.dart';
 import 'package:splg_customer/ui/views/repurchase_notice/repurchase_notice_view.dart';
 import 'package:splg_lib/domain/order.dart';
 import 'package:splg_lib/splg_lib.dart';
+import 'package:stacked_services/stacked_services.dart';
 
 import '../helpers/fake_m3_m5_services.dart';
 import '../helpers/fixtures.dart';
@@ -73,12 +76,125 @@ void main() {
       await settle(t);
       expect(find.text('Te estás quedando sin gas'), findsOneWidget);
       expect(find.text('2 × 10kg · 1 × 15kg'), findsOneWidget);
-      expect(find.textContaining('Av. Corrientes 1234'), findsOneWidget);
+      // La dirección con la que se pide: la elegida en el inicio.
+      expect(find.text('Entrega en Buenos Aires 4114, Posadas'),
+          findsOneWidget);
+      expect(find.byKey(const Key('home-repurchase-change')), findsOneWidget);
       expect(find.textContaining('Mañana · 09:00 a 13:00'), findsOneWidget);
       await t.tap(find.byKey(const Key('home-repurchase-accept')));
       await settle(t);
       expect(repurchase.calls, contains('accept:inv-1'));
       expect(find.byKey(const Key('home-repurchase-card')), findsNothing);
+    });
+
+    phoneTest('«Cambiar» elige otra dirección y la tarjeta la muestra',
+        (t) async {
+      final customers = locator<CustomerService>() as MockCustomerService;
+      final mitre = addr('a2', 'Mitre 123', city: 'Posadas');
+      when(customers.customer).thenReturn(customerWith([
+        addr('a1', 'Buenos Aires 4114', primary: true, city: 'Posadas'),
+        mitre,
+      ]));
+      final sheets = locator<BottomSheetService>() as MockBottomSheetService;
+      when(sheets.showCustomSheet(
+        variant: BottomSheetType.addressList,
+        title: anyNamed('title'),
+        data: anyNamed('data'),
+      )).thenAnswer((_) async => SheetResponse(confirmed: true, data: mitre));
+      repurchase.invitationsResult = ApiResult.ok([invitation()]);
+      repurchase.quoteResult = const ApiResult.ok(OrderQuote(
+          lines: [],
+          subtotal: 29500,
+          zoneSurcharge: 0,
+          paymentSurcharge: 0,
+          deposit: 0,
+          total: 29500,
+          balance: 29500));
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      expect(find.text('Total aproximado \$31.000'), findsOneWidget);
+      await t.tap(find.byKey(const Key('home-repurchase-change')));
+      await settle(t);
+      expect(find.text('Entrega en Mitre 123, Posadas'), findsOneWidget);
+      expect(find.text('Total aproximado \$29.500'), findsOneWidget);
+      await t.tap(find.byKey(const Key('home-repurchase-accept')));
+      await settle(t);
+      expect(repurchase.lastAcceptAddressId, 'a2');
+    });
+
+    phoneTest('fuera de cobertura: el motivo en la tarjeta y «Pedir» '
+        'deshabilitado', (t) async {
+      final customers = locator<CustomerService>() as MockCustomerService;
+      final lejos = addr('a2', 'Ruta 12 km 40', city: 'Garupá');
+      when(customers.customer).thenReturn(customerWith([
+        addr('a1', 'Buenos Aires 4114', primary: true, city: 'Posadas'),
+        lejos,
+      ]));
+      final sheets = locator<BottomSheetService>() as MockBottomSheetService;
+      when(sheets.showCustomSheet(
+        variant: BottomSheetType.addressList,
+        title: anyNamed('title'),
+        data: anyNamed('data'),
+      )).thenAnswer((_) async => SheetResponse(confirmed: true, data: lejos));
+      repurchase.invitationsResult = ApiResult.ok([invitation()]);
+      repurchase.quoteResult = const ApiResult.fail(
+          'La dirección está fuera de la zona de cobertura de la distribuidora',
+          status: 400);
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byKey(const Key('home-repurchase-change')));
+      await settle(t);
+      expect(
+          find.text(
+              'La dirección está fuera de la zona de cobertura de la distribuidora'),
+          findsOneWidget);
+      expect(find.byKey(const Key('home-repurchase-card')), findsOneWidget);
+      expect(find.byKey(const Key('home-repurchase-quote-retry')),
+          findsNothing);
+      await t.tap(find.byKey(const Key('home-repurchase-accept')),
+          warnIfMissed: false);
+      await settle(t);
+      expect(repurchase.calls.where((c) => c.startsWith('accept')), isEmpty);
+    });
+
+    phoneTest('sin conexión al cotizar: «Reintentar» vuelve a cotizar; fuera '
+        'de cobertura no lo ofrece', (t) async {
+      final customers = locator<CustomerService>() as MockCustomerService;
+      final mitre = addr('a2', 'Mitre 123', city: 'Posadas');
+      when(customers.customer).thenReturn(customerWith([
+        addr('a1', 'Buenos Aires 4114', primary: true, city: 'Posadas'),
+        mitre,
+      ]));
+      final sheets = locator<BottomSheetService>() as MockBottomSheetService;
+      when(sheets.showCustomSheet(
+        variant: BottomSheetType.addressList,
+        title: anyNamed('title'),
+        data: anyNamed('data'),
+      )).thenAnswer((_) async => SheetResponse(confirmed: true, data: mitre));
+      repurchase.invitationsResult = ApiResult.ok([invitation()]);
+      repurchase.quoteResult = const ApiResult.fail('Sin conexión.');
+      await t.pumpWidget(app(const HomeView()));
+      await settle(t);
+      await t.tap(find.byKey(const Key('home-repurchase-change')));
+      await settle(t);
+      expect(find.text('Sin conexión.'), findsOneWidget);
+      expect(find.byKey(const Key('home-repurchase-quote-retry')),
+          findsOneWidget);
+
+      repurchase.quoteResult = const ApiResult.ok(OrderQuote(
+          lines: [],
+          subtotal: 29500,
+          zoneSurcharge: 0,
+          paymentSurcharge: 0,
+          deposit: 0,
+          total: 29500,
+          balance: 29500));
+      await t.tap(find.byKey(const Key('home-repurchase-quote-retry')));
+      await settle(t);
+      expect(repurchase.quoted, ['a2', 'a2']);
+      expect(find.text('Total aproximado \$29.500'), findsOneWidget);
+      expect(find.byKey(const Key('home-repurchase-quote-retry')),
+          findsNothing);
     });
 
     phoneTest('«Ahora no» descarta y la tarjeta se va', (t) async {

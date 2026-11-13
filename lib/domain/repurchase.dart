@@ -92,6 +92,9 @@ class RepurchaseInvitation {
     required this.estimatedTotal,
     required this.expiresAt,
     this.projectedDepletionAt,
+    this.distributorId,
+    this.paymentMethod,
+    this.addressId,
     this.addressLabel,
     this.slot,
     this.orderId,
@@ -105,6 +108,17 @@ class RepurchaseInvitation {
   final double estimatedTotal;
   final DateTime expiresAt;
   final DateTime? projectedDepletionAt;
+
+  /// Distribuidora de la invitación: va en `X-Distributor` al cotizar.
+  final String? distributorId;
+
+  /// Medio de pago de la invitación tal como viaja (`cash`, `transfer`,
+  /// `mercadopago`): con ese se crea el pedido al aceptarla.
+  final String? paymentMethod;
+
+  /// La dirección de la invitación (la de su última compra): el back la usa
+  /// si al aceptar no se manda otra.
+  final String? addressId;
   final String? addressLabel;
   final RepurchaseSlot? slot;
   final String? orderId;
@@ -142,6 +156,9 @@ class RepurchaseInvitation {
       estimatedTotal: _number(json['estimatedTotal']),
       expiresAt: expires,
       projectedDepletionAt: _date(json['projectedDepletionAt']),
+      distributorId: _text(json['distributorId']),
+      paymentMethod: _text(json['paymentMethod']),
+      addressId: address is Map ? _text(address['addressId']) : null,
       addressLabel: address is Map ? _text(address['label']) : null,
       slot: slot is Map && _text(slot['timeSlotId']) != null
           ? RepurchaseSlot(

@@ -3,6 +3,7 @@ import 'package:splg_customer/ui/views/order_detail/widgets/transfer_card.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
+import 'package:splg_customer/ui/common/status_bar.dart';
 
 import 'order_tracking_viewmodel.dart';
 import 'widgets/arriving_banner.dart';
@@ -33,55 +34,59 @@ class OrderTrackingView extends StackedView<OrderTrackingViewModel> {
     Widget? child,
   ) {
     if (!viewModel.hasOrderLoaded) {
-      return Scaffold(
-        body: viewModel.isBusy
-            ? const SplgLoader()
-            : _LoadError(model: viewModel),
+      return StatusBarRegion.surface(
+        child: Scaffold(
+          body: viewModel.isBusy
+              ? const SplgLoader()
+              : _LoadError(model: viewModel),
+        ),
       );
     }
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: OrderTrackingView.debugMapBuilder?.call(
-                  context,
-                  viewModel,
-                ) ??
-                _TrackingMap(model: viewModel),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: _StatusCard(model: viewModel),
+    return StatusBarRegion.light(
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: OrderTrackingView.debugMapBuilder?.call(
+                    context,
+                    viewModel,
+                  ) ??
+                  _TrackingMap(model: viewModel),
             ),
-          ),
-          if (viewModel.showArrivingBanner)
-            const SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 132),
-                  child: ArrivingBanner(),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: _StatusCard(model: viewModel),
+              ),
+            ),
+            if (viewModel.showArrivingBanner)
+              const SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 132),
+                    child: ArrivingBanner(),
+                  ),
                 ),
               ),
-            ),
-          if (!viewModel.isFinished)
-            Positioned(
-              left: 8,
-              bottom: context.sp(210),
-              child: SplgFloatingButton(
-                key: const Key('tracking-locate'),
-                tooltip: 'Recentrar',
-                icon: SplgIcons.locate,
-                onPressed: viewModel.recenterMap,
+            if (!viewModel.isFinished)
+              Positioned(
+                left: 8,
+                bottom: context.sp(210),
+                child: SplgFloatingButton(
+                  key: const Key('tracking-locate'),
+                  tooltip: 'Recentrar',
+                  icon: SplgIcons.locate,
+                  onPressed: viewModel.recenterMap,
+                ),
               ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _TrackingSheet(model: viewModel),
             ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _TrackingSheet(model: viewModel),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

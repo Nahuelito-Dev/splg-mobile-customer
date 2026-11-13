@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
+import 'package:splg_customer/ui/common/status_bar.dart';
 
 import 'startup_viewmodel.dart';
 
@@ -14,22 +15,24 @@ class StartupView extends StackedView<StartupViewModel> {
     StartupViewModel viewModel,
     Widget? child,
   ) {
-    return Scaffold(
-      body: SplgGradientBackground(
-        gradient: SplgGradients.splash,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SplgLogo(height: context.sp(40), color: Colors.white),
-              const SizedBox(height: 28),
-              const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.4, color: Colors.white),
-              ),
-            ],
+    return StatusBarRegion.brand(
+      child: Scaffold(
+        body: SplgGradientBackground(
+          gradient: SplgGradients.splash,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SplgLogo(height: context.sp(40), color: Colors.white),
+                const SizedBox(height: 28),
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.4, color: Colors.white),
+                ),
+              ],
+            ),
           ),
         ),
       ),

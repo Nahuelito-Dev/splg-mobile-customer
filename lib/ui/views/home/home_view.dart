@@ -3,6 +3,7 @@ import 'package:splg_lib/splg_lib.dart';
 import 'package:stacked/stacked.dart';
 
 import 'package:splg_customer/ui/widgets/app_drawer/app_drawer.dart';
+import 'package:splg_customer/ui/common/status_bar.dart';
 import 'home_viewmodel.dart';
 import 'widgets/repurchase_card.dart';
 import 'widgets/catalog_sheet.dart';
@@ -28,154 +29,164 @@ class HomeView extends StackedView<HomeViewModel> {
       });
     }
     final brasa = context.brasa;
-    return Scaffold(
-      drawer: const AppDrawer(),
-      backgroundColor: brasa.surfaceSunken,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: HomeMap(
-              delivery: model.deliveryPoint,
-              user: model.userPoint,
-              showUserLocation: model.showUserLocation,
+    return StatusBarRegion.light(
+      child: Scaffold(
+        drawer: const AppDrawer(),
+        backgroundColor: brasa.surfaceSunken,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: HomeMap(
+                delivery: model.deliveryPoint,
+                user: model.userPoint,
+                showUserLocation: model.showUserLocation,
+              ),
             ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Builder(
-                  builder: (ctx) => SplgIconButton(
-                    icon: SplgIcons.menu,
-                    tooltip: 'Abrir menú',
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Builder(
+                    builder: (ctx) => SplgIconButton(
+                      icon: SplgIcons.menu,
+                      tooltip: 'Abrir menú',
+                      onPressed: () => Scaffold.of(ctx).openDrawer(),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (model.locationNotice != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: _LocationNotice(
-                      text: model.locationNotice!,
-                      onSettings: model.locationSettingsHint
-                          ? model.openLocationSettings
-                          : null,
-                      onClose: model.dismissLocationNotice,
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: SplgIconButton(
-                      icon: SplgIcons.locate,
-                      tooltip: 'Mi ubicación',
-                      size: 48,
-                      onPressed: model.locateMe,
-                    ),
-                  ),
-                ),
-                if (model.showRepurchase)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: RepurchaseCard(
-                      invitation: model.invitation!,
-                      busy: model.repurchaseBusy,
-                      onAccept: model.acceptInvitation,
-                      onDismiss: model.dismissInvitation,
-                    ),
-                  ),
-                if (model.hasActiveOrder)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: _ActiveOrderBanner(
-                      code: model.activeOrderShortCode,
-                      status: model.activeOrderStatusLabel,
-                      onTap: model.openActiveOrder,
-                    ),
-                  ),
-                SplgBottomPanel(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SplgAddressPill(
-                        text: model.deliveryLabel,
-                        onTap: model.chooseAddress,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (model.locationNotice != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _LocationNotice(
+                        text: model.locationNotice!,
+                        onSettings: model.locationSettingsHint
+                            ? model.openLocationSettings
+                            : null,
+                        onClose: model.dismissLocationNotice,
                       ),
-                      if (model.addressNotice != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(model.addressNotice!,
-                              key: const Key('home-address-notice'),
-                              textAlign: TextAlign.center,
-                              style: SplgType.of(context)
-                                  .caption
-                                  .copyWith(color: brasa.danger)),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: SplgIconButton(
+                        icon: SplgIcons.locate,
+                        tooltip: 'Mi ubicación',
+                        size: 48,
+                        onPressed: model.locateMe,
+                      ),
+                    ),
+                  ),
+                  if (model.showRepurchase)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: RepurchaseCard(
+                        invitation: model.invitation!,
+                        addressLabel: model.repurchaseAddressLabel,
+                        totalText: model.repurchaseTotalText,
+                        totalError: model.repurchaseQuoteError,
+                        canAccept: model.canAcceptRepurchase,
+                        onRetryQuote: model.repurchaseQuoteRetryable
+                            ? model.retryRepurchaseQuote
+                            : null,
+                        busy: model.repurchaseBusy,
+                        onChangeAddress: model.changeRepurchaseAddress,
+                        onAccept: model.acceptInvitation,
+                        onDismiss: model.dismissInvitation,
+                      ),
+                    ),
+                  if (model.hasActiveOrder)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _ActiveOrderBanner(
+                        code: model.activeOrderShortCode,
+                        status: model.activeOrderStatusLabel,
+                        onTap: model.openActiveOrder,
+                      ),
+                    ),
+                  SplgBottomPanel(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SplgAddressPill(
+                          text: model.deliveryLabel,
+                          onTap: model.chooseAddress,
                         ),
-                      const SizedBox(height: 12),
-                      if (model.showFeatured) ...[
-                        FeaturedStrip(
-                          model: model,
-                          onTap: (c) {
-                            model.addFeatured(c);
-                            showCatalogSheet(context, model);
-                          },
-                        ),
+                        if (model.addressNotice != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(model.addressNotice!,
+                                key: const Key('home-address-notice'),
+                                textAlign: TextAlign.center,
+                                style: SplgType.of(context)
+                                    .caption
+                                    .copyWith(color: brasa.danger)),
+                          ),
                         const SizedBox(height: 12),
-                      ],
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _CatalogField(
-                              onTap: () {
-                                if (model.loadError != null) {
-                                  model.reloadCatalog();
-                                }
-                                showCatalogSheet(context, model);
-                              },
-                            ),
+                        if (model.showFeatured) ...[
+                          FeaturedStrip(
+                            model: model,
+                            onTap: (c) {
+                              model.addFeatured(c);
+                              showCatalogSheet(context, model);
+                            },
                           ),
-                          const SizedBox(width: 12),
-                          SplgIconButton(
-                            icon: SplgIcons.plus,
-                            tooltip: 'Agregar dirección',
-                            size: 52,
-                            onPressed: model.addAddress,
-                          ),
+                          const SizedBox(height: 12),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      SplgButton(
-                        key: const Key('home-express'),
-                        title: 'Pedido express de un toque',
-                        style: SplgButtonStyle.outlined,
-                        loading: model.expressBusy,
-                        onPressed: model.expressOrder,
-                      ),
-                      if (model.canPlaceOrder) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _CatalogField(
+                                onTap: () {
+                                  if (model.loadError != null) {
+                                    model.reloadCatalog();
+                                  }
+                                  showCatalogSheet(context, model);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SplgIconButton(
+                              icon: SplgIcons.plus,
+                              tooltip: 'Agregar dirección',
+                              size: 52,
+                              onPressed: model.addAddress,
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 12),
                         SplgButton(
-                          title: model.continueLabel,
-                          onPressed: model.placeOrder,
+                          key: const Key('home-express'),
+                          title: 'Pedido express de un toque',
+                          style: SplgButtonStyle.outlined,
+                          loading: model.expressBusy,
+                          onPressed: model.expressOrder,
                         ),
+                        if (model.canPlaceOrder) ...[
+                          const SizedBox(height: 12),
+                          SplgButton(
+                            title: model.continueLabel,
+                            onPressed: model.placeOrder,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

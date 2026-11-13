@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:splg_customer/core/network/api_result.dart';
 import 'package:splg_customer/domain/cylinder_recovery.dart';
+import 'package:splg_customer/domain/order_quote.dart';
 import 'package:splg_customer/domain/repurchase.dart';
 import 'package:splg_customer/services/customer_events_service.dart';
 import 'package:splg_customer/services/cylinder_recovery_service.dart';
@@ -23,6 +24,32 @@ class FakeRepurchaseService implements RepurchaseService {
 
   final calls = <String>[];
   Map<String, Object?>? lastSave;
+
+  /// La dirección con la que se aceptó la última invitación (null: la suya).
+  String? lastAcceptAddressId;
+
+  /// Respuesta de `quote`; con [quoteGate] la respuesta espera a que se
+  /// complete (para ver el «Calculando…»).
+  ApiResult<OrderQuote> quoteResult = const ApiResult.fail('sin cotizar');
+  Completer<void>? quoteGate;
+
+  /// Direcciones cotizadas, en orden.
+  final quoted = <String>[];
+
+  /// Si está, decide cada respuesta de `quote` (para desordenarlas).
+  Future<ApiResult<OrderQuote>> Function(String addressId)? quoteResponder;
+
+  @override
+  Future<ApiResult<OrderQuote>> quote(
+      RepurchaseInvitation invitation, String addressId) async {
+    calls.add('quote:${invitation.invitationId}:$addressId');
+    quoted.add(addressId);
+    final responder = quoteResponder;
+    if (responder != null) return responder(addressId);
+    final gate = quoteGate;
+    if (gate != null) await gate.future;
+    return quoteResult;
+  }
 
   @override
   Future<ApiResult<RepurchaseForecast>> forecast() async {
@@ -58,8 +85,10 @@ class FakeRepurchaseService implements RepurchaseService {
   }
 
   @override
-  Future<ApiResult<RepurchaseAccepted>> accept(String invitationId) async {
+  Future<ApiResult<RepurchaseAccepted>> accept(String invitationId,
+      {String? addressId}) async {
     calls.add('accept:$invitationId');
+    lastAcceptAddressId = addressId;
     return acceptResult;
   }
 
