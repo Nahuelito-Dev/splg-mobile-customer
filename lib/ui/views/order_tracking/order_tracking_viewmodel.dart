@@ -5,6 +5,7 @@ import 'dart:math' show max, min;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:splg_customer/core/config/app_config.dart';
 import 'package:splg_customer/app/app.locator.dart';
 import 'package:splg_customer/app/app.router.dart';
 import 'package:splg_customer/app/app.bottomsheets.dart';
@@ -190,7 +191,8 @@ class OrderTrackingViewModel extends BaseViewModel
 
   /// "Reintentar" sólo tiene sentido si no es la sesión la que venció.
   bool get canRetryLoad => _loadRetryable;
-  LatLng get fallbackCenter => const LatLng(-27.3671, -55.8961);
+  LatLng get fallbackCenter =>
+      LatLng(AppConfig.mapFallbackLat, AppConfig.mapFallbackLng);
 
   LatLng? get driverPosition => _driverLocation;
   double get driverHeading => _driverHeading;

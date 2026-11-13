@@ -16,5 +16,10 @@ void main() {
     test('apiUrl cuelga de apiBaseUrl con /api/v1/', () {
       expect(AppConfig.apiUrl, '${AppConfig.apiBaseUrl}/api/v1/');
     });
+
+    test('sin GPS el mapa arranca en Posadas, no en Buenos Aires', () {
+      expect(AppConfig.mapFallbackLat, closeTo(-27.37, 0.05));
+      expect(AppConfig.mapFallbackLng, closeTo(-55.90, 0.05));
+    });
   });
 }

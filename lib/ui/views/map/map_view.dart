@@ -3,6 +3,7 @@ import 'package:splg_lib/icons/splg_icons.dart';
 import 'package:splg_lib/theme/brasa_palette.dart';
 import 'package:stacked/stacked.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:splg_customer/core/config/app_config.dart';
 
 import 'map_viewmodel.dart';
 
@@ -23,7 +24,8 @@ class MapView extends StackedView<MapViewModel> {
                 GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: viewModel.currentPosition ??
-                        const LatLng(-34.6037, -58.3816),
+                        LatLng(
+                            AppConfig.mapFallbackLat, AppConfig.mapFallbackLng),
                     zoom: 15,
                   ),
                   onMapCreated: viewModel.onMapCreated,

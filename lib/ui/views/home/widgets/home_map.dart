@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:splg_customer/core/config/app_config.dart';
 import 'package:splg_lib/splg_lib.dart';
 
 /// Mapa del inicio a pantalla completa: marca la dirección de entrega elegida y
@@ -25,7 +26,8 @@ class HomeMap extends StatefulWidget {
   @visibleForTesting
   static bool placeholder = false;
 
-  static const fallback = LatLng(-34.6037, -58.3816);
+  static LatLng get fallback =>
+      LatLng(AppConfig.mapFallbackLat, AppConfig.mapFallbackLng);
 
   @override
   State<HomeMap> createState() => _HomeMapState();
